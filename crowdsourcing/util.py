@@ -1,4 +1,5 @@
 import itertools
+import re
 
 class ChoiceEnum(object):
     def __init__(self, choices):
@@ -9,7 +10,8 @@ class ChoiceEnum(object):
         else:
             values=zip(itertools.count(1), choices)
         for v, n in values:
-            setattr(self, n.upper(), v)
+            name=re.sub('- ', '_', n.upper())
+            setattr(self, name, v)
         self._choices=values
 
     def __getitem__(self, idx):
