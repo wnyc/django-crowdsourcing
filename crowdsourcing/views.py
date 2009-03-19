@@ -54,12 +54,22 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-def survey_results(request, slug):
+def survey_results(request, slug, page=None):
+    if page is None:
+        page=1
+    else:
+        page=get_int_or_404(page)
     survey=get_object_or_404(Survey.live, slug=slug)
+    submissions=survey.public_submissions()
+    paginator, page_obj=paginate_or_404(submissions, page)
+    # clean this out?
     thanks=request.session.get('survey_thanks_%s' % slug)
     return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
                                 'crowdsourcing/survey_results.html'],
-                               dict(survey=survey, thanks=thanks),
+                               dict(survey=survey,
+                                    thanks=thanks,
+                                    paginator=paginator,
+                                    page_obj=page_obj),
                                request)
     
 

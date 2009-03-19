@@ -34,21 +34,34 @@ class Survey(models.Model):
     slug=models.SlugField(unique=True)
     tease=models.CharField(max_length=100)
     description=models.TextField(blank=True)
+    
     require_login=models.BooleanField(default=False)
     allow_multiple_submits=models.BooleanField(default=False)
+    moderate_submits=models.BooleanField(default=False)
 
     ask_for_email=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
+    email_field_name=models.CharField(max_length=128, default="Email")
+    
     ask_for_title=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
+    title_field_name=models.CharField(max_length=128, default="Title")
+    
     ask_for_story=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
+    story_field_name=models.CharField(max_length=128, default="Your Story")
+    
     ask_for_location=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                          default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
+    location_field_name=models.CharField(max_length=128, default="Your Location")
+    
     ask_for_photo=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
+    photo_field_name=models.CharField(max_length=128, default="Your Photo")
+    
     ask_for_video=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
+    video_field_name=models.CharField(max_length=128, default="Your Video")    
 
     archive_policy=models.results=models.IntegerField(choices=ARCHIVE_POLICY_CHOICES,
                                                       default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
@@ -88,8 +101,12 @@ class Survey(models.Model):
             return Submission.objects.none()
         return Submission.objects.filter(q)
 
-
-          
+    def public_submissions(self):
+        if self.archive_policy==ARCHIVE_POLICY_CHOICES.NEVER or (
+            self.archive_policy==ARCHIVE_POLICY_CHOICES.POST_CLOSE and
+            self.is_open):
+            return self.submission_set.none()
+        return self.submission_set.filter(is_public=True)
 
     def __unicode__(self):
         return self.title
