@@ -9,6 +9,7 @@ from django.db import models
 
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
+from . import settings as local_settings
 
 ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
                                    'post-close',
@@ -32,36 +33,42 @@ class LiveSurveyManager(models.Manager):
 class Survey(models.Model):
     title=models.CharField(max_length=80)
     slug=models.SlugField(unique=True)
-    tease=models.CharField(max_length=100)
+    tease=models.TextField(blank=True)
     description=models.TextField(blank=True)
     
     require_login=models.BooleanField(default=False)
-    allow_multiple_submits=models.BooleanField(default=False)
-    moderate_submits=models.BooleanField(default=False)
+    allow_multiple_submissions=models.BooleanField(default=False)
+    moderate_submissions=models.BooleanField(default=local_settings.MODERATE_SUBMISSIONS)
 
     ask_for_email=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
     email_field_name=models.CharField(max_length=128, default="Email")
+    email_help_text=models.CharField(max_length=200, blank=True)
     
     ask_for_title=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
     title_field_name=models.CharField(max_length=128, default="Title")
+    title_help_text=models.CharField(max_length=200, blank=True)
     
     ask_for_story=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
     story_field_name=models.CharField(max_length=128, default="Your Story")
+    story_help_text=models.CharField(max_length=200, blank=True)
     
     ask_for_location=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                          default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
     location_field_name=models.CharField(max_length=128, default="Your Location")
+    location_help_text=models.CharField(max_length=200, blank=True)
     
     ask_for_photo=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
     photo_field_name=models.CharField(max_length=128, default="Your Photo")
+    photo_help_text=models.CharField(max_length=200, blank=True)
     
     ask_for_video=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
                                       default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
-    video_field_name=models.CharField(max_length=128, default="Your Video")    
+    video_field_name=models.CharField(max_length=128, default="Your Video")
+    video_help_text=models.CharField(max_length=200, blank=True)
 
     archive_policy=models.results=models.IntegerField(choices=ARCHIVE_POLICY_CHOICES,
                                                       default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
@@ -130,7 +137,9 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                  
 class Question(models.Model):
     survey=models.ForeignKey(Survey)
+    fieldname=models.CharField(max_length=32)
     question=models.TextField()
+    help_text=models.TextField(blank=True)
     required=models.BooleanField(default=False)
     order=models.IntegerField(null=True, blank=True)
     option_type=models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
@@ -139,10 +148,15 @@ class Question(models.Model):
 
     class Meta:
         ordering=('order',)
+        unique_together=('fieldname', 'survey')
         verbose_name="additional question"
 
     def __unicode__(self):
         return self.question
+
+    @property
+    def parsed_options(self):
+        return filter(None, (s.strip() for s in self.options.splitlines()))
 
 class Submission(models.Model):
     survey=models.ForeignKey(Survey)
@@ -172,6 +186,25 @@ class Submission(models.Model):
                 logging.exception("An error occurred trying to geocode address %s" % (self.address))
         super(Submission, self).save(**kwargs)
 
+
+    def get_answer_dict(self):
+        try:
+            # avoid called __getattr__
+            return self.__dict__['_answer_dict']
+        except KeyError:
+            answers=self.answer_set()
+            d=dict((a.question.fieldname, a.value) for a in answers)
+            self.__dict__['_answer_dict']=d
+            return d
+
+    def __getattr__(self, k):
+        d=self.get_answer_dict()
+        try:
+            return d[k]
+        except KeyError:
+            raise AttributeError("no such attribute: %s" % k)
+
+
 class Answer(models.Model):
     submission=models.ForeignKey(Submission)
     question=models.ForeignKey(Question)
@@ -179,6 +212,31 @@ class Answer(models.Model):
     integer_answer=models.IntegerField(null=True)
     float_answer=models.FloatField(null=True)
     boolean_answer=models.NullBooleanField()
+
+    def value():
+        def get(self):
+            ot=self.question.option_type
+            if ot==OPTION_TYPE_CHOICES.BOOL:
+                return self.boolean_answer
+            elif ot==OPTION_TYPE_CHOICES.FLOAT:
+                return self.float_answer
+            elif ot==OPTION_TYPE_CHOICES.INTEGER:
+                return self.integer_answer
+            return self.text_answer
+        
+        def set(self, v):
+            ot=self.question.option_type
+            if ot==OPTION_TYPE_CHOICES.BOOL:
+                self.boolean_answer=bool(v)
+            elif ot==OPTION_TYPE_CHOICES.FLOAT:
+                self.float_answer=float(v)
+            elif ot==OPTION_TYPE_CHOICES.INTEGER:
+                self.integer_answer=int(v)
+            else:
+                self.text_answer=v
+                
+        return get, set
+    value=property(*value())
 
     class Meta:
         ordering=('question',)

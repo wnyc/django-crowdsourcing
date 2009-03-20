@@ -10,7 +10,7 @@ class ChoiceEnum(object):
         else:
             values=zip(itertools.count(1), choices)
         for v, n in values:
-            name=re.sub('- ', '_', n.upper())
+            name=re.sub('[- ]', '_', n.upper())
             setattr(self, name, v)
         self._choices=values
 

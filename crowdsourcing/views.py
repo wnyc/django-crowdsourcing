@@ -1,9 +1,12 @@
 from __future__ import absolute_import
+
 import httplib
 import logging
 
 # django-viewutil
 from djview import *
+
+from .forms import forms_for_survey
 
 def _survey_submit(request, survey):
     if not survey.is_open():
@@ -15,14 +18,14 @@ def _survey_submit(request, survey):
         return HttpResponseRedirect(reverse("auth_login") + '?next=%s' % request.path)
     if not hasattr(request, 'session'):
         return HttpResponse("Cookies must be enabled to use this application.", status=httplib.FORBIDDEN)
-    if (not survey.allow_multiple_submits) and
-        survey.submissions_for(request.user, request.session.session_key).count():
+    if (not survey.allow_multiple_submissions and
+        survey.submissions_for(request.user, request.session.session_key).count()):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
                                    dict(survey=survey),
                                    request)
 
-    forms=_get_forms_for_survey(survey, request)
+    forms=forms_for_survey(survey, request)
     if all(form.is_valid() for form in forms):
         for form in forms:
             form.save()
@@ -37,8 +40,6 @@ def _survey_show_form(request, survey, forms):
                                dict(survey=survey, forms=forms),
                                request)
 
-def _get_forms_for_survey(survey, request=None):
-    pass
 
 def survey_detail(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
@@ -48,7 +49,7 @@ def survey_detail(request, slug):
 
     can_show_form=survey.is_open and (request.user.is_authenticated() or not survey.require_login)
     if can_show_form:
-        forms =_get_forms_for_survey(survey)
+        forms =forms_for_survey(survey, request)
     else:
         forms=()
     return _survey_show_form(request, survey, forms)
