@@ -1,0 +1,20 @@
+<html>
+<head>
+<title>{{ survey.title }}</title>
+</head>
+<body>
+<h1>{{ survey.title }}</h1>
+<p>{{ survey.description }}</p>
+
+{% if forms %}
+<form method="POST">
+{% for form in forms %}
+ {{ form.as_p }}
+{% endfor %}
+<input type="submit" value="Submit Survey"/>
+</form>
+{% endif %}
+
+
+</body>
+</html>

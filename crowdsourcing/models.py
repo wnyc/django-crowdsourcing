@@ -22,7 +22,7 @@ OPTION_REQUIREMENT_CHOICES=ChoiceEnum(("not presented",
 class LiveSurveyManager(models.Manager):
     def get_query_set(self):
         now=datetime.datetime.now()
-        return super(SurveyManager, self).get_query_set().filter(
+        return super(LiveSurveyManager, self).get_query_set().filter(
             is_published=True,
             starts_at__lte=now).filter(
             ~models.Q(archive_policy__exact=ARCHIVE_POLICY_CHOICES.NEVER) | 
@@ -97,8 +97,8 @@ class Survey(models.Model):
         else:
             return self.starts_at <= now
 
-    def submissions_for(user, session_key):
-        q=models.Q(survey=survey)
+    def submissions_for(self, user, session_key):
+        q=models.Q(survey=self)
         if user.is_authenticated():
             q=q & models.Q(user=user)
         elif session_key:
@@ -120,7 +120,7 @@ class Survey(models.Model):
 
     @models.permalink
     def get_absolute_url(self):
-        return ('survey_detail', (), {'survey_slug': self.slug })
+        return ('survey_detail', (), {'slug': self.slug })
 
     objects=models.Manager()
     live=LiveSurveyManager()
@@ -136,7 +136,7 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                         key=itemgetter(1)))
                                  
 class Question(models.Model):
-    survey=models.ForeignKey(Survey)
+    survey=models.ForeignKey(Survey, related_name="questions")
     fieldname=models.CharField(max_length=32)
     question=models.TextField()
     help_text=models.TextField(blank=True)

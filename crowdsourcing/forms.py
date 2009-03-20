@@ -38,9 +38,10 @@ class BaseAnswerForm(Form):
 
     def _configure_answer_field(self):
         answer=self.fields['answer']
-        answer.required=question.required
-        answer.label=question.question
-        answer.help_text=question.help_text        
+        q=self.question
+        answer.required=q.required
+        answer.label=q.question
+        answer.help_text=q.help_text        
         # set some property on the basis of question.fieldname? TBD
         return answer
 

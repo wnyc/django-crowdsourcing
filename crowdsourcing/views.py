@@ -7,9 +7,10 @@ import logging
 from djview import *
 
 from .forms import forms_for_survey
+from .models import Survey, Submission, Answer
 
 def _survey_submit(request, survey):
-    if not survey.is_open():
+    if not survey.is_open:
         # this should rarely if ever happen, since the form goes away when the survey is closed.
         return HttpResponseRedirect(reverse('survey_results', kwargs=dict(slug=survey.slug)))
 
@@ -26,7 +27,14 @@ def _survey_submit(request, survey):
                                    request)
 
     forms=forms_for_survey(survey, request)
+
+    
     if all(form.is_valid() for form in forms):
+        submission_form=forms[0]
+        submission=submission_form.save(commit=False)
+        submission.survey=survey
+        submission.ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META['REMOTE_ADDR'])
+        submission.save()
         for form in forms:
             form.save()
         # go to survey results/thanks page
@@ -60,6 +68,7 @@ def survey_results(request, slug, page=None):
         page=1
     else:
         page=get_int_or_404(page)
+    print slug
     survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
@@ -75,6 +84,7 @@ def survey_results(request, slug, page=None):
     
 
 def _survey_results_redirect(request, survey, thanks=False):
+    print "in redirect"
     url=reverse('survey_results', kwargs={'slug': survey.slug})
     response=HttpResponseRedirect(url)
     if thanks:
