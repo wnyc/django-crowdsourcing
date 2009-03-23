@@ -216,7 +216,7 @@ class Answer(models.Model):
     def value():
         def get(self):
             ot=self.question.option_type
-            if ot==OPTION_TYPE_CHOICES.BOOL:
+            if ot==OPTION_TYPE_CHOICES.BOOLEAN:
                 return self.boolean_answer
             elif ot==OPTION_TYPE_CHOICES.FLOAT:
                 return self.float_answer
@@ -226,7 +226,7 @@ class Answer(models.Model):
         
         def set(self, v):
             ot=self.question.option_type
-            if ot==OPTION_TYPE_CHOICES.BOOL:
+            if ot==OPTION_TYPE_CHOICES.BOOLEAN:
                 self.boolean_answer=bool(v)
             elif ot==OPTION_TYPE_CHOICES.FLOAT:
                 self.float_answer=float(v)
@@ -241,4 +241,5 @@ class Answer(models.Model):
     class Meta:
         ordering=('question',)
     
-    
+    def __unicode__(self):
+        return unicode(self.question)

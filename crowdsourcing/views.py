@@ -20,7 +20,7 @@ def _survey_submit(request, survey):
     if not hasattr(request, 'session'):
         return HttpResponse("Cookies must be enabled to use this application.", status=httplib.FORBIDDEN)
     if (not survey.allow_multiple_submissions and
-        survey.submissions_for(request.user, request.session.session_key).count()):
+        survey.submissions_for(request.user, request.session.session_key.lower()).count()):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
                                    dict(survey=survey),
@@ -34,9 +34,12 @@ def _survey_submit(request, survey):
         submission=submission_form.save(commit=False)
         submission.survey=survey
         submission.ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META['REMOTE_ADDR'])
+        submission.is_public=not survey.moderate_submissions
         submission.save()
         for form in forms:
-            form.save()
+            answer=form.save(commit=False)
+            answer.submission=submission
+            answer.save()
         # go to survey results/thanks page
         return _survey_results_redirect(request, survey, thanks=True)
     else:

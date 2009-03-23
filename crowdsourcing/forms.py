@@ -2,35 +2,36 @@ from __future__ import absolute_import
 
 from itertools import chain
 import logging
-import uuid
 
 from django.conf import settings
-from django.forms import BaseForm, Form, ValidationError
-from django.forms import CharField, IntegerField, DecimalField, ChoiceField, SplitDateTimeField,\
-                            CheckboxInput, BooleanField,FileInput,\
-                            FileField, ImageField, FloatField
-from django.forms import Textarea, TextInput, Select, RadioSelect,\
-                            CheckboxSelectMultiple, MultipleChoiceField,\
-                            SplitDateTimeWidget,MultiWidget, MultiValueField
-from django.forms.formsets import BaseFormSet
-
+from django.forms import (
+    BooleanField,
+    CharField,
+    CheckboxSelectMultiple,
+    ChoiceField, 
+    FloatField,
+    Form,
+    IntegerField,
+    MultipleChoiceField,
+    RadioSelect,
+    Select,
+    Textarea,
+    ValidationError,
+    )
 from django.forms.forms import BoundField
+from django.forms.formsets import BaseFormSet
 from django.forms.models import ModelForm
-from django.utils.translation import ugettext_lazy as _
-from django.utils.safestring import mark_safe
 from django.template import Context, loader
 from django.template.defaultfilters import slugify
+from django.utils.safestring import mark_safe
+from django.utils.translation import ugettext_lazy as _
 
-from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
+from .models import OPTION_REQUIREMENT_CHOICES, OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 
 class BaseAnswerForm(Form):
     def __init__(self, question, session_key, submission=None, *args, **kwargs):
         self.question=question
-        self.session_key=session_key.lower()
-        if submission:
-            self.user=submission.user
-        else:
-            self.user=None
+        self.session_key=session_key
         self.submission=submission
         super(BaseAnswerForm, self).__init__(*args, **kwargs)
         self._configure_answer_field()
@@ -53,12 +54,13 @@ class BaseAnswerForm(Form):
         return t.render(c)
 
     def save(self, commit=True):
-        if not self.cleaned_data['answer']:
+        if self.cleaned_data['answer'] is None:
             if self.fields['answer'].required:
                 raise ValidationError, _('This field is required.')
             return
         ans=Answer()
-        ans.submission=self.submission
+        if self.submission:
+            ans.submission=self.submission
         ans.question=self.question
         ans.value=self.cleaned_data['answer']
         if commit:
@@ -75,7 +77,13 @@ class FloatInputAnswer(BaseAnswerForm):
     answer=FloatField()
     
 class BooleanInputAnswer(BaseAnswerForm):
-    answer=BooleanField(required=False)
+    answer=BooleanField(initial=False)
+
+    def clean_answer(self):
+        value=self.cleaned_data['answer']
+        if not value:
+            return False
+        return value
 
     def _configure_answer_field(self):
         fld=super(BooleanInputAnswer, self)._configure_answer_field()
@@ -157,9 +165,23 @@ QTYPE_FORM={
 }
 
 class SubmissionForm(ModelForm):
+
+    def __init__(self, survey, *args, **kwargs):
+        super(SubmissionForm, self).__init__(*args, **kwargs)
+        for attr, fld in (tuple(('ask_for_%s' % x, x) for x in ('email', 'title', 'story', 'photo', 'location')) +
+                          (('ask_for_video', 'video_url'),)):
+            v=getattr(survey, attr)
+            if v==OPTION_REQUIREMENT_CHOICES.NOT_PRESENTED:
+                del self.fields[fld]
+            elif v==OPTION_REQUIREMENT_CHOICES.REQUIRED:
+                self.fields[fld].required=True
+        
+        
     class Meta:
         model=Submission
-        exclude=('survey','latitude', 'longitude','submitted_at','ip_address','user',)
+        exclude=('survey','latitude', 'longitude','submitted_at','ip_address','user', 'is_public')
+
+
 
 def forms_for_survey(survey, request, submission=None):
     sp=str(survey.id) + '_'
@@ -167,7 +189,7 @@ def forms_for_survey(survey, request, submission=None):
     login_user=request.user
     posted_data=request.POST or None
     files=request.FILES or None
-    main_form=SubmissionForm(posted_data, files)
+    main_form=SubmissionForm(survey, data=posted_data, files=files)
     return [main_form] + [
         QTYPE_FORM[q.option_type](q, session_key, submission=submission, prefix=sp+str(q.id), data=posted_data)
         for q in survey.questions.all().order_by("order")]

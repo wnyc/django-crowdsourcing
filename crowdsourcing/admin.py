@@ -18,6 +18,7 @@ class SurveyAdmin(admin.ModelAdmin):
 
 class AnswerInline(admin.TabularInline):
     model=Answer
+    exclude=('question',)
     extra=0
 
 class SubmissionAdmin(admin.ModelAdmin):
