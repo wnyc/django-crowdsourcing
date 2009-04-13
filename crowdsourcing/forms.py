@@ -8,9 +8,11 @@ from django.forms import (
     BooleanField,
     CharField,
     CheckboxSelectMultiple,
-    ChoiceField, 
+    ChoiceField,
+    EmailField,
     FloatField,
     Form,
+    ImageField,
     IntegerField,
     MultipleChoiceField,
     RadioSelect,
@@ -26,7 +28,9 @@ from django.template.defaultfilters import slugify
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
-from .models import OPTION_REQUIREMENT_CHOICES, OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
+from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
+from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
+
 
 class BaseAnswerForm(Form):
     def __init__(self, question, session_key, submission=None, *args, **kwargs):
@@ -35,7 +39,6 @@ class BaseAnswerForm(Form):
         self.submission=submission
         super(BaseAnswerForm, self).__init__(*args, **kwargs)
         self._configure_answer_field()
-
 
     def _configure_answer_field(self):
         answer=self.fields['answer']
@@ -67,14 +70,18 @@ class BaseAnswerForm(Form):
             ans.save()
         return ans
 
+
 class TextInputAnswer(BaseAnswerForm):
     answer=CharField()
 
+
 class IntegerInputAnswer(BaseAnswerForm):
     answer=IntegerField()
+
     
 class FloatInputAnswer(BaseAnswerForm):
     answer=FloatField()
+
     
 class BooleanInputAnswer(BaseAnswerForm):
     answer=BooleanField(initial=False)
@@ -91,9 +98,33 @@ class BooleanInputAnswer(BaseAnswerForm):
         # being required doesn't make much sense in a survey
         fld.required=False
         return fld
+
         
 class TextAreaAnswer(BaseAnswerForm):
     answer=CharField(widget=Textarea)
+
+
+class EmailAnswer(BaseAnswerForm):
+    answer=EmailField()
+
+
+class VideoAnswer(BaseAnswerForm):
+    answer=CharField()
+
+    def clean_answer(self):
+        value=self.cleaned_data['answer']
+        if not value:
+            return value
+        for v in VIDEO_URL_PATTERNS:
+            if v.match(value):
+                return value
+        raise ValidationError("A video url is required.")
+
+class PhotoUpload(BaseAnswerForm):
+    answer=ImageField()
+
+class LocationAnswer(BaseAnswerForm):
+    answer=CharField()
 
 class NullSelect(Select):
     def __init__(self, attrs=None, choices=(), empty_label=u"---------"):
@@ -138,6 +169,7 @@ class BaseOptionAnswer(BaseAnswerForm):
             ans_list.append(ans)
         return ans_list
 
+
 class OptionAnswer(BaseOptionAnswer):
     answer=ChoiceField(widget=NullSelect)
 
@@ -146,6 +178,7 @@ class OptionRadio(BaseOptionAnswer):
     def __init__(self, *args, **kwargs):
         super(OptionRadio, self).__init__(*args, **kwargs)
         self.fields['answer'].widget=RadioSelect(choices=self.choices)
+
 
 class OptionCheckbox(BaseOptionAnswer):
     answer=MultipleChoiceField(widget=CheckboxSelectMultiple)
@@ -162,25 +195,22 @@ QTYPE_FORM={
     OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE: OptionAnswer,
     OPTION_TYPE_CHOICES.RADIO_LIST:        OptionRadio,
     OPTION_TYPE_CHOICES.CHECKBOX_LIST:     OptionCheckbox,
+    OPTION_TYPE_CHOICES.EMAIL_FIELD:       EmailAnswer, 
+    #OPTION_TYPE_CHOICES.PHOTO_UPLOAD:      PhotoUpload,
+    OPTION_TYPE_CHOICES.VIDEO_LINK:        VideoAnswer,
+    OPTION_TYPE_CHOICES.LOCATION_FIELD:    LocationAnswer,
 }
+
 
 class SubmissionForm(ModelForm):
 
     def __init__(self, survey, *args, **kwargs):
         super(SubmissionForm, self).__init__(*args, **kwargs)
-        for attr, fld in (tuple(('ask_for_%s' % x, x) for x in ('email', 'title', 'story', 'photo', 'location')) +
-                          (('ask_for_video', 'video_url'),)):
-            v=getattr(survey, attr)
-            if v==OPTION_REQUIREMENT_CHOICES.NOT_PRESENTED:
-                del self.fields[fld]
-            elif v==OPTION_REQUIREMENT_CHOICES.REQUIRED:
-                self.fields[fld].required=True
-        
+        self.survey=survey
         
     class Meta:
         model=Submission
         exclude=('survey','latitude', 'longitude','submitted_at','ip_address','user', 'is_public')
-
 
 
 def forms_for_survey(survey, request, submission=None):
@@ -193,5 +223,3 @@ def forms_for_survey(survey, request, submission=None):
     return [main_form] + [
         QTYPE_FORM[q.option_type](q, session_key, submission=submission, prefix=sp+str(q.id), data=posted_data)
         for q in survey.questions.all().order_by("order")]
-
-

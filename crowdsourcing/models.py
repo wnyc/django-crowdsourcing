@@ -15,10 +15,6 @@ ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
                                    'post-close',
                                    'never'))
 
-OPTION_REQUIREMENT_CHOICES=ChoiceEnum(("not presented",
-                                       "optional",
-                                       "required"))
-
 class LiveSurveyManager(models.Manager):
     def get_query_set(self):
         now=datetime.datetime.now()
@@ -39,37 +35,6 @@ class Survey(models.Model):
     require_login=models.BooleanField(default=False)
     allow_multiple_submissions=models.BooleanField(default=False)
     moderate_submissions=models.BooleanField(default=local_settings.MODERATE_SUBMISSIONS)
-
-    ask_for_email=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                      default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
-    email_field_name=models.CharField(max_length=128, default="Email")
-    email_help_text=models.CharField(max_length=200, blank=True)
-    
-    ask_for_title=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                      default=OPTION_REQUIREMENT_CHOICES.REQUIRED)
-    title_field_name=models.CharField(max_length=128, default="Title")
-    title_help_text=models.CharField(max_length=200, blank=True)
-    
-    ask_for_story=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                      default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
-    story_field_name=models.CharField(max_length=128, default="Your Story")
-    story_help_text=models.CharField(max_length=200, blank=True)
-    
-    ask_for_location=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                         default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
-    location_field_name=models.CharField(max_length=128, default="Your Location")
-    location_help_text=models.CharField(max_length=200, blank=True)
-    
-    ask_for_photo=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                      default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
-    photo_field_name=models.CharField(max_length=128, default="Your Photo")
-    photo_help_text=models.CharField(max_length=200, blank=True)
-    
-    ask_for_video=models.IntegerField(choices=OPTION_REQUIREMENT_CHOICES,
-                                      default=OPTION_REQUIREMENT_CHOICES.OPTIONAL)
-    video_field_name=models.CharField(max_length=128, default="Your Video")
-    video_help_text=models.CharField(max_length=200, blank=True)
-
     archive_policy=models.results=models.IntegerField(choices=ARCHIVE_POLICY_CHOICES,
                                                       default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
 
@@ -126,6 +91,10 @@ class Survey(models.Model):
     live=LiveSurveyManager()
     
 OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
+                                         ('email', 'Email Field'),
+                                         ('photo', 'Photo Upload'),
+                                         ('video', 'Video Link'),
+                                         ('location', 'Location Field'),
                                          ('integer', 'Integer'),
                                          ('float', 'Float'),
                                          ('bool', 'Boolean'),
@@ -149,7 +118,7 @@ class Question(models.Model):
     class Meta:
         ordering=('order',)
         unique_together=('fieldname', 'survey')
-        verbose_name="additional question"
+
 
     def __unicode__(self):
         return self.question
@@ -166,12 +135,6 @@ class Submission(models.Model):
     submitted_at=models.DateTimeField(default=datetime.datetime.now)
     session_key=models.CharField(max_length=40, blank=True, editable=False)
 
-    # basic fields
-    title=models.CharField(max_length=128, blank=True)
-    story=models.TextField(blank=True)
-    photo=models.ImageField(max_length=400, null=True, blank=True, upload_to="crowdsource/%Y/%m/%d")
-    video_url=models.URLField(max_length=300, blank=True, verify_exists=False)
-    address=models.CharField(max_length=200, blank=True, null=True)
     latitude=models.FloatField(blank=True, null=True)
     longitude=models.FloatField(blank=True, null=True)
 
@@ -192,7 +155,7 @@ class Submission(models.Model):
             # avoid called __getattr__
             return self.__dict__['_answer_dict']
         except KeyError:
-            answers=self.answer_set()
+            answers=self.answer_set.all()
             d=dict((a.question.fieldname, a.value) for a in answers)
             self.__dict__['_answer_dict']=d
             return d
@@ -212,6 +175,8 @@ class Answer(models.Model):
     integer_answer=models.IntegerField(null=True)
     float_answer=models.FloatField(null=True)
     boolean_answer=models.NullBooleanField()
+    latitude=models.FloatField(blank=True, null=True)
+    longitude=models.FloatField(blank=True, null=True)    
 
     def value():
         def get(self):
