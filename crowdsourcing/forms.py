@@ -28,6 +28,7 @@ from django.template.defaultfilters import slugify
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
+from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
 
@@ -125,6 +126,14 @@ class PhotoUpload(BaseAnswerForm):
 
 class LocationAnswer(BaseAnswerForm):
     answer=CharField()
+
+    def save(self, commit=True):
+        obj=super(LocationAnswer, self).save(commit=False)
+        obj.latitude, obj.longitude=get_latitude_and_longitude(self.value)
+        if commit:
+            obj.save()
+        return obj
+        
 
 class NullSelect(Select):
     def __init__(self, attrs=None, choices=(), empty_label=u"---------"):
