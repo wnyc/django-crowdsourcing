@@ -130,7 +130,6 @@ class Question(models.Model):
 class Submission(models.Model):
     survey=models.ForeignKey(Survey)
     user=models.ForeignKey(User, null=True)
-    email=models.EmailField(blank=True, null=True)
     ip_address=models.IPAddressField()
     submitted_at=models.DateTimeField(default=datetime.datetime.now)
     session_key=models.CharField(max_length=40, blank=True, editable=False)

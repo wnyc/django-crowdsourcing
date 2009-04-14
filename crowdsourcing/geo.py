@@ -7,7 +7,7 @@ from geopy import geocoders
 from django.conf import settings
 
 def get_latitude_and_longitude(location):
-    google_key=getattr(settings, 'GOOGLE_API_KEY')
+    google_key=getattr(settings, 'GOOGLE_API_KEY', None)
     if google_key:
         g=geocoders.Google(settings.GOOGLE_API_KEY)
     else:

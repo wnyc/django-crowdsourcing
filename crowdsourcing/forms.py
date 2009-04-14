@@ -136,20 +136,13 @@ class PhotoUpload(BaseAnswerForm):
             return dest
         return value
 
-    def save(self, commit=True):
-        self.
-        ans=super(PhotoUpload, self).save(commit=False)
-
-        if commit:
-            ans.save()
-        return ans
 
 class LocationAnswer(BaseAnswerForm):
     answer=CharField()
 
     def save(self, commit=True):
         obj=super(LocationAnswer, self).save(commit=False)
-        obj.latitude, obj.longitude=get_latitude_and_longitude(self.value)
+        obj.latitude, obj.longitude=get_latitude_and_longitude(obj.value)
         if commit:
             obj.save()
         return obj
@@ -200,7 +193,7 @@ class BaseOptionAnswer(BaseAnswerForm):
 
 
 class OptionAnswer(BaseOptionAnswer):
-    answer=ChoiceField(widget=NullSelect)
+    answer=ChoiceField() #widget=NullSelect)
 
 
 class OptionRadio(BaseOptionAnswer):
@@ -239,16 +232,19 @@ class SubmissionForm(ModelForm):
         
     class Meta:
         model=Submission
-        exclude=('survey','latitude', 'longitude','submitted_at','ip_address','user', 'is_public')
+        exclude=('survey', 'submitted_at','ip_address','user', 'is_public')
 
 
 def forms_for_survey(survey, request, submission=None):
-    sp=str(survey.id) + '_'
     session_key=request.session.session_key.lower()
-    login_user=request.user
     posted_data=request.POST or None
     files=request.FILES or None
     main_form=SubmissionForm(survey, data=posted_data, files=files)
     return [main_form] + [
-        QTYPE_FORM[q.option_type](q, session_key, submission=submission, prefix=sp+str(q.id), data=posted_data)
+        QTYPE_FORM[q.option_type](question=q,
+                                  session_key=session_key,
+                                  submission=submission,
+                                  prefix='%s_%s' % (survey.id, q.id),
+                                  data=posted_data,
+                                  files=files)
         for q in survey.questions.all().order_by("order")]

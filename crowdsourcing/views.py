@@ -9,11 +9,8 @@ from djview import *
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
 
-def _survey_submit(request, survey):
-    if not survey.is_open:
-        # this should rarely if ever happen, since the form goes away when the survey is closed.
-        return HttpResponseRedirect(reverse('survey_results', kwargs=dict(slug=survey.slug)))
 
+def _survey_submit(request, survey):
     if survey.require_login and request.user.is_anonymous():
         # again, the form should only be shown after the user is logged in, but to be safe...
         return HttpResponseRedirect(reverse("auth_login") + '?next=%s' % request.path)
@@ -27,7 +24,6 @@ def _survey_submit(request, survey):
                                    request)
 
     forms=forms_for_survey(survey, request)
-
     
     if all(form.is_valid() for form in forms):
         submission_form=forms[0]
@@ -45,6 +41,7 @@ def _survey_submit(request, survey):
     else:
         return _survey_show_form(request, survey, forms)
 
+
 def _survey_show_form(request, survey, forms):
     return render_with_request(['crowdsourcing/%s_survey_detail.html' % survey.slug,
                                 'crowdsourcing/survey_detail.html'],
@@ -54,12 +51,11 @@ def _survey_show_form(request, survey, forms):
 
 def survey_detail(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
-
-    if request.method=='POST':
-        return _survey_submit(request, survey)
-
     can_show_form=survey.is_open and (request.user.is_authenticated() or not survey.require_login)
+    
     if can_show_form:
+        if request.method=='POST':
+            return _survey_submit(request, survey)
         forms =forms_for_survey(survey, request)
     else:
         forms=()
@@ -71,7 +67,7 @@ def survey_results(request, slug, page=None):
         page=1
     else:
         page=get_int_or_404(page)
-    print slug
+
     survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
@@ -87,7 +83,6 @@ def survey_results(request, slug, page=None):
     
 
 def _survey_results_redirect(request, survey, thanks=False):
-    print "in redirect"
     url=reverse('survey_results', kwargs={'slug': survey.slug})
     response=HttpResponseRedirect(url)
     if thanks:

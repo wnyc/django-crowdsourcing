@@ -22,8 +22,8 @@ class AnswerInline(admin.TabularInline):
     extra=0
 
 class SubmissionAdmin(admin.ModelAdmin):
-    search_fields=('email', 'answer__text_answer') #'title', 'story', 'address')
-    list_display=('survey', 'submitted_at', 'user', 'email', 'ip_address', 'is_public')
+    search_fields=('answer__text_answer',) #'title', 'story', 'address')
+    list_display=('survey', 'submitted_at', 'user', 'ip_address', 'is_public')
     list_filter=('survey', 'submitted_at', 'is_public')
     date_hierarchy='submitted_at'
     inlines=[AnswerInline]

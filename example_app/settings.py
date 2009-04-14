@@ -82,3 +82,8 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'crowdsourcing',
 )
+
+try:
+    from local_settings import *
+except ImportError:
+    pass
