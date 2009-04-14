@@ -2,6 +2,7 @@ from __future__ import absolute_import, with_statement
 
 from itertools import chain
 import logging
+import re
 
 from django.conf import settings
 from django.forms import (
@@ -64,6 +65,7 @@ class BaseAnswerForm(Form):
             return
         ans=Answer()
         if self.submission:
+            print self, self.submission, ans
             ans.submission=self.submission
         ans.question=self.question
         ans.value=self.cleaned_data['answer']
@@ -114,12 +116,9 @@ class VideoAnswer(BaseAnswerForm):
 
     def clean_answer(self):
         value=self.cleaned_data['answer']
-        if not value:
-            return value
-        for v in VIDEO_URL_PATTERNS:
-            if v.match(value):
-                return value
-        raise ValidationError(_("A video url is required."))
+        if value and not any(re.match(v, value) for v in VIDEO_URL_PATTERNS):
+            raise ValidationError(_("A video url is required."))
+        return value
 
 class PhotoUpload(BaseAnswerForm):
     answer=ImageField()
@@ -148,27 +147,6 @@ class LocationAnswer(BaseAnswerForm):
         return obj
         
 
-class NullSelect(Select):
-    def __init__(self, attrs=None, choices=(), empty_label=u"---------"):
-        self.empty_label=empty_label
-        super(NullSelect, self).__init__(attrs, choices)
-
-    def render(self, name, value, attrs=None, choices=(), **kwargs):
-        empty_choice=()
-        # kwargs is needed because it is the only way to determine if an
-        # override is provided or not.
-        if 'empty_label' in kwargs:
-            if kwargs['empty_label'] is not None:
-                empty_choice=((u'', kwargs['empty_label']),)
-        elif self.empty_label is not None:
-            empty_choice=((u'', self.empty_label),)
-        base_choices=self.choices
-        self.choices=chain(empty_choice, base_choices)
-        result=super(NullSelect, self).render(name, value, attrs, choices)
-        self.choices=base_choices
-        return result
-
-
 class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
@@ -181,9 +159,11 @@ class BaseOptionAnswer(BaseAnswerForm):
         return key
     
     def save(self, commit=True):
+        ans_list=[]
         for text in self.cleaned_data['answer']:
             ans=Answer()
-            ans.submission=self.submission
+            if self.submission:
+                ans.submission=self.submission
             ans.question=self.question
             ans.value=text
             if commit:
@@ -193,15 +173,13 @@ class BaseOptionAnswer(BaseAnswerForm):
 
 
 class OptionAnswer(BaseOptionAnswer):
-    answer=ChoiceField() #widget=NullSelect)
+    answer=ChoiceField()
 
 
 class OptionRadio(BaseOptionAnswer):
-    def __init__(self, *args, **kwargs):
-        super(OptionRadio, self).__init__(*args, **kwargs)
-        self.fields['answer'].widget=RadioSelect(choices=self.choices)
+    answer=ChoiceField(widget=RadioSelect)
 
-
+    
 class OptionCheckbox(BaseOptionAnswer):
     answer=MultipleChoiceField(widget=CheckboxSelectMultiple)
 

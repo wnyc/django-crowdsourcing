@@ -34,8 +34,13 @@ def _survey_submit(request, survey):
         submission.save()
         for form in forms:
             answer=form.save(commit=False)
-            answer.submission=submission
-            answer.save()
+            if isinstance(answer, (list,tuple)):
+                for a in answer:
+                    a.submission=submission
+                    a.save()
+            else:
+                answer.submission=submission
+                answer.save()
         # go to survey results/thanks page
         return _survey_results_redirect(request, survey, thanks=True)
     else:
