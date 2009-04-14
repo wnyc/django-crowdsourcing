@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, with_statement
 
 from itertools import chain
 import logging
@@ -119,10 +119,30 @@ class VideoAnswer(BaseAnswerForm):
         for v in VIDEO_URL_PATTERNS:
             if v.match(value):
                 return value
-        raise ValidationError("A video url is required.")
+        raise ValidationError(_("A video url is required."))
 
 class PhotoUpload(BaseAnswerForm):
     answer=ImageField()
+
+    def clean_answer(self):
+        value=self.cleaned_data['answer']
+        if value:
+            dest=os.path.join(datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN), value.name)
+            while os.path.exists(dest):
+                dest+='_'
+            with open(dest, 'wb+') as fp:
+                for chunk in value.chunks():
+                    fp.write(chunk)
+            return dest
+        return value
+
+    def save(self, commit=True):
+        self.
+        ans=super(PhotoUpload, self).save(commit=False)
+
+        if commit:
+            ans.save()
+        return ans
 
 class LocationAnswer(BaseAnswerForm):
     answer=CharField()
@@ -205,7 +225,7 @@ QTYPE_FORM={
     OPTION_TYPE_CHOICES.RADIO_LIST:        OptionRadio,
     OPTION_TYPE_CHOICES.CHECKBOX_LIST:     OptionCheckbox,
     OPTION_TYPE_CHOICES.EMAIL_FIELD:       EmailAnswer, 
-    #OPTION_TYPE_CHOICES.PHOTO_UPLOAD:      PhotoUpload,
+    OPTION_TYPE_CHOICES.PHOTO_UPLOAD:      PhotoUpload,
     OPTION_TYPE_CHOICES.VIDEO_LINK:        VideoAnswer,
     OPTION_TYPE_CHOICES.LOCATION_FIELD:    LocationAnswer,
 }

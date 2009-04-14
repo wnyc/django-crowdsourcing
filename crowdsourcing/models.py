@@ -135,19 +135,9 @@ class Submission(models.Model):
     submitted_at=models.DateTimeField(default=datetime.datetime.now)
     session_key=models.CharField(max_length=40, blank=True, editable=False)
 
-    latitude=models.FloatField(blank=True, null=True)
-    longitude=models.FloatField(blank=True, null=True)
-
     # for moderation
     is_public=models.BooleanField(default=True)
     
-    def save(self, **kwargs):
-        if not (self.latitude or self.longitude) and (self.address):
-            try:
-                self.latitude, self.longitude=get_latitude_and_longitude(self.address)
-            except:
-                logging.exception("An error occurred trying to geocode address %s" % (self.address))
-        super(Submission, self).save(**kwargs)
 
 
     def get_answer_dict(self):
