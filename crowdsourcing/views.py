@@ -32,15 +32,17 @@ def _survey_submit(request, survey):
         submission.ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META['REMOTE_ADDR'])
         submission.is_public=not survey.moderate_submissions
         submission.save()
-        for form in forms:
+        for form in forms[1:]:
             answer=form.save(commit=False)
             if isinstance(answer, (list,tuple)):
                 for a in answer:
                     a.submission=submission
                     a.save()
             else:
-                answer.submission=submission
-                answer.save()
+                print form, answer
+                if answer:
+                    answer.submission=submission
+                    answer.save()
         # go to survey results/thanks page
         return _survey_results_redirect(request, survey, thanks=True)
     else:

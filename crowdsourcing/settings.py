@@ -7,7 +7,7 @@ MODERATE_SUBMISSIONS=getattr(_gs, 'CROWDSOURCING_MODERATE_SUBMISSIONS', False)
 
 
 VIDEO_URL_PATTERNS=getattr(_gs, 'CROWDSOURCING_VIDEO_URL_PATTERNS',
-                           (r'^http://www.youtube.com/watch?v=[a-zA-Z0-9]+$',)
+                           (r'^http://www\.youtube\.com/watch\?v=[a-zA-Z0-9]+$',)
                            )
 
 

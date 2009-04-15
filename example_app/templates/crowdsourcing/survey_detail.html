@@ -7,7 +7,7 @@
 <p>{{ survey.description }}</p>
 
 {% if forms %}
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
 {% for form in forms %}
  {{ form.as_p }}
 {% endfor %}

@@ -6,14 +6,17 @@ from operator import itemgetter
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils.translation import ugettext_lazy as _
 
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
+
 ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
                                    'post-close',
                                    'never'))
+
 
 class LiveSurveyManager(models.Manager):
     def get_query_set(self):
@@ -89,6 +92,7 @@ class Survey(models.Model):
 
     objects=models.Manager()
     live=LiveSurveyManager()
+
     
 OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                          ('email', 'Email Field'),
@@ -103,10 +107,14 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                          ('radio', 'Radio List'),
                                          ('checkbox', 'Checkbox List'),],
                                         key=itemgetter(1)))
+
                                  
 class Question(models.Model):
     survey=models.ForeignKey(Survey, related_name="questions")
-    fieldname=models.CharField(max_length=32)
+    fieldname=models.CharField('field name',
+                               max_length=32,
+                               help_text=_('a single-word identifier used to track this value; '
+                                           'it must begin with a letter and may contain alphanumerics and underscores (no spaces).'))
     question=models.TextField()
     help_text=models.TextField(blank=True)
     required=models.BooleanField(default=False)
@@ -119,13 +127,13 @@ class Question(models.Model):
         ordering=('order',)
         unique_together=('fieldname', 'survey')
 
-
     def __unicode__(self):
         return self.question
 
     @property
     def parsed_options(self):
         return filter(None, (s.strip() for s in self.options.splitlines()))
+
 
 class Submission(models.Model):
     survey=models.ForeignKey(Survey)
@@ -136,9 +144,10 @@ class Submission(models.Model):
 
     # for moderation
     is_public=models.BooleanField(default=True)
+
+    class Meta:
+        ordering=('-submitted_at',)
     
-
-
     def get_answer_dict(self):
         try:
             # avoid called __getattr__
@@ -155,6 +164,11 @@ class Submission(models.Model):
             return d[k]
         except KeyError:
             raise AttributeError("no such attribute: %s" % k)
+
+    @property
+    def email(self):
+        return self.get_answer_dict().get('email', '')
+        
 
 
 class Answer(models.Model):

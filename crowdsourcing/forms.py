@@ -1,7 +1,9 @@
 from __future__ import absolute_import, with_statement
 
+import datetime
 from itertools import chain
 import logging
+import os
 import re
 
 from django.conf import settings
@@ -120,16 +122,24 @@ class VideoAnswer(BaseAnswerForm):
             raise ValidationError(_("A video url is required."))
         return value
 
+
 class PhotoUpload(BaseAnswerForm):
     answer=ImageField()
 
     def clean_answer(self):
         value=self.cleaned_data['answer']
         if value:
-            dest=os.path.join(datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN), value.name)
-            while os.path.exists(dest):
+            mediaroot=settings.MEDIA_ROOT
+            subpath=datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN)
+            dirpath=os.path.join(mediaroot, subpath)
+            if not os.path.exists(dirpath):
+                os.makedirs(dirpath)
+            dest=os.path.join(subpath, value.name)
+            fullpath=os.path.join(mediaroot, dest)
+            while os.path.exists(fullpath):
                 dest+='_'
-            with open(dest, 'wb+') as fp:
+                fullpath=os.path.join(mediaroot, dest)
+            with open(fullpath, 'wb+') as fp:
                 for chunk in value.chunks():
                     fp.write(chunk)
             return dest
@@ -156,6 +166,8 @@ class BaseOptionAnswer(BaseAnswerForm):
         key=self.cleaned_data['answer']
         if not key and self.fields['answer'].required:
             raise ValidationError, _('This field is required.')
+        if not isinstance(key, (list, tuple)):
+            key=(key,)
         return key
     
     def save(self, commit=True):
