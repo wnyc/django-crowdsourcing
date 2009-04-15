@@ -8,9 +8,18 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 
+from .fields import ImageWithThumbnailsField
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
+
+try:
+    from .flickrsupport import sync_to_flickr
+except ImportError:
+    logging.warn('no flickr support available')
+    
+    sync_to_flickr=None
+
 
 
 ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
@@ -178,11 +187,15 @@ class Answer(models.Model):
     integer_answer=models.IntegerField(null=True)
     float_answer=models.FloatField(null=True)
     boolean_answer=models.NullBooleanField()
-    image_answer=models.ImageField(max_length=500,
-                                   blank=True,
-                                   upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
+    image_answer=ImageWithThumbnailsField(max_length=500,
+                                          blank=True,
+                                          thumbnail=dict(size=(250,250)),
+                                          upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude=models.FloatField(blank=True, null=True)
-    longitude=models.FloatField(blank=True, null=True)    
+    longitude=models.FloatField(blank=True, null=True)
+
+    flickr_id=models.CharField(max_length=64, blank=True)
+    photo_hash=models.CharField(max_length=40, null=True, blank=True, editable=False)    
 
     def value():
         def get(self):
@@ -215,6 +228,18 @@ class Answer(models.Model):
 
     class Meta:
         ordering=('question',)
+
+    def save(self, **kwargs):
+        if sync_to_flickr:
+            survey=self.question.survey
+            if survey.flickr_set_id:
+                try:
+                    sync_to_flickr(self, survey.flickr_set_id)
+                except:
+                    logging.exception("error in syncing to flickr")
+                    
+        super(Answer, self).save(**kwargs)
     
     def __unicode__(self):
         return unicode(self.question)
+
