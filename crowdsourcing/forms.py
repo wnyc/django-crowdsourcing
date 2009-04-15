@@ -1,9 +1,9 @@
 from __future__ import absolute_import, with_statement
 
-import datetime
+#import datetime
 from itertools import chain
 import logging
-import os
+#import os
 import re
 
 from django.conf import settings
@@ -126,24 +126,24 @@ class VideoAnswer(BaseAnswerForm):
 class PhotoUpload(BaseAnswerForm):
     answer=ImageField()
 
-    def clean_answer(self):
-        value=self.cleaned_data['answer']
-        if value:
-            mediaroot=settings.MEDIA_ROOT
-            subpath=datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN)
-            dirpath=os.path.join(mediaroot, subpath)
-            if not os.path.exists(dirpath):
-                os.makedirs(dirpath)
-            dest=os.path.join(subpath, value.name)
-            fullpath=os.path.join(mediaroot, dest)
-            while os.path.exists(fullpath):
-                dest+='_'
-                fullpath=os.path.join(mediaroot, dest)
-            with open(fullpath, 'wb+') as fp:
-                for chunk in value.chunks():
-                    fp.write(chunk)
-            return dest
-        return value
+##     def clean_answer(self):
+##         value=self.cleaned_data['answer']
+##         if value:
+##             mediaroot=settings.MEDIA_ROOT
+##             subpath=datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN)
+##             dirpath=os.path.join(mediaroot, subpath)
+##             if not os.path.exists(dirpath):
+##                 os.makedirs(dirpath)
+##             dest=os.path.join(subpath, value.name)
+##             fullpath=os.path.join(mediaroot, dest)
+##             while os.path.exists(fullpath):
+##                 dest+='_'
+##                 fullpath=os.path.join(mediaroot, dest)
+##             with open(fullpath, 'wb+') as fp:
+##                 for chunk in value.chunks():
+##                     fp.write(chunk)
+##             return dest
+##         return value
 
 
 class LocationAnswer(BaseAnswerForm):

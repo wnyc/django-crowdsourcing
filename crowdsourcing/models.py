@@ -178,6 +178,9 @@ class Answer(models.Model):
     integer_answer=models.IntegerField(null=True)
     float_answer=models.FloatField(null=True)
     boolean_answer=models.NullBooleanField()
+    image_answer=models.ImageField(max_length=500,
+                                   blank=True,
+                                   upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude=models.FloatField(blank=True, null=True)
     longitude=models.FloatField(blank=True, null=True)    
 
@@ -190,6 +193,8 @@ class Answer(models.Model):
                 return self.float_answer
             elif ot==OPTION_TYPE_CHOICES.INTEGER:
                 return self.integer_answer
+            elif ot==OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+                return self.image_answer
             return self.text_answer
         
         def set(self, v):
@@ -200,6 +205,8 @@ class Answer(models.Model):
                 self.float_answer=float(v)
             elif ot==OPTION_TYPE_CHOICES.INTEGER:
                 self.integer_answer=int(v)
+            elif ot==OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+                self.image_answer=v
             else:
                 self.text_answer=v
                 
