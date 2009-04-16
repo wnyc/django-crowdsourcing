@@ -70,6 +70,10 @@ def survey_detail(request, slug):
 
 
 def survey_results(request, slug, page=None):
+    """
+    This should use some logic to show the most likely-to-be-relevant
+    results -- and also consider the archive policy.
+    """
     if page is None:
         page=1
     else:
@@ -95,3 +99,36 @@ def _survey_results_redirect(request, survey, thanks=False):
     if thanks:
         request.session['survey_thanks_%s' % survey.slug]='1'
     return response
+
+
+def survey_results_grid(request, survey):
+    survey=get_object_or_404(Survey.live, slug=slug)
+    submissions=survey.public_submissions()
+    # I assume this will call some sort of JSON feed for a live grid ...
+    # but maybe not, maybe I should paginate it.
+    return render_with_request(['crowdsourcing/%s_survey_grid.html' % slug,
+                                'crowdsourcing/survey_grid.html'],
+                               dict(survey=survey,
+                                    submissions=submissions),
+                               request)
+
+
+def survey_results_archive(request, survey, page=None):    
+    page=1 if page is None else get_int_or_404(page) 
+    survey=get_object_or_404(Survey.live, slug=slug)
+    submissions=survey.public_submissions()
+    paginator, page_obj=paginate_or_404(submissions, page)
+    return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
+                                'crowdsourcing/survey_results.html'],
+                               dict(survey=survey,
+                                    paginator=paginator,
+                                    page_obj=page_obj),
+                               request)
+    
+
+    
+def survey_results_aggregate(request, survey):
+    """
+    this is where we generate graphs and all that good stuff.
+    """
+    pass
