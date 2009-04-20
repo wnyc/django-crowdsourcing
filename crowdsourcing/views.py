@@ -138,10 +138,9 @@ def survey_results_json(request, survey):
 
 
 def survey_results_grid(request, survey):
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey=get_object_or_404(Survey.live, slug=survey)
     submissions=survey.public_submissions()
-    # I assume this will call some sort of JSON feed for a live grid ...
-    # but maybe not, maybe I should paginate it.
+    # this might call the JSON view, or not.
     return render_with_request(['crowdsourcing/%s_survey_grid.html' % slug,
                                 'crowdsourcing/survey_grid.html'],
                                dict(survey=survey,
@@ -149,14 +148,32 @@ def survey_results_grid(request, survey):
                                request)
 
 
+def survey_results_map(request, survey):
+    survey=get_object_or_404(Survey.live, slug=survey)
+    location_fields=list(survey.get_public_location_fields())
+    if not location_fields:
+        raise Http404
+    submissions=survey.public_submissions()    
+    return render_with_request(['crowdsourcing/%s_survey_results_map.html' % slug,
+                                'crowdsourcing/survey_results_map.html'],
+                               dict(survey=survey,
+                                    submissions=submissions,
+                                    location_fields=location_fields),
+                               request)
+    
+
 def survey_results_archive(request, survey, page=None):    
     page=1 if page is None else get_int_or_404(page) 
     survey=get_object_or_404(Survey.live, slug=slug)
+    archive_fields=list(survey.get_public_archive_fields())
+    if not archive_fields:
+        raise Http404
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
     return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
                                 'crowdsourcing/survey_results.html'],
                                dict(survey=survey,
+                                    archive_fields=archive_fields,
                                     paginator=paginator,
                                     page_obj=page_obj),
                                request)
@@ -167,4 +184,15 @@ def survey_results_aggregate(request, survey):
     """
     this is where we generate graphs and all that good stuff.
     """
-    pass
+    survey=get_object_or_404(Survey.live, slug=survey)
+    aggregate_fields=list(survey.get_public_aggregate_fields())
+    if not aggregate_fields:
+        raise Http404
+    submissions=survey.public_submissions()
+    return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
+                                'crowdsourcing/survey_results.html'],
+                               dict(survey=survey,
+                                    aggregate_fields=aggregate_fields,
+                                    submissions=submissions),
+                               request)
+    

@@ -82,6 +82,28 @@ class Survey(models.Model):
         else:
             return self.starts_at <= now
 
+
+    def get_public_location_fields(self):
+        return self.questions.filter(option_type==OPTION_TYPE_CHOICES.LOCATION_FIELD,
+                                     answer_is_public=True)
+
+    def get_public_archive_fields(self):
+        return self.questions.filter(option_type__in=(OPTION_TYPE_CHOICES.TEXT_FIELD,
+                                                      OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
+                                                      OPTION_TYPE_CHOICES.VIDEO_LINK,
+                                                      OPTION_TYPE_CHOICES.TEXT_AREA),
+                                     answer_is_public=True)
+
+    def get_public_aggregate_fields(self):
+        return self.questions.filter(option_type__in=(OPTION_TYPE_CHOICES.INTEGER,
+                                                      OPTION_TYPE_CHOICES.FLOAT,
+                                                      OPTION_TYPE_CHOICES.BOOLEAN,
+                                                      OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+                                                      OPTION_TYPE_CHOICES.RADIO_LIST,
+                                                      OPTION_TYPE_CHOICES.CHECKBOX_LIST),
+                                     answer_is_public=True)
+        
+
     def submissions_for(self, user, session_key):
         q=models.Q(survey=self)
         if user.is_authenticated():
