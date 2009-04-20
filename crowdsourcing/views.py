@@ -70,7 +70,7 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-def survey_results(request, slug, page=None):
+def survey_results(request, survey, page=None):
     """
     This should use some logic to show the most likely-to-be-relevant
     results -- and also consider the archive policy.
@@ -80,12 +80,12 @@ def survey_results(request, slug, page=None):
     else:
         page=get_int_or_404(page)
 
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey=get_object_or_404(Survey.live, slug=survey)
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
     # clean this out?
-    thanks=request.session.get('survey_thanks_%s' % slug)
-    return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
+    thanks=request.session.get('survey_thanks_%s' % survey.slug)
+    return render_with_request(['crowdsourcing/%s_survey_results.html' % survey.slug,
                                 'crowdsourcing/survey_results.html'],
                                dict(survey=survey,
                                     thanks=thanks,
@@ -141,7 +141,7 @@ def survey_results_grid(request, survey):
     survey=get_object_or_404(Survey.live, slug=survey)
     submissions=survey.public_submissions()
     # this might call the JSON view, or not.
-    return render_with_request(['crowdsourcing/%s_survey_grid.html' % slug,
+    return render_with_request(['crowdsourcing/%s_survey_grid.html' % survey.slug,
                                 'crowdsourcing/survey_grid.html'],
                                dict(survey=survey,
                                     submissions=submissions),
@@ -154,7 +154,7 @@ def survey_results_map(request, survey):
     if not location_fields:
         raise Http404
     submissions=survey.public_submissions()    
-    return render_with_request(['crowdsourcing/%s_survey_results_map.html' % slug,
+    return render_with_request(['crowdsourcing/%s_survey_results_map.html' % survey.slug,
                                 'crowdsourcing/survey_results_map.html'],
                                dict(survey=survey,
                                     submissions=submissions,
@@ -164,14 +164,14 @@ def survey_results_map(request, survey):
 
 def survey_results_archive(request, survey, page=None):    
     page=1 if page is None else get_int_or_404(page) 
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey=get_object_or_404(Survey.live, slug=survey)
     archive_fields=list(survey.get_public_archive_fields())
     if not archive_fields:
         raise Http404
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
-    return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
-                                'crowdsourcing/survey_results.html'],
+    return render_with_request(['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
+                                'crowdsourcing/survey_results_archive.html'],
                                dict(survey=survey,
                                     archive_fields=archive_fields,
                                     paginator=paginator,
@@ -189,8 +189,8 @@ def survey_results_aggregate(request, survey):
     if not aggregate_fields:
         raise Http404
     submissions=survey.public_submissions()
-    return render_with_request(['crowdsourcing/%s_survey_results.html' % slug,
-                                'crowdsourcing/survey_results.html'],
+    return render_with_request(['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
+                                'crowdsourcing/survey_results_aggregate.html'],
                                dict(survey=survey,
                                     aggregate_fields=aggregate_fields,
                                     submissions=submissions),
