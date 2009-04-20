@@ -214,6 +214,9 @@ class Submission(models.Model):
             self.__dict__['_answer_dict']=d
             return d
 
+    def items(self):
+        return self.get_answer_dict().items()
+
     def __getattr__(self, k):
         d=self.get_answer_dict()
         try:
