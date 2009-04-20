@@ -2,7 +2,7 @@ from __future__ import absolute_import
 
 from django.conf.urls.defaults import patterns, url
 
-from .views import survey_detail, survey_results
+from .views import survey_detail, survey_results, survey_results_json
 
 urlpatterns=patterns(
     "",
@@ -13,6 +13,10 @@ urlpatterns=patterns(
     url(r'^(?P<slug>[-a-z0-9_]+)/results/$',
         survey_results,
         name="survey_results"),
+
+    url(r'^(?P<survey>[-a-z0-9_]+)/api/$',
+        survey_results_json,
+        name="survey_results_api"),
 
     )
 

@@ -6,6 +6,7 @@ from operator import itemgetter
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
 
 from .fields import ImageWithThumbnailsField
@@ -57,6 +58,13 @@ class Survey(models.Model):
 
     # Flickr integration
     flickr_set_id=models.CharField(max_length=60, blank=True)
+
+    def to_jsondata(self):
+        return dict(title=self.title,
+                    slug=self.slug,
+                    description=self.description,
+                    questions=[q.to_jsondata() for q in self.questions.filter(answer_is_public=True)])
+    
 
     def save(self, **kwargs):
         self.survey_date=self.starts_at.date()
@@ -132,6 +140,14 @@ class Question(models.Model):
     options=models.TextField(blank=True, default='')
     answer_is_public=models.BooleanField(default=True)
 
+    def to_jsondata(self):
+        return dict(fieldname=self.fieldname,
+                    question=self.question,
+                    required=self.required,
+                    option_type=self.option_type,
+                    options=self.parsed_options)
+                    
+
     class Meta:
         ordering=('order',)
         unique_together=('fieldname', 'survey')
@@ -156,6 +172,15 @@ class Submission(models.Model):
 
     class Meta:
         ordering=('-submitted_at',)
+
+    def to_jsondata(self):
+        def to_json(v):
+            if isinstance(v, ImageFieldFile):
+                return v.url if v else ''
+            return v
+        return dict(data=dict((a.question.fieldname, to_json(a.value))
+                              for a in self.answer_set.filter(question__answer_is_public=True)),
+                    submitted_at=self.submitted_at)
     
     def get_answer_dict(self):
         try:

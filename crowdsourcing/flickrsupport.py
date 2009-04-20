@@ -70,6 +70,6 @@ def sync_to_flickr(answer, pool_id):
                                    format='etree')
                 photo_id=res.findtext('photoid')
                 answer.flickr_id=photo_id
-    answer.save()
+    return answer
     
 

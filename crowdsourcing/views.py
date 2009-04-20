@@ -5,6 +5,7 @@ import logging
 
 # django-viewutil
 from djview import *
+from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
@@ -99,6 +100,41 @@ def _survey_results_redirect(request, survey, thanks=False):
     if thanks:
         request.session['survey_thanks_%s' % survey.slug]='1'
     return response
+
+
+def survey_results_json(request, survey):
+    survey=get_object_or_404(Survey.live, slug=survey)
+    qs=survey.public_submissions()
+
+    vars=dict((k.encode('utf-8', 'ignore'), v) for k, v in (request.POST if request.method=='POST' else request.GET).items())
+    limit=vars.pop('limit', 30)
+    offset=vars.pop('offset', 0)
+    order=vars.pop('order', None)
+    cntonly=vars.pop('countonly', False)
+    callback=vars.pop('callback', None)
+    if vars:
+        qs=qs.filter(**vars)
+    cnt=qs.count()
+    if cntonly:
+        data=dict(count=cnt,
+                  survey=survey.to_jsondata())
+    else:
+        if order:
+            qs=qs.order_by(order)
+        res=qs[offset:limit]
+        data=dict(results=[x.to_jsondata() for x in res],
+                  survey=survey.to_jsondata(),
+                  count=cnt)
+
+    if callback:
+        body='<script type="text/javascript">%s(%s);</script>' % (callback,
+                                                                  dumps(data))
+        return HttpResponse(body, mimetype='application/javascript')        
+    else:
+        response=HttpResponse(mimetype='application/json')
+        dump(data, response)
+    return response
+    
 
 
 def survey_results_grid(request, survey):
