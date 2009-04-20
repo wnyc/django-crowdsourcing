@@ -1,0 +1,9 @@
+django-crowdsourcing is a survey application that began life as a fork
+of Doug Napoleone's django-survey to meet a couple of objectives:
+
+1. survey creation can be done effectively in the django admin.
+2. there is support for photo uploads and video embeds.
+3. results are available via a JSON api.
+4. depending on the nature of a survey, submissions may be  displayed in 
+   archives as well as aggregated in various ways.
+
