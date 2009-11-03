@@ -5,6 +5,7 @@ import logging
 from operator import itemgetter
 
 from django.contrib.auth.models import User
+from django.contrib.sites.models import Site
 from django.db import models
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
@@ -56,6 +57,7 @@ class Survey(models.Model):
     ends_at=models.DateTimeField(null=True, blank=True)
     is_published=models.BooleanField(default=False)
 
+    site=models.ForeignKey(Site)
     # Flickr integration
     flickr_set_id=models.CharField(max_length=60, blank=True)
 

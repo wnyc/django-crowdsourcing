@@ -70,7 +70,7 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-def survey_results(request, survey, page=None):
+def survey_results(request, slug, page=None):
     """
     This should use some logic to show the most likely-to-be-relevant
     results -- and also consider the archive policy.
@@ -80,7 +80,7 @@ def survey_results(request, survey, page=None):
     else:
         page=get_int_or_404(page)
 
-    survey=get_object_or_404(Survey.live, slug=survey)
+    survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
     paginator, page_obj=paginate_or_404(submissions, page)
     # clean this out?
@@ -102,8 +102,8 @@ def _survey_results_redirect(request, survey, thanks=False):
     return response
 
 
-def survey_results_json(request, survey):
-    survey=get_object_or_404(Survey.live, slug=survey)
+def survey_results_json(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
     qs=survey.public_submissions()
 
     vars=dict((k.encode('utf-8', 'ignore'), v) for k, v in (request.POST if request.method=='POST' else request.GET).items())
@@ -137,8 +137,8 @@ def survey_results_json(request, survey):
     
 
 
-def survey_results_grid(request, survey):
-    survey=get_object_or_404(Survey.live, slug=survey)
+def survey_results_grid(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
     # this might call the JSON view, or not.
     return render_with_request(['crowdsourcing/%s_survey_grid.html' % survey.slug,
@@ -148,8 +148,8 @@ def survey_results_grid(request, survey):
                                request)
 
 
-def survey_results_map(request, survey):
-    survey=get_object_or_404(Survey.live, slug=survey)
+def survey_results_map(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
     location_fields=list(survey.get_public_location_fields())
     if not location_fields:
         raise Http404
@@ -162,9 +162,9 @@ def survey_results_map(request, survey):
                                request)
     
 
-def survey_results_archive(request, survey, page=None):    
+def survey_results_archive(request, slug, page=None):    
     page=1 if page is None else get_int_or_404(page) 
-    survey=get_object_or_404(Survey.live, slug=survey)
+    survey=get_object_or_404(Survey.live, slug=slug)
     archive_fields=list(survey.get_public_archive_fields())
     if not archive_fields:
         raise Http404
@@ -180,11 +180,11 @@ def survey_results_archive(request, survey, page=None):
     
 
     
-def survey_results_aggregate(request, survey):
+def survey_results_aggregate(request, slug):
     """
     this is where we generate graphs and all that good stuff.
     """
-    survey=get_object_or_404(Survey.live, slug=survey)
+    survey=get_object_or_404(Survey.live, slug=slug)
     aggregate_fields=list(survey.get_public_aggregate_fields())
     if not aggregate_fields:
         raise Http404
