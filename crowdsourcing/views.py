@@ -4,12 +4,15 @@ import httplib
 import logging
 
 # django-viewutil
+from django.db.models import Count
 from djview import *
 from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
 
+def _user_entered_survey(request, survey):
+    return bool(survey.submissions_for(request.user, request.session.session_key.lower()).count())
 
 def _survey_submit(request, survey):
     if survey.require_login and request.user.is_anonymous():
@@ -17,8 +20,7 @@ def _survey_submit(request, survey):
         return HttpResponseRedirect(reverse("auth_login") + '?next=%s' % request.path)
     if not hasattr(request, 'session'):
         return HttpResponse("Cookies must be enabled to use this application.", status=httplib.FORBIDDEN)
-    if (not survey.allow_multiple_submissions and
-        survey.submissions_for(request.user, request.session.session_key.lower()).count()):
+    if (not survey.allow_multiple_submissions and _user_entered_survey(request, survey)):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
                                    dict(survey=survey),
@@ -101,6 +103,33 @@ def _survey_results_redirect(request, survey, thanks=False):
         request.session['survey_thanks_%s' % survey.slug]='1'
     return response
 
+def can_enter(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
+    response=HttpResponse(mimetype='application/json')
+    dump(survey.allow_multiple_submissions or not _user_entered_survey(request, survey), response)
+    return response
+
+def _survey_questions_api(survey, questionData):
+    response=HttpResponse(mimetype='application/json')
+    dump({"id": survey.id, "title": survey.title, "description": survey.description, "questions": questionData}, response)
+    return response
+    
+def questions(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
+    questionData = {}
+    for q in survey.questions.all():
+        questionData[q.id] = {"question": q.question, "answers": q.parsed_options}
+    return _survey_questions_api(survey, questionData)
+
+def aggregate_results(request, slug):
+    survey=get_object_or_404(Survey.live, slug=slug)
+    questionData = {}
+    for question in survey.questions.all():
+        subData = {}
+        for answer in question.answer_set.values('text_answer').annotate(count=Count("id")):
+            subData[answer['text_answer']] = answer['count']
+        questionData[question.question] = subData
+    return _survey_questions_api(survey, questionData)
 
 def survey_results_json(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)

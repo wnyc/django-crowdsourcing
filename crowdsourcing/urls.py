@@ -2,7 +2,10 @@ from __future__ import absolute_import
 
 from django.conf.urls.defaults import patterns, url
 
-from .views import (survey_detail,
+from .views import (aggregate_results,
+                    can_enter,
+                    questions,
+                    survey_detail,
                     survey_results,
                     survey_results_json,
                     survey_results_map,
@@ -35,5 +38,16 @@ urlpatterns=patterns(
         survey_results_json,
         name="survey_results_api"),
 
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/can_enter/$',
+        can_enter,
+        name="can_enter"),
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/questions/$',
+        questions,
+        name="questions"),
+    
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/aggregate_results/$',
+        aggregate_results,
+        name="aggregate_results"),
     )
 
