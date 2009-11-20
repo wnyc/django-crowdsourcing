@@ -111,7 +111,7 @@ def can_enter(request, slug):
 
 def _survey_questions_api(survey, questionData):
     response=HttpResponse(mimetype='application/json')
-    dump({"id": survey.id, "title": survey.title, "description": survey.description, "questions": questionData}, response)
+    dump({"id": survey.id, "title": survey.title, "tease": survey.tease, "description": survey.description, "questions": questionData}, response)
     return response
     
 def questions(request, slug):
