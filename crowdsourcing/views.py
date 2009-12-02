@@ -14,6 +14,13 @@ from .models import Survey, Submission, Answer
 def _user_entered_survey(request, survey):
     return bool(survey.submissions_for(request.user, request.session.session_key.lower()).count())
 
+def _get_remote_ip(request):
+    forwarded=request.META.get('HTTP_X_FORWARDED_FOR')
+    if forwarded:
+        return forwarded.split(',')[-1].strip()
+    return request.META['REMOTE_ADDR']
+        
+
 def _survey_submit(request, survey):
     if survey.require_login and request.user.is_anonymous():
         # again, the form should only be shown after the user is logged in, but to be safe...
@@ -32,7 +39,7 @@ def _survey_submit(request, survey):
         submission_form=forms[0]
         submission=submission_form.save(commit=False)
         submission.survey=survey
-        submission.ip_address=request.META.get('HTTP_X_FORWARDED_FOR', request.META['REMOTE_ADDR'])
+        submission.ip_address=_get_remote_ip(request)
         submission.is_public=not survey.moderate_submissions
         submission.save()
         for form in forms[1:]:
