@@ -40,26 +40,36 @@ class LiveSurveyManager(models.Manager):
             models.Q(ends_at__gt=now))
 
 
+class SurveyGroup(models.Model):
+    name = models.CharField(max_length=80)
+    slug = models.SlugField(unique=True)
+
+    def __unicode__(self):
+        return self.name
+
 class Survey(models.Model):
-    title=models.CharField(max_length=80)
-    slug=models.SlugField(unique=True)
-    tease=models.TextField(blank=True)
-    description=models.TextField(blank=True)
+    title = models.CharField(max_length=80)
+    slug = models.SlugField(unique=True)
+    tease = models.TextField(blank=True)
+    description = models.TextField(blank=True)
     
-    require_login=models.BooleanField(default=False)
-    allow_multiple_submissions=models.BooleanField(default=False)
-    moderate_submissions=models.BooleanField(default=local_settings.MODERATE_SUBMISSIONS)
-    archive_policy=models.results=models.IntegerField(choices=ARCHIVE_POLICY_CHOICES,
-                                                      default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
+    require_login = models.BooleanField(default=False)
+    allow_multiple_submissions = models.BooleanField(default=False)
+    moderate_submissions = models.BooleanField(
+        default=local_settings.MODERATE_SUBMISSIONS)
+    archive_policy = models.results=models.IntegerField(
+        choices=ARCHIVE_POLICY_CHOICES,
+        default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
 
-    starts_at=models.DateTimeField(default=datetime.datetime.now)
-    survey_date=models.DateField(blank=True, null=True, editable=False)
-    ends_at=models.DateTimeField(null=True, blank=True)
-    is_published=models.BooleanField(default=False)
+    starts_at = models.DateTimeField(default=datetime.datetime.now)
+    survey_date = models.DateField(blank=True, null=True, editable=False)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    is_published = models.BooleanField(default=False)
 
-    site=models.ForeignKey(Site)
+    site = models.ForeignKey(Site)
+    survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
     # Flickr integration
-    flickr_set_id=models.CharField(max_length=60, blank=True)
+    flickr_set_id = models.CharField(max_length=60, blank=True)
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -73,12 +83,12 @@ class Survey(models.Model):
         super(Survey, self).save(**kwargs)
 
     class Meta:
-        ordering=('-starts_at',)
-        unique_together=(('survey_date', 'slug'),)
+        ordering = ('-starts_at',)
+        unique_together = (('survey_date', 'slug'),)
 
     @property
     def is_open(self):
-        now=datetime.datetime.now()
+        now = datetime.datetime.now()
         if self.ends_at:
             return self.starts_at <= now < self.ends_at
         else:
