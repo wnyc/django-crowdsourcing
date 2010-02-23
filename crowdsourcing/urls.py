@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from django.conf.urls.defaults import patterns, url
 
 from .views import (aggregate_results,
+                    allowed_actions,
                     can_enter,
                     questions,
                     survey_detail,
@@ -41,6 +42,10 @@ urlpatterns=patterns(
     url(r'^(?P<slug>[-a-z0-9_]+)/api/can_enter/$',
         can_enter,
         name="can_enter"),
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/allowed_actions/$',
+        allowed_actions,
+        name="allowed_actions"),
 
     url(r'^(?P<slug>[-a-z0-9_]+)/api/questions/$',
         questions,

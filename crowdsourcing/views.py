@@ -3,7 +3,6 @@ from __future__ import absolute_import
 import httplib
 import logging
 
-# django-viewutil
 from django.db.models import Count
 from djview import *
 from djview.jsonutil import dump, dumps
@@ -11,39 +10,53 @@ from djview.jsonutil import dump, dumps
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
 
+
 def _user_entered_survey(request, survey):
     return bool(survey.submissions_for(request.user, request.session.session_key.lower()).count())
+
+
+def _user_too_many_entries(request, survey):
+    return all((
+        not survey.allow_multiple_submissions,
+        _user_entered_survey(request, survey),))
 
 def _get_remote_ip(request):
     forwarded=request.META.get('HTTP_X_FORWARDED_FOR')
     if forwarded:
         return forwarded.split(',')[-1].strip()
     return request.META['REMOTE_ADDR']
-        
+
+
+def login_url(request):
+    return reverse("auth_login") + '?next=%s' % request.path
+
 
 def _survey_submit(request, survey):
     if survey.require_login and request.user.is_anonymous():
-        # again, the form should only be shown after the user is logged in, but to be safe...
-        return HttpResponseRedirect(reverse("auth_login") + '?next=%s' % request.path)
+        # again, the form should only be shown after the user is logged in, but
+        # to be safe...
+        return HttpResponseRedirect(login_url(request))
     if not hasattr(request, 'session'):
         return HttpResponse("Cookies must be enabled to use this application.", status=httplib.FORBIDDEN)
-    if (not survey.allow_multiple_submissions and _user_entered_survey(request, survey)):
+    if (_user_too_many_entries(request, survey)):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
                                    dict(survey=survey),
                                    request)
 
-    forms=forms_for_survey(survey, request)
+    forms = forms_for_survey(survey, request)
     
     if all(form.is_valid() for form in forms):
-        submission_form=forms[0]
-        submission=submission_form.save(commit=False)
-        submission.survey=survey
-        submission.ip_address=_get_remote_ip(request)
-        submission.is_public=not survey.moderate_submissions
+        submission_form = forms[0]
+        submission = submission_form.save(commit=False)
+        submission.survey = survey
+        submission.ip_address = _get_remote_ip(request)
+        submission.is_public = not survey.moderate_submissions
+        if request.user.is_authenticated():
+            submission.user = request.user
         submission.save()
         for form in forms[1:]:
-            answer=form.save(commit=False)
+            answer = form.save(commit=False)
             if isinstance(answer, (list,tuple)):
                 for a in answer:
                     a.submission=submission
@@ -54,28 +67,50 @@ def _survey_submit(request, survey):
                     answer.submission=submission
                     answer.save()
         # go to survey results/thanks page
-        return _survey_results_redirect(request, survey, thanks=True)
+        if survey.can_have_public_submissions():
+            return _survey_results_redirect(request, survey, thanks=True)
+        return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
 
 
 def _survey_show_form(request, survey, forms):
-    return render_with_request(['crowdsourcing/%s_survey_detail.html' % survey.slug,
+    specific_template = 'crowdsourcing/%s_survey_detail.html' % survey.slug
+    entered = _user_entered_survey(request, survey)
+    return render_with_request([specific_template,
                                 'crowdsourcing/survey_detail.html'],
-                               dict(survey=survey, forms=forms),
+                               dict(survey=survey,
+                                    forms=forms,
+                                    entered=entered,
+                                    login_url=login_url(request)),
                                request)
 
 
-def survey_detail(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    can_show_form=survey.is_open and (request.user.is_authenticated() or not survey.require_login)
+def can_show_form(request, survey):
+    authenticated = request.user.is_authenticated()
+    return all((
+        survey.is_open,
+        authenticated or not survey.require_login,
+        not _user_too_many_entries(request, survey)))
     
-    if can_show_form:
-        if request.method=='POST':
+def survey_detail(request, slug):
+    survey = get_object_or_404(Survey, slug=slug, is_published=True)
+    if not survey.is_open and survey.can_have_public_submissions():
+        return _survey_results_redirect(request, survey)
+    need_login = all((
+        survey.is_open,
+        survey.require_login,
+        not request.user.is_authenticated()))
+    if can_show_form(request, survey):
+        if request.method == 'POST':
             return _survey_submit(request, survey)
-        forms =forms_for_survey(survey, request)
-    else:
-        forms=()
+        forms = forms_for_survey(survey, request)
+    elif need_login:
+        forms = ()
+    elif survey.can_have_public_submissions():
+        return _survey_results_redirect(request, survey)
+    else: # Survey is closed with private results.
+        forms = ()
     return _survey_show_form(request, survey, forms)
 
 
@@ -85,15 +120,17 @@ def survey_results(request, slug, page=None):
     results -- and also consider the archive policy.
     """
     if page is None:
-        page=1
+        page = 1
     else:
-        page=get_int_or_404(page)
+        page = get_int_or_404(page)
 
-    survey=get_object_or_404(Survey.live, slug=slug)
-    submissions=survey.public_submissions()
-    paginator, page_obj=paginate_or_404(submissions, page)
+    survey = get_object_or_404(Survey.live, slug=slug)
+    if not survey.can_have_public_submissions():
+        raise Http404
+    submissions = survey.public_submissions()
+    paginator, page_obj = paginate_or_404(submissions, page)
     # clean this out?
-    thanks=request.session.get('survey_thanks_%s' % survey.slug)
+    thanks = request.session.get('survey_thanks_%s' % survey.slug)
     return render_with_request(['crowdsourcing/%s_survey_results.html' % survey.slug,
                                 'crowdsourcing/survey_results.html'],
                                dict(survey=survey,
@@ -104,17 +141,27 @@ def survey_results(request, slug, page=None):
     
 
 def _survey_results_redirect(request, survey, thanks=False):
-    url=reverse('survey_results', kwargs={'slug': survey.slug})
-    response=HttpResponseRedirect(url)
+    url = reverse('survey_results', kwargs={'slug': survey.slug})
+    response = HttpResponseRedirect(url)
     if thanks:
-        request.session['survey_thanks_%s' % survey.slug]='1'
+        request.session['survey_thanks_%s' % survey.slug] = '1'
     return response
 
+
 def can_enter(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    response=HttpResponse(mimetype='application/json')
-    dump(survey.allow_multiple_submissions or not _user_entered_survey(request, survey), response)
+    survey = get_object_or_404(Survey.live, slug=slug)
+    response = HttpResponse(mimetype='application/json')
+    dump(not _user_too_many_entries(request, survey), response)
     return response
+
+
+def allowed_actions(request, slug):
+    survey = get_object_or_404(Survey.live, slug=slug)
+    response = HttpResponse(mimetype='application/json')
+    dump({"enter": can_show_form(request, survey),
+          "view": survey.can_have_public_submissions()}, response)
+    return response
+
 
 def _survey_questions_api(survey, questionData):
     response=HttpResponse(mimetype='application/json')

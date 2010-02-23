@@ -91,9 +91,7 @@ class Survey(models.Model):
         now = datetime.datetime.now()
         if self.ends_at:
             return self.starts_at <= now < self.ends_at
-        else:
-            return self.starts_at <= now
-
+        return self.starts_at <= now
 
     def get_public_location_fields(self):
         return self.questions.filter(option_type==OPTION_TYPE_CHOICES.LOCATION_FIELD,
@@ -119,18 +117,21 @@ class Survey(models.Model):
     def submissions_for(self, user, session_key):
         q=models.Q(survey=self)
         if user.is_authenticated():
-            q=q & models.Q(user=user)
+            q = q & models.Q(user=user)
         elif session_key:
-            q=q & models.Q(session_key=session_key)
+            q = q & models.Q(session_key=session_key)
         else:
             # can't pinpoint user, return none
             return Submission.objects.none()
         return Submission.objects.filter(q)
 
+    def can_have_public_submissions(self):
+        return self.archive_policy != ARCHIVE_POLICY_CHOICES.NEVER and (
+            self.archive_policy == ARCHIVE_POLICY_CHOICES.IMMEDIATE or
+            not self.is_open)
+
     def public_submissions(self):
-        if self.archive_policy==ARCHIVE_POLICY_CHOICES.NEVER or (
-            self.archive_policy==ARCHIVE_POLICY_CHOICES.POST_CLOSE and
-            self.is_open):
+        if not self.can_have_public_submissions():
             return self.submission_set.none()
         return self.submission_set.filter(is_public=True)
 
@@ -141,8 +142,8 @@ class Survey(models.Model):
     def get_absolute_url(self):
         return ('survey_detail', (), {'slug': self.slug })
 
-    objects=models.Manager()
-    live=LiveSurveyManager()
+    objects = models.Manager()
+    live = LiveSurveyManager()
 
     
 OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
@@ -195,17 +196,17 @@ class Question(models.Model):
 
 
 class Submission(models.Model):
-    survey=models.ForeignKey(Survey)
-    user=models.ForeignKey(User, null=True)
-    ip_address=models.IPAddressField()
-    submitted_at=models.DateTimeField(default=datetime.datetime.now)
-    session_key=models.CharField(max_length=40, blank=True, editable=False)
+    survey = models.ForeignKey(Survey)
+    user = models.ForeignKey(User, null=True)
+    ip_address = models.IPAddressField()
+    submitted_at = models.DateTimeField(default=datetime.datetime.now)
+    session_key = models.CharField(max_length=40, blank=True, editable=False)
 
     # for moderation
-    is_public=models.BooleanField(default=True)
+    is_public = models.BooleanField(default=True)
 
     class Meta:
-        ordering=('-submitted_at',)
+        ordering = ('-submitted_at',)
 
     def to_jsondata(self):
         def to_json(v):
@@ -221,8 +222,8 @@ class Submission(models.Model):
             # avoid called __getattr__
             return self.__dict__['_answer_dict']
         except KeyError:
-            answers=self.answer_set.all()
-            d=dict((a.question.fieldname, a.value) for a in answers)
+            answers = self.answer_set.all()
+            d = dict((a.question.fieldname, a.value) for a in answers)
             self.__dict__['_answer_dict']=d
             return d
 
@@ -230,7 +231,7 @@ class Submission(models.Model):
         return self.get_answer_dict().items()
 
     def __getattr__(self, k):
-        d=self.get_answer_dict()
+        d = self.get_answer_dict()
         try:
             return d[k]
         except KeyError:
@@ -243,21 +244,21 @@ class Submission(models.Model):
 
 
 class Answer(models.Model):
-    submission=models.ForeignKey(Submission)
-    question=models.ForeignKey(Question)
-    text_answer=models.TextField(blank=True)
-    integer_answer=models.IntegerField(null=True)
-    float_answer=models.FloatField(null=True)
-    boolean_answer=models.NullBooleanField()
-    image_answer=ImageWithThumbnailsField(max_length=500,
-                                          blank=True,
-                                          thumbnail=dict(size=(250,250)),
-                                          upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
-    latitude=models.FloatField(blank=True, null=True)
-    longitude=models.FloatField(blank=True, null=True)
+    submission = models.ForeignKey(Submission)
+    question = models.ForeignKey(Question)
+    text_answer = models.TextField(blank=True)
+    integer_answer = models.IntegerField(null=True)
+    float_answer = models.FloatField(null=True)
+    boolean_answer = models.NullBooleanField()
+    image_answer = ImageWithThumbnailsField(max_length=500,
+                                            blank=True,
+                                            thumbnail=dict(size=(250,250)),
+                                            upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
 
-    flickr_id=models.CharField(max_length=64, blank=True)
-    photo_hash=models.CharField(max_length=40, null=True, blank=True, editable=False)    
+    flickr_id = models.CharField(max_length=64, blank=True)
+    photo_hash = models.CharField(max_length=40, null=True, blank=True, editable=False)    
 
     def value():
         def get(self):
