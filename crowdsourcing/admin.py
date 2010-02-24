@@ -6,7 +6,8 @@ from django.contrib import admin
 from django.forms import ModelForm, ValidationError
 from django.utils.translation import ugettext_lazy as _
 
-from .models import Question, Survey, Answer, Submission, SurveyGroup
+from .models import (Question, Survey, Answer, Submission, SurveyGroup,
+                     SurveyTag)
 
 
 class QuestionForm(ModelForm):
@@ -59,6 +60,11 @@ class SurveyGroupAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
 
 
+class SurveyTagAdmin(admin.ModelAdmin):
+    prepopulated_fields = {'slug': ('name',)}
+
+
 admin.site.register(Survey, SurveyAdmin)
 admin.site.register(Submission, SubmissionAdmin)
 admin.site.register(SurveyGroup, SurveyGroupAdmin)
+admin.site.register(SurveyTag, SurveyTagAdmin)

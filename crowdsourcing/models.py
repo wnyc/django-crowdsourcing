@@ -47,6 +47,15 @@ class SurveyGroup(models.Model):
     def __unicode__(self):
         return self.name
 
+
+class SurveyTag(models.Model):
+    name = models.CharField(max_length=80)
+    slug = models.SlugField(unique=True)
+
+    def __unicode__(self):
+        return self.name
+
+
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -68,6 +77,7 @@ class Survey(models.Model):
 
     site = models.ForeignKey(Site)
     survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
+    survey_tags = models.ManyToManyField(SurveyTag)
     # Flickr integration
     flickr_set_id = models.CharField(max_length=60, blank=True)
 
