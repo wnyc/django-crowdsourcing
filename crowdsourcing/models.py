@@ -23,7 +23,6 @@ except ImportError:
     sync_to_flickr=None
 
 
-
 ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
                                    'post-close',
                                    'never'))
@@ -31,7 +30,7 @@ ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
 
 class LiveSurveyManager(models.Manager):
     def get_query_set(self):
-        now=datetime.datetime.now()
+        nowv=vdatetime.datetime.now()
         return super(LiveSurveyManager, self).get_query_set().filter(
             is_published=True,
             starts_at__lte=now).filter(
@@ -39,13 +38,6 @@ class LiveSurveyManager(models.Manager):
             models.Q(ends_at__isnull=True) |
             models.Q(ends_at__gt=now))
 
-
-class SurveyGroup(models.Model):
-    name = models.CharField(max_length=80)
-    slug = models.SlugField(unique=True)
-
-    def __unicode__(self):
-        return self.name
 
 class Survey(models.Model):
     title = models.CharField(max_length=80)
@@ -67,7 +59,6 @@ class Survey(models.Model):
     is_published = models.BooleanField(default=False)
 
     site = models.ForeignKey(Site)
-    survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
     # Flickr integration
     flickr_set_id = models.CharField(max_length=60, blank=True)
 
@@ -75,11 +66,11 @@ class Survey(models.Model):
         return dict(title=self.title,
                     slug=self.slug,
                     description=self.description,
-                    questions=[q.to_jsondata() for q in self.questions.filter(answer_is_public=True)])
+                    questions=[q.to_jsondata() for q in \
+                               self.questions.filter(answer_is_public=True)])
     
-
     def save(self, **kwargs):
-        self.survey_date=self.starts_at.date()
+        self.survey_date = self.starts_at.date()
         super(Survey, self).save(**kwargs)
 
     class Meta:
@@ -94,28 +85,30 @@ class Survey(models.Model):
         return self.starts_at <= now
 
     def get_public_location_fields(self):
-        return self.questions.filter(option_type==OPTION_TYPE_CHOICES.LOCATION_FIELD,
-                                     answer_is_public=True)
+        return self.questions.filter(
+            option_type=OPTION_TYPE_CHOICES.LOCATION_FIELD,
+            answer_is_public=True)
 
     def get_public_archive_fields(self):
-        return self.questions.filter(option_type__in=(OPTION_TYPE_CHOICES.TEXT_FIELD,
-                                                      OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
-                                                      OPTION_TYPE_CHOICES.VIDEO_LINK,
-                                                      OPTION_TYPE_CHOICES.TEXT_AREA),
-                                     answer_is_public=True)
+        return self.questions.filter(
+            option_type__in=(OPTION_TYPE_CHOICES.TEXT_FIELD,
+                             OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
+                             OPTION_TYPE_CHOICES.VIDEO_LINK,
+                             OPTION_TYPE_CHOICES.TEXT_AREA),
+            answer_is_public=True)
 
     def get_public_aggregate_fields(self):
-        return self.questions.filter(option_type__in=(OPTION_TYPE_CHOICES.INTEGER,
-                                                      OPTION_TYPE_CHOICES.FLOAT,
-                                                      OPTION_TYPE_CHOICES.BOOLEAN,
-                                                      OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-                                                      OPTION_TYPE_CHOICES.RADIO_LIST,
-                                                      OPTION_TYPE_CHOICES.CHECKBOX_LIST),
-                                     answer_is_public=True)
-        
+        return self.questions.filter(
+            option_type__in=(OPTION_TYPE_CHOICES.INTEGER,
+                             OPTION_TYPE_CHOICES.FLOAT,
+                             OPTION_TYPE_CHOICES.BOOLEAN,
+                             OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+                             OPTION_TYPE_CHOICES.RADIO_LIST,
+                             OPTION_TYPE_CHOICES.CHECKBOX_LIST),
+            answer_is_public=True)
 
     def submissions_for(self, user, session_key):
-        q=models.Q(survey=self)
+        q = models.Q(survey=self)
         if user.is_authenticated():
             q = q & models.Q(user=user)
         elif session_key:
@@ -160,32 +153,47 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                          ('checkbox', 'Checkbox List'),],
                                         key=itemgetter(1)))
 
+
+FILTERABLE_OPTIONS_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
+                            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+                            OPTION_TYPE_CHOICES.RADIO_LIST,
+                            OPTION_TYPE_CHOICES.CHECKBOX_LIST)
+
                                  
 class Question(models.Model):
-    survey=models.ForeignKey(Survey, related_name="questions")
-    fieldname=models.CharField('field name',
-                               max_length=32,
-                               help_text=_('a single-word identifier used to track this value; '
-                                           'it must begin with a letter and may contain alphanumerics and underscores (no spaces).'))
-    question=models.TextField()
-    help_text=models.TextField(blank=True)
-    required=models.BooleanField(default=False)
-    order=models.IntegerField(null=True, blank=True)
-    option_type=models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
-    options=models.TextField(blank=True, default='')
-    answer_is_public=models.BooleanField(default=True)
+    survey = models.ForeignKey(Survey, related_name="questions")
+    label = models.CharField(max_length=32)
+    fieldname = models.CharField(
+        max_length=32,
+        help_text=_('a single-word identifier used to track this value; '
+                    'it must begin with a letter and may contain '
+                    'alphanumerics and underscores (no spaces).'))
+    question = models.TextField()
+    help_text = models.TextField(blank=True)
+    required = models.BooleanField(default=False)
+    order = models.IntegerField(null=True, blank=True)
+    option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
+    options = models.TextField(blank=True, default='')
+    answer_is_public = models.BooleanField(default=True)
+    use_as_filter = models.BooleanField(default=True)
 
+    @property
+    def is_filterable(self):
+        return (self.use_as_filter and
+                self.option_type in FILTERABLE_OPTION_TYPES)
+    
     def to_jsondata(self):
         return dict(fieldname=self.fieldname,
+                    label=self.label,
+                    is_filterable=self.is_filterable,
                     question=self.question,
                     required=self.required,
                     option_type=self.option_type,
                     options=self.parsed_options)
                     
-
     class Meta:
-        ordering=('order',)
-        unique_together=('fieldname', 'survey')
+        ordering = ('order',)
+        unique_together = ('fieldname', 'survey')
 
     def __unicode__(self):
         return self.question
@@ -213,8 +221,9 @@ class Submission(models.Model):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
-        return dict(data=dict((a.question.fieldname, to_json(a.value))
-                              for a in self.answer_set.filter(question__answer_is_public=True)),
+        return dict(data=dict(
+            (a.question.fieldname, to_json(a.value))
+            for a in self.answer_set.filter(question__answer_is_public=True)),
                     submitted_at=self.submitted_at)
     
     def get_answer_dict(self):
@@ -242,7 +251,6 @@ class Submission(models.Model):
         return self.get_answer_dict().get('email', '')
         
 
-
 class Answer(models.Model):
     submission = models.ForeignKey(Submission)
     question = models.ForeignKey(Question)
@@ -262,39 +270,41 @@ class Answer(models.Model):
 
     def value():
         def get(self):
-            ot=self.question.option_type
-            if ot==OPTION_TYPE_CHOICES.BOOLEAN:
+            ot = self.question.option_type
+            if ot == OPTION_TYPE_CHOICES.BOOLEAN:
                 return self.boolean_answer
-            elif ot==OPTION_TYPE_CHOICES.FLOAT:
+            elif ot == OPTION_TYPE_CHOICES.FLOAT:
                 return self.float_answer
-            elif ot==OPTION_TYPE_CHOICES.INTEGER:
+            elif ot == OPTION_TYPE_CHOICES.INTEGER:
                 return self.integer_answer
-            elif ot==OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+            elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
                 return self.image_answer
             return self.text_answer
         
         def set(self, v):
-            ot=self.question.option_type
-            if ot==OPTION_TYPE_CHOICES.BOOLEAN:
-                self.boolean_answer=bool(v)
-            elif ot==OPTION_TYPE_CHOICES.FLOAT:
-                self.float_answer=float(v)
-            elif ot==OPTION_TYPE_CHOICES.INTEGER:
-                self.integer_answer=int(v)
-            elif ot==OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
-                self.image_answer=v
+            ot = self.question.option_type
+            if ot == OPTION_TYPE_CHOICES.BOOLEAN:
+                self.boolean_answer = bool(v)
+            elif ot == OPTION_TYPE_CHOICES.FLOAT:
+                self.float_answer = float(v)
+            elif ot == OPTION_TYPE_CHOICES.INTEGER:
+                self.integer_answer = int(v)
+            elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+                self.image_answer = v
             else:
-                self.text_answer=v
+                self.text_answer = v
                 
         return get, set
     value=property(*value())
 
     class Meta:
-        ordering=('question',)
+        ordering = ('question',)
 
     def save(self, **kwargs):
+        # or should this be in a signal?  Or build in an option
+        # to manage asynchronously? @TBD
         if sync_to_flickr:
-            survey=self.question.survey
+            survey = self.question.survey
             if survey.flickr_set_id:
                 try:
                     sync_to_flickr(self, survey.flickr_set_id)
@@ -305,4 +315,3 @@ class Answer(models.Model):
     
     def __unicode__(self):
         return unicode(self.question)
-

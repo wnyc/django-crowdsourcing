@@ -11,12 +11,14 @@ from .models import Question, Survey, Answer, Submission, SurveyGroup
 
 class QuestionForm(ModelForm):
     class Meta:
-        model=Question
+        model = Question
 
     def clean_fieldname(self):
-        fieldname=self.cleaned_data['fieldname'].strip()
+        fieldname = self.cleaned_data['fieldname'].strip()
         if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', fieldname):
-            raise ValidationError(_('The field name must start with a letter and contain nothing but alphanumerics and underscore.'))
+            raise ValidationError(_('The field name must start with a letter '
+                                    'and contain nothing but alphanumerics '
+                                    'and underscore.'))
         return fieldname
 
 
@@ -48,17 +50,14 @@ class AnswerInline(admin.TabularInline):
 
 class SubmissionAdmin(admin.ModelAdmin):
     search_fields=('answer__text_answer',) #'title', 'story', 'address')
-    list_display=('survey', 'submitted_at', 'user', 'ip_address', 'email', 'is_public',)
+    list_display=('survey', 'submitted_at', 'user',
+                  'ip_address', 'email', 'is_public',)
     list_editable=('is_public',)
     list_filter=('survey', 'submitted_at', 'is_public')
     date_hierarchy='submitted_at'
     inlines=[AnswerInline]
 
 
-class SurveyGroupAdmin(admin.ModelAdmin):
-    prepopulated_fields = {'slug': ('name',)}
-
-
 admin.site.register(Survey, SurveyAdmin)
 admin.site.register(Submission, SubmissionAdmin)
-admin.site.register(SurveyGroup, SurveyGroupAdmin)
+

@@ -252,6 +252,7 @@ def survey_results_archive(request, slug, page=None):
     if not archive_fields:
         raise Http404
     submissions=survey.public_submissions()
+    # add filtering from request.GET @TBD
     paginator, page_obj=paginate_or_404(submissions, page)
     return render_with_request(['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
                                 'crowdsourcing/survey_results_archive.html'],
@@ -262,7 +263,6 @@ def survey_results_archive(request, slug, page=None):
                                request)
     
 
-    
 def survey_results_aggregate(request, slug):
     """
     this is where we generate graphs and all that good stuff.
@@ -272,6 +272,7 @@ def survey_results_aggregate(request, slug):
     if not aggregate_fields:
         raise Http404
     submissions=survey.public_submissions()
+    # add filtering from request.GET @TBD    
     return render_with_request(['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
                                 'crowdsourcing/survey_results_aggregate.html'],
                                dict(survey=survey,
