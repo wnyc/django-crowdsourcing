@@ -129,6 +129,11 @@ class Survey(models.Model):
             return self.submission_set.none()
         return self.submission_set.filter(is_public=True)
 
+    def get_filters(self):
+        return self.questions.filter(use_filterable=True,
+                                     answer_is_public=True,
+                                     option_type__in=FILTERABLE_OPTION_TYPES)
+
     def __unicode__(self):
         return self.title
 
@@ -338,6 +343,11 @@ class SurveyReport(models.Model):
     slug = models.CharField(max_length=50, blank=True)
     # some text at the beginning
     summary = models.TextField(blank=True)
+
+    @models.permalink
+    def get_absolute_url(self):
+        return ('survey_report', (), {'slug': self.survey.slug,
+                                      'report': self.slug})
     
     class Meta:
         unique_together = (('survey', 'slug'),)
@@ -356,10 +366,5 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True)
     annotation = models.TextField(blank=True)
-    legend = models.TextField(blank=True)
-    # this isn't ideal.  What options could we support?
-    # colors and styles per fieldname spring to mind, as
-    # well as global options.
-    options = models.TextField(blank=True,
-                               'custom options for the display type, if applicable')
     order = PositionField(collection=('report',))
+

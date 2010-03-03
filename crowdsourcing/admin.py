@@ -6,7 +6,8 @@ from django.contrib import admin
 from django.forms import ModelForm, ValidationError
 from django.utils.translation import ugettext_lazy as _
 
-from .models import Question, Survey, Answer, Submission, SurveyGroup
+from .models import (Question, Survey, Answer, Submission,
+                     SurveyReport, SurveyReportDisplay)
 
 
 class QuestionForm(ModelForm):
@@ -23,9 +24,9 @@ class QuestionForm(ModelForm):
 
 
 class QuestionInline(admin.StackedInline):
-    model=Question
-    extra=1
-    form=QuestionForm
+    model = Question
+    extra = 1
+    form = QuestionForm
 
 
 class SurveyAdmin(admin.ModelAdmin):
@@ -42,22 +43,35 @@ class SurveyAdmin(admin.ModelAdmin):
     inlines = [QuestionInline]
 
 
+admin.site.register(Survey, SurveyAdmin)
+
+
 class AnswerInline(admin.TabularInline):
-    model=Answer
-    exclude=('question',)
-    extra=0
+    model = Answer
+    exclude = ('question',)
+    extra = 0
 
 
 class SubmissionAdmin(admin.ModelAdmin):
-    search_fields=('answer__text_answer',) #'title', 'story', 'address')
-    list_display=('survey', 'submitted_at', 'user',
-                  'ip_address', 'email', 'is_public',)
-    list_editable=('is_public',)
-    list_filter=('survey', 'submitted_at', 'is_public')
-    date_hierarchy='submitted_at'
-    inlines=[AnswerInline]
+    search_fields = ('answer__text_answer',) #'title', 'story', 'address')
+    list_display = ('survey', 'submitted_at', 'user',
+                    'ip_address', 'email', 'is_public',)
+    list_editable = ('is_public',)
+    list_filter = ('survey', 'submitted_at', 'is_public')
+    date_hierarchy = 'submitted_at'
+    inlines = [AnswerInline]
 
 
-admin.site.register(Survey, SurveyAdmin)
 admin.site.register(Submission, SubmissionAdmin)
 
+
+class SurveyReportDisplayInline(admin.StackedInline):
+    model = SurveyReportDisplay
+    extra = 3
+
+
+class SurveyReportAdmin(admin.ModelAdmin):
+    inlines = [SurveyReportDisplayInline]
+
+
+admin.site.register(SurveyReport, SurveyReportAdmin)    

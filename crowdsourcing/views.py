@@ -30,6 +30,17 @@ def _get_remote_ip(request):
     return request.META['REMOTE_ADDR']
 
 
+def _filter_submissions(requestdata, submissions):
+    qs_filters = {}
+    for fld in (f.fieldname for f in survey.get_filters()):
+        v= requestdata.get(fld)
+        if v:
+            qs_filters[fld] = v
+    if qs_filters:
+        submissions = submissions.filter(**qs_filters)
+    return submissions
+
+
 def login_url(request):
     return reverse("auth_login") + '?next=%s' % request.path
 
@@ -130,7 +141,7 @@ def survey_results(request, slug, page=None):
     survey = get_object_or_404(Survey.live, slug=slug)
     if not survey.can_have_public_submissions():
         raise Http404
-    submissions = survey.public_submissions()
+    submissions = _filter_submissions(request, survey.public_submissions())
     paginator, page_obj = paginate_or_404(submissions, page)
     # clean this out?
     thanks = request.session.get('survey_thanks_%s' % survey.slug)
@@ -201,7 +212,6 @@ def aggregate_results(request, slug):
 def survey_results_json(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     qs=survey.public_submissions()
-
     vars=dict((k.encode('utf-8', 'ignore'), v) \
               for k, v in (request.POST
                            if request.method=='POST'
@@ -235,7 +245,6 @@ def survey_results_json(request, slug):
     return response
     
 
-
 def survey_results_grid(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
@@ -264,14 +273,14 @@ def survey_results_map(request, slug):
     
 
 def survey_results_archive(request, slug, page=None):    
-    page=1 if page is None else get_int_or_404(page) 
-    survey=get_object_or_404(Survey.live, slug=slug)
-    archive_fields=list(survey.get_public_archive_fields())
+    page = 1 if page is None else get_int_or_404(page) 
+    survey = get_object_or_404(Survey.live, slug=slug)
+    archive_fields = list(survey.get_public_archive_fields())
     if not archive_fields:
         raise Http404
-    submissions=survey.public_submissions()
-    # add filtering from request.GET @TBD
-    paginator, page_obj=paginate_or_404(submissions, page)
+    submissions = _filter_submissions(request.GET,
+                                      survey.public_submissions())
+    paginator, page_obj = paginate_or_404(submissions, page)
     return render_with_request(
         ['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
          'crowdsourcing/survey_results_archive.html'],
@@ -286,12 +295,12 @@ def survey_results_aggregate(request, slug):
     """
     this is where we generate graphs and all that good stuff.
     """
-    survey=get_object_or_404(Survey.live, slug=slug)
-    aggregate_fields=list(survey.get_public_aggregate_fields())
+    survey = get_object_or_404(Survey.live, slug=slug)
+    aggregate_fields = list(survey.get_public_aggregate_fields())
     if not aggregate_fields:
         raise Http404
-    submissions=survey.public_submissions()
-    # add filtering from request.GET @TBD    
+    submissions = _filter_submissions(request.GET,
+                                      survey.public_submissions())
     return render_with_request(
         ['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
          'crowdsourcing/survey_results_aggregate.html'],
@@ -300,3 +309,39 @@ def survey_results_aggregate(request, slug):
              submissions=submissions),
         request)
     
+
+def survey_report(request, slug, report='', page=None):
+    """
+    show a report for the survey
+    """
+    page = 1 if page is None else get_int_or_404(page)     
+    survey = get_object_or_404(Survey.live,
+                               slug=slug,
+                               site__id=settings.SITE_ID)
+    # is the survey anything we can actually have a report on?
+    if not survey.can_have_public_submissions():
+        raise Http404
+
+    submissions = _filter_submissions(request.GET,
+                                      survey.public_submissions())
+    paginator, page_obj = paginate_or_404(submissions, page)
+    reports = survey.surveyreport_set.all()    
+    if not reports:
+        the_report = None
+    else:
+        try:
+            the_report = reports.get(slug=report)
+        except SurveyReport.DoesNotExist:
+            if report == '' and len(reports) == 1:
+            the_report = reports[0]
+    templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
+                 'crowdsourcing/survey_report.html']
+
+    return render_with_request(templates,
+                               dict(survey=survey,
+                                    submissions=submissions,
+                                    paginator=paginator,
+                                    page_obj=page_obj,
+                                    reports=reports,
+                                    report=the_report),
+                               request)
