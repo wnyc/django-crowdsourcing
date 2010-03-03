@@ -12,13 +12,16 @@ from .models import Survey, Submission, Answer
 
 
 def _user_entered_survey(request, survey):
-    return bool(survey.submissions_for(request.user, request.session.session_key.lower()).count())
+    return bool(survey.submissions_for(
+        request.user,
+        request.session.session_key.lower()).count())
 
 
 def _user_too_many_entries(request, survey):
     return all((
         not survey.allow_multiple_submissions,
         _user_entered_survey(request, survey),))
+
 
 def _get_remote_ip(request):
     forwarded=request.META.get('HTTP_X_FORWARDED_FOR')
@@ -93,14 +96,14 @@ def can_show_form(request, survey):
         authenticated or not survey.require_login,
         not _user_too_many_entries(request, survey)))
     
+
 def survey_detail(request, slug):
     survey = get_object_or_404(Survey, slug=slug, is_published=True)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
-    need_login = all((
-        survey.is_open,
-        survey.require_login,
-        not request.user.is_authenticated()))
+    need_login = (survey.is_open 
+                  and survey.require_login
+                  and not request.user.is_authenticated())
     if can_show_form(request, survey):
         if request.method == 'POST':
             return _survey_submit(request, survey)
@@ -165,31 +168,44 @@ def allowed_actions(request, slug):
 
 def _survey_questions_api(survey, questionData):
     response=HttpResponse(mimetype='application/json')
-    dump({"id": survey.id, "title": survey.title, "tease": survey.tease, "description": survey.description, "questions": questionData}, response)
+    dump({"id": survey.id,
+          "title": survey.title,
+          "tease": survey.tease,
+          "description": survey.description,
+          "questions": questionData},
+         response)
     return response
     
+
 def questions(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     questionData = {}
     for q in survey.questions.all():
-        questionData[q.id] = {"question": q.question, "answers": q.parsed_options}
+        questionData[q.id] = {"question": q.question,
+                              "answers": q.parsed_options}
     return _survey_questions_api(survey, questionData)
+
 
 def aggregate_results(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     questionData = {}
     for question in survey.questions.all():
         subData = {}
-        for answer in question.answer_set.values('text_answer').annotate(count=Count("id")):
+        for answer in question.answer_set.values('text_answer')\
+                .annotate(count=Count("id")):
             subData[answer['text_answer']] = answer['count']
         questionData[question.question] = subData
     return _survey_questions_api(survey, questionData)
+
 
 def survey_results_json(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     qs=survey.public_submissions()
 
-    vars=dict((k.encode('utf-8', 'ignore'), v) for k, v in (request.POST if request.method=='POST' else request.GET).items())
+    vars=dict((k.encode('utf-8', 'ignore'), v) \
+              for k, v in (request.POST
+                           if request.method=='POST'
+                           else request.GET).items())
     limit=vars.pop('limit', 30)
     offset=vars.pop('offset', 0)
     order=vars.pop('order', None)
@@ -224,11 +240,12 @@ def survey_results_grid(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     submissions=survey.public_submissions()
     # this might call the JSON view, or not.
-    return render_with_request(['crowdsourcing/%s_survey_grid.html' % survey.slug,
-                                'crowdsourcing/survey_grid.html'],
-                               dict(survey=survey,
-                                    submissions=submissions),
-                               request)
+    return render_with_request(
+        ['crowdsourcing/%s_survey_grid.html' % survey.slug,
+         'crowdsourcing/survey_grid.html'],
+        dict(survey=survey,
+             submissions=submissions),
+        request)
 
 
 def survey_results_map(request, slug):
@@ -237,12 +254,13 @@ def survey_results_map(request, slug):
     if not location_fields:
         raise Http404
     submissions=survey.public_submissions()    
-    return render_with_request(['crowdsourcing/%s_survey_results_map.html' % survey.slug,
-                                'crowdsourcing/survey_results_map.html'],
-                               dict(survey=survey,
-                                    submissions=submissions,
-                                    location_fields=location_fields),
-                               request)
+    return render_with_request(
+        ['crowdsourcing/%s_survey_results_map.html' % survey.slug,
+         'crowdsourcing/survey_results_map.html'],
+        dict(survey=survey,
+             submissions=submissions,
+             location_fields=location_fields),
+        request)
     
 
 def survey_results_archive(request, slug, page=None):    
@@ -254,13 +272,14 @@ def survey_results_archive(request, slug, page=None):
     submissions=survey.public_submissions()
     # add filtering from request.GET @TBD
     paginator, page_obj=paginate_or_404(submissions, page)
-    return render_with_request(['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
-                                'crowdsourcing/survey_results_archive.html'],
-                               dict(survey=survey,
-                                    archive_fields=archive_fields,
-                                    paginator=paginator,
-                                    page_obj=page_obj),
-                               request)
+    return render_with_request(
+        ['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
+         'crowdsourcing/survey_results_archive.html'],
+        dict(survey=survey,
+             archive_fields=archive_fields,
+             paginator=paginator,
+             page_obj=page_obj),
+        request)
     
 
 def survey_results_aggregate(request, slug):
@@ -273,10 +292,11 @@ def survey_results_aggregate(request, slug):
         raise Http404
     submissions=survey.public_submissions()
     # add filtering from request.GET @TBD    
-    return render_with_request(['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
-                                'crowdsourcing/survey_results_aggregate.html'],
-                               dict(survey=survey,
-                                    aggregate_fields=aggregate_fields,
-                                    submissions=submissions),
-                               request)
+    return render_with_request(
+        ['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
+         'crowdsourcing/survey_results_aggregate.html'],
+        dict(survey=survey,
+             aggregate_fields=aggregate_fields,
+             submissions=submissions),
+        request)
     

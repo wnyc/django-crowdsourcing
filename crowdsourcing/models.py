@@ -15,26 +15,29 @@ from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
+from positions.fields import PositionField
+
 try:
     from .flickrsupport import sync_to_flickr
 except ImportError:
     logging.warn('no flickr support available')
-    
-    sync_to_flickr=None
+
+    sync_to_flickr = None
 
 
-ARCHIVE_POLICY_CHOICES=ChoiceEnum(('immediate',
-                                   'post-close',
-                                   'never'))
+ARCHIVE_POLICY_CHOICES = ChoiceEnum(('immediate',
+                                     'post-close',
+                                     'never'))
 
 
 class LiveSurveyManager(models.Manager):
+
     def get_query_set(self):
-        nowv=vdatetime.datetime.now()
+        now = datetime.datetime.now()
         return super(LiveSurveyManager, self).get_query_set().filter(
             is_published=True,
             starts_at__lte=now).filter(
-            ~models.Q(archive_policy__exact=ARCHIVE_POLICY_CHOICES.NEVER) | 
+            ~models.Q(archive_policy__exact=ARCHIVE_POLICY_CHOICES.NEVER) |
             models.Q(ends_at__isnull=True) |
             models.Q(ends_at__gt=now))
 
@@ -44,23 +47,21 @@ class Survey(models.Model):
     slug = models.SlugField(unique=True)
     tease = models.TextField(blank=True)
     description = models.TextField(blank=True)
-    
+
     require_login = models.BooleanField(default=False)
     allow_multiple_submissions = models.BooleanField(default=False)
     moderate_submissions = models.BooleanField(
         default=local_settings.MODERATE_SUBMISSIONS)
-    archive_policy = models.results=models.IntegerField(
+    archive_policy = models.IntegerField(
         choices=ARCHIVE_POLICY_CHOICES,
         default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
-
     starts_at = models.DateTimeField(default=datetime.datetime.now)
     survey_date = models.DateField(blank=True, null=True, editable=False)
     ends_at = models.DateTimeField(null=True, blank=True)
     is_published = models.BooleanField(default=False)
-
     site = models.ForeignKey(Site)
-    # Flickr integration
-    flickr_set_id = models.CharField(max_length=60, blank=True)
+    # flickr integration
+    flickr_pool_id = models.CharField(max_length=60, blank=True)
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -68,7 +69,7 @@ class Survey(models.Model):
                     description=self.description,
                     questions=[q.to_jsondata() for q in \
                                self.questions.filter(answer_is_public=True)])
-    
+
     def save(self, **kwargs):
         self.survey_date = self.starts_at.date()
         super(Survey, self).save(**kwargs)
@@ -133,12 +134,12 @@ class Survey(models.Model):
 
     @models.permalink
     def get_absolute_url(self):
-        return ('survey_detail', (), {'slug': self.slug })
+        return ('survey_detail', (), {'slug': self.slug})
 
     objects = models.Manager()
     live = LiveSurveyManager()
 
-    
+
 OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                          ('email', 'Email Field'),
                                          ('photo', 'Photo Upload'),
@@ -150,7 +151,7 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                          ('text', 'Text Area'),
                                          ('select', 'Select One Choice'),
                                          ('radio', 'Radio List'),
-                                         ('checkbox', 'Checkbox List'),],
+                                         ('checkbox', 'Checkbox List')],
                                         key=itemgetter(1)))
 
 
@@ -159,7 +160,7 @@ FILTERABLE_OPTIONS_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
                             OPTION_TYPE_CHOICES.RADIO_LIST,
                             OPTION_TYPE_CHOICES.CHECKBOX_LIST)
 
-                                 
+
 class Question(models.Model):
     survey = models.ForeignKey(Survey, related_name="questions")
     label = models.CharField(max_length=32)
@@ -171,7 +172,8 @@ class Question(models.Model):
     question = models.TextField()
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    order = models.IntegerField(null=True, blank=True)
+    # use PositionField @TBD
+    order = PositionField(collection=('survey',))
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -181,7 +183,7 @@ class Question(models.Model):
     def is_filterable(self):
         return (self.use_as_filter and
                 self.option_type in FILTERABLE_OPTION_TYPES)
-    
+
     def to_jsondata(self):
         return dict(fieldname=self.fieldname,
                     label=self.label,
@@ -189,8 +191,9 @@ class Question(models.Model):
                     question=self.question,
                     required=self.required,
                     option_type=self.option_type,
+                    answer_is_public=self.answer_is_public,
                     options=self.parsed_options)
-                    
+
     class Meta:
         ordering = ('order',)
         unique_together = ('fieldname', 'survey')
@@ -217,6 +220,7 @@ class Submission(models.Model):
         ordering = ('-submitted_at',)
 
     def to_jsondata(self):
+
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
@@ -225,7 +229,7 @@ class Submission(models.Model):
             (a.question.fieldname, to_json(a.value))
             for a in self.answer_set.filter(question__answer_is_public=True)),
                     submitted_at=self.submitted_at)
-    
+
     def get_answer_dict(self):
         try:
             # avoid called __getattr__
@@ -233,7 +237,7 @@ class Submission(models.Model):
         except KeyError:
             answers = self.answer_set.all()
             d = dict((a.question.fieldname, a.value) for a in answers)
-            self.__dict__['_answer_dict']=d
+            self.__dict__['_answer_dict'] = d
             return d
 
     def items(self):
@@ -249,7 +253,7 @@ class Submission(models.Model):
     @property
     def email(self):
         return self.get_answer_dict().get('email', '')
-        
+
 
 class Answer(models.Model):
     submission = models.ForeignKey(Submission)
@@ -258,17 +262,22 @@ class Answer(models.Model):
     integer_answer = models.IntegerField(null=True)
     float_answer = models.FloatField(null=True)
     boolean_answer = models.NullBooleanField()
-    image_answer = ImageWithThumbnailsField(max_length=500,
-                                            blank=True,
-                                            thumbnail=dict(size=(250,250)),
-                                            upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
+    image_answer = ImageWithThumbnailsField(
+        max_length=500,
+        blank=True,
+        thumbnail=dict(size=(250, 250)),
+        upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
 
     flickr_id = models.CharField(max_length=64, blank=True)
-    photo_hash = models.CharField(max_length=40, null=True, blank=True, editable=False)    
+    photo_hash = models.CharField(max_length=40,
+                                  null=True,
+                                  blank=True,
+                                  editable=False)
 
     def value():
+
         def get(self):
             ot = self.question.option_type
             if ot == OPTION_TYPE_CHOICES.BOOLEAN:
@@ -280,7 +289,7 @@ class Answer(models.Model):
             elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
                 return self.image_answer
             return self.text_answer
-        
+
         def set(self, v):
             ot = self.question.option_type
             if ot == OPTION_TYPE_CHOICES.BOOLEAN:
@@ -293,9 +302,9 @@ class Answer(models.Model):
                 self.image_answer = v
             else:
                 self.text_answer = v
-                
+
         return get, set
-    value=property(*value())
+    value = property(*value())
 
     class Meta:
         ordering = ('question',)
@@ -305,13 +314,52 @@ class Answer(models.Model):
         # to manage asynchronously? @TBD
         if sync_to_flickr:
             survey = self.question.survey
-            if survey.flickr_set_id:
+            if survey.flickr_pool_id:
                 try:
-                    sync_to_flickr(self, survey.flickr_set_id)
+                    sync_to_flickr(self, survey.flickr_pool_id)
                 except:
                     logging.exception("error in syncing to flickr")
-                    
+
         super(Answer, self).save(**kwargs)
-    
+
     def __unicode__(self):
         return unicode(self.question)
+
+
+class SurveyReport(models.Model):
+    """
+    a survey report permits the presentation of data submitted in a
+    survey to be customized.  It consists of a series of display
+    options, which each take a display type, a series of fieldnames,
+    and an annotation.  It also has article-like fields of its own.
+    """
+    survey = models.ForeignKey(Survey)
+    title = models.CharField(max_length=50, blank=True)
+    slug = models.CharField(max_length=50, blank=True)
+    # some text at the beginning
+    summary = models.TextField(blank=True)
+    
+    class Meta:
+        unique_together = (('survey', 'slug'),)
+        ordering = ('title',)
+
+    def __unicode__(self):
+        return self.title
+
+
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie bar grid')
+
+
+class SurveyReportDisplay(models.Model):
+    report = models.ForeignKey(SurveyReport)
+    display_type = models.PositiveIntegerField(
+        choices=SURVEY_DISPLAY_TYPE_CHOICES)
+    fieldnames = models.TextField(blank=True)
+    annotation = models.TextField(blank=True)
+    legend = models.TextField(blank=True)
+    # this isn't ideal.  What options could we support?
+    # colors and styles per fieldname spring to mind, as
+    # well as global options.
+    options = models.TextField(blank=True,
+                               'custom options for the display type, if applicable')
+    order = PositionField(collection=('report',))
