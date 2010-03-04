@@ -1,4 +1,5 @@
 syntax: glob
 *.pyc
+*.swp
 Crowdsourcing.egg*
 build/lib/crowdsourcing/*

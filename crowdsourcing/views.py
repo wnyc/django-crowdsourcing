@@ -45,6 +45,8 @@ def _survey_submit(request, survey):
                                    request)
 
     forms = forms_for_survey(survey, request)
+    for form in forms:
+        print "Is form valid? %s" % str(form.is_valid())
     
     if all(form.is_valid() for form in forms):
         submission_form = forms[0]
@@ -62,7 +64,6 @@ def _survey_submit(request, survey):
                     a.submission=submission
                     a.save()
             else:
-                print form, answer
                 if answer:
                     answer.submission=submission
                     answer.save()
@@ -164,19 +165,26 @@ def allowed_actions(request, slug):
 
 
 def _survey_questions_api(survey, questionData):
-    response=HttpResponse(mimetype='application/json')
-    dump({"id": survey.id, "title": survey.title, "tease": survey.tease, "description": survey.description, "questions": questionData}, response)
+    response = HttpResponse(mimetype='application/json')
+    url = reverse('survey_detail', kwargs={'slug': survey.slug})
+    dump({"id": survey.id,
+          "title": survey.title,
+          "tease": survey.tease,
+          "description": survey.description,
+          "submit_url": url,
+          "questions": questionData},
+         response)
     return response
     
+
 def questions(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    questionData = {}
-    for q in survey.questions.all():
-        questionData[q.id] = {"question": q.question, "answers": q.parsed_options}
-    return _survey_questions_api(survey, questionData)
+    survey = get_object_or_404(Survey.live, slug=slug)
+    questions = survey.questions.all().order_by("order")
+    return _survey_questions_api(survey, [q.to_jsondata() for q in questions])
+
 
 def aggregate_results(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey = get_object_or_404(Survey.live, slug=slug)
     questionData = {}
     for question in survey.questions.all():
         subData = {}
@@ -184,6 +192,7 @@ def aggregate_results(request, slug):
             subData[answer['text_answer']] = answer['count']
         questionData[question.question] = subData
     return _survey_questions_api(survey, questionData)
+
 
 def survey_results_json(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
@@ -218,7 +227,6 @@ def survey_results_json(request, slug):
         dump(data, response)
     return response
     
-
 
 def survey_results_grid(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
@@ -261,7 +269,6 @@ def survey_results_archive(request, slug, page=None):
                                     page_obj=page_obj),
                                request)
     
-
     
 def survey_results_aggregate(request, slug):
     """
@@ -277,5 +284,4 @@ def survey_results_aggregate(request, slug):
                                dict(survey=survey,
                                     aggregate_fields=aggregate_fields,
                                     submissions=submissions),
-                               request)
-    
+                               request)    

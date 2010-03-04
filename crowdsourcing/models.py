@@ -48,14 +48,6 @@ class SurveyGroup(models.Model):
         return self.name
 
 
-class SurveyTag(models.Model):
-    name = models.CharField(max_length=80)
-    slug = models.SlugField(unique=True)
-
-    def __unicode__(self):
-        return self.name
-
-
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -77,9 +69,10 @@ class Survey(models.Model):
 
     site = models.ForeignKey(Site)
     survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
-    survey_tags = models.ManyToManyField(SurveyTag)
-    # Flickr integration
-    flickr_set_id = models.CharField(max_length=60, blank=True)
+    flickr_group_id = models.CharField(
+        max_length=60,
+        blank=True,
+        help_text="http://www.flickr.com/groups/10questionsthatcount/")
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -172,25 +165,29 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
 
                                  
 class Question(models.Model):
-    survey=models.ForeignKey(Survey, related_name="questions")
-    fieldname=models.CharField('field name',
-                               max_length=32,
-                               help_text=_('a single-word identifier used to track this value; '
-                                           'it must begin with a letter and may contain alphanumerics and underscores (no spaces).'))
-    question=models.TextField()
-    help_text=models.TextField(blank=True)
-    required=models.BooleanField(default=False)
-    order=models.IntegerField(null=True, blank=True)
-    option_type=models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
-    options=models.TextField(blank=True, default='')
-    answer_is_public=models.BooleanField(default=True)
+    survey = models.ForeignKey(Survey, related_name="questions")
+    fieldname = models.CharField(
+        'field name',
+        max_length=32,
+        help_text=_('a single-word identifier used to track this value; '
+                    'it must begin with a letter and may contain alphanumerics'
+                    ' and underscores (no spaces).'))
+    question = models.TextField()
+    help_text = models.TextField(blank=True)
+    required = models.BooleanField(default=False)
+    order = models.IntegerField(null=True, blank=True)
+    option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
+    options = models.TextField(blank=True, default='')
+    answer_is_public = models.BooleanField(default=True)
 
     def to_jsondata(self):
         return dict(fieldname=self.fieldname,
                     question=self.question,
                     required=self.required,
                     option_type=self.option_type,
-                    options=self.parsed_options)
+                    options=self.parsed_options,
+                    cms_id=self.id,
+                    help_text=self.help_text)
                     
 
     class Meta:
@@ -303,15 +300,15 @@ class Answer(models.Model):
         ordering=('question',)
 
     def save(self, **kwargs):
-        if sync_to_flickr:
-            survey=self.question.survey
-            if survey.flickr_set_id:
-                try:
-                    sync_to_flickr(self, survey.flickr_set_id)
-                except:
-                    logging.exception("error in syncing to flickr")
-                    
         super(Answer, self).save(**kwargs)
+        if sync_to_flickr:
+            survey = self.question.survey
+            if survey.flickr_group_id:
+                try:
+                    sync_to_flickr(self, survey.flickr_group_id)
+                except Exception as ex:
+                    message = "error in syncing to flickr: %s" % str(ex)
+                    logging.exception(message)
     
     def __unicode__(self):
         return unicode(self.question)
