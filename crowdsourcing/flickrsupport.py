@@ -27,6 +27,23 @@ def get_photo_hash(djfile):
     return h.hexdigest()
 
 
+def _get_groups():
+    flickr = _get_flickr()
+    return flickr.groups_pools_getGroups()._children[0]._children
+
+
+def get_group_names():
+    return [group.get("name") for group in _get_groups()]
+
+
+def get_group_id(group_name):
+    if group_name:
+        for group in _get_groups():
+            if group.get("name") == group_name:
+                return group.get("id")
+    return ""
+
+
 def sync_to_flickr(answer, group_id):
     flickr = _get_flickr()
 

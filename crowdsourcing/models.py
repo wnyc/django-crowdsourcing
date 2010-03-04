@@ -16,11 +16,11 @@ from .util import ChoiceEnum
 from . import settings as local_settings
 
 try:
-    from .flickrsupport import sync_to_flickr
+    from .flickrsupport import sync_to_flickr, get_group_id
 except ImportError:
     logging.warn('no flickr support available')
     
-    sync_to_flickr=None
+    sync_to_flickr = None
 
 
 
@@ -72,7 +72,11 @@ class Survey(models.Model):
     flickr_group_id = models.CharField(
         max_length=60,
         blank=True,
-        help_text="http://www.flickr.com/groups/10questionsthatcount/")
+        editable=False)
+    flickr_group_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="E.g. WNYC Brian Lehrer Show's \"10 Questions That Count\"")
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -80,9 +84,11 @@ class Survey(models.Model):
                     description=self.description,
                     questions=[q.to_jsondata() for q in self.questions.filter(answer_is_public=True)])
     
-
     def save(self, **kwargs):
-        self.survey_date=self.starts_at.date()
+        self.survey_date = self.starts_at.date()
+        self.flickr_group_id = ""
+        if self.flickr_group_name and sync_to_flickr:
+            self.flickr_group_id = get_group_id(self.flickr_group_name)
         super(Survey, self).save(**kwargs)
 
     class Meta:

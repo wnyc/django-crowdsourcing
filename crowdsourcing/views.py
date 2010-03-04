@@ -45,8 +45,6 @@ def _survey_submit(request, survey):
                                    request)
 
     forms = forms_for_survey(survey, request)
-    for form in forms:
-        print "Is form valid? %s" % str(form.is_valid())
     
     if all(form.is_valid() for form in forms):
         submission_form = forms[0]
