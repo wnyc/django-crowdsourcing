@@ -1,9 +1,5 @@
-from __future__ import absolute_import, with_statement
+from __future__ import absolute_import
 
-#import datetime
-from itertools import chain
-import logging
-#import os
 import re
 
 from django.conf import settings
@@ -37,27 +33,33 @@ from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
 
 
 class BaseAnswerForm(Form):
-    def __init__(self, question, session_key, submission=None, *args, **kwargs):
-        self.question=question
-        self.session_key=session_key
-        self.submission=submission
+    def __init__(self,
+                 question,
+                 session_key,
+                 submission=None,
+                 *args,
+                 **kwargs):
+        self.question = question
+        self.session_key = session_key
+        self.submission = submission
         super(BaseAnswerForm, self).__init__(*args, **kwargs)
         self._configure_answer_field()
 
     def _configure_answer_field(self):
-        answer=self.fields['answer']
-        q=self.question
-        answer.required=q.required
-        answer.label=q.question
-        answer.help_text=q.help_text        
+        answer = self.fields['answer']
+        q = self.question
+        answer.required = q.required
+        answer.label = q.question
+        answer.help_text = q.help_text        
         # set some property on the basis of question.fieldname? TBD
         return answer
 
     def as_template(self):
         "Helper function for fieldsting fields data from form."
-        bound_fields=[BoundField(self, field, name) for name, field in self.fields.items()]
-        c=Context(dict(form=self, bound_fields=bound_fields))
-        t=loader.get_template('forms/form.html')
+        bound_fields = [BoundField(self, field, name) \
+                      for name, field in self.fields.items()]
+        c = Context(dict(form=self, bound_fields=bound_fields))
+        t = loader.get_template('forms/form.html')
         return t.render(c)
 
     def save(self, commit=True):
@@ -76,40 +78,40 @@ class BaseAnswerForm(Form):
 
 
 class TextInputAnswer(BaseAnswerForm):
-    answer=CharField()
+    answer = CharField()
 
 
 class IntegerInputAnswer(BaseAnswerForm):
-    answer=IntegerField()
+    answer = IntegerField()
 
     
 class FloatInputAnswer(BaseAnswerForm):
-    answer=FloatField()
+    answer = FloatField()
 
     
 class BooleanInputAnswer(BaseAnswerForm):
-    answer=BooleanField(initial=False)
+    answer = BooleanField(initial=False)
 
     def clean_answer(self):
-        value=self.cleaned_data['answer']
+        value = self.cleaned_data['answer']
         if not value:
             return False
         return value
 
     def _configure_answer_field(self):
-        fld=super(BooleanInputAnswer, self)._configure_answer_field()
+        fld = super(BooleanInputAnswer, self)._configure_answer_field()
         # we don't want to set this as required, as a single boolean field
         # being required doesn't make much sense in a survey
-        fld.required=False
+        fld.required = False
         return fld
 
         
 class TextAreaAnswer(BaseAnswerForm):
-    answer=CharField(widget=Textarea)
+    answer = CharField(widget=Textarea)
 
 
 class EmailAnswer(BaseAnswerForm):
-    answer=EmailField()
+    answer = EmailField()
 
 
 class VideoAnswer(BaseAnswerForm):
@@ -128,7 +130,7 @@ class VideoAnswer(BaseAnswerForm):
 
 
 class PhotoUpload(BaseAnswerForm):
-    answer=ImageField()
+    answer = ImageField()
 
 ##     def clean_answer(self):
 ##         value=self.cleaned_data['answer']
@@ -151,11 +153,11 @@ class PhotoUpload(BaseAnswerForm):
 
 
 class LocationAnswer(BaseAnswerForm):
-    answer=CharField()
+    answer = CharField()
 
     def save(self, commit=True):
-        obj=super(LocationAnswer, self).save(commit=False)
-        obj.latitude, obj.longitude=get_latitude_and_longitude(obj.value)
+        obj = super(LocationAnswer, self).save(commit=False)
+        obj.latitude, obj.longitude = get_latitude_and_longitude(obj.value)
         if commit:
             obj.save()
         return obj
@@ -170,21 +172,21 @@ class BaseOptionAnswer(BaseAnswerForm):
         self.fields['answer'].choices = choices
         
     def clean_answer(self):
-        key=self.cleaned_data['answer']
+        key = self.cleaned_data['answer']
         if not key and self.fields['answer'].required:
             raise ValidationError, _('This field is required.')
         if not isinstance(key, (list, tuple)):
-            key=(key,)
+            key = (key,)
         return key
     
     def save(self, commit=True):
-        ans_list=[]
+        ans_list = []
         for text in self.cleaned_data['answer']:
-            ans=Answer()
+            ans = Answer()
             if self.submission:
-                ans.submission=self.submission
-            ans.question=self.question
-            ans.value=text
+                ans.submission = self.submission
+            ans.question = self.question
+            ans.value = text
             if commit:
                 ans.save()
             ans_list.append(ans)
@@ -192,20 +194,20 @@ class BaseOptionAnswer(BaseAnswerForm):
 
 
 class OptionAnswer(BaseOptionAnswer):
-    answer=ChoiceField()
+    answer = ChoiceField()
 
 
 class OptionRadio(BaseOptionAnswer):
-    answer=ChoiceField(widget=RadioSelect)
+    answer = ChoiceField(widget=RadioSelect)
 
     
 class OptionCheckbox(BaseOptionAnswer):
-    answer=MultipleChoiceField(widget=CheckboxSelectMultiple)
+    answer = MultipleChoiceField(widget=CheckboxSelectMultiple)
 
 
 ## each question gets a form with one element, determined by the type
 ## for the answer.
-QTYPE_FORM={
+QTYPE_FORM = {
     OPTION_TYPE_CHOICES.TEXT_FIELD:        TextInputAnswer,
     OPTION_TYPE_CHOICES.INTEGER:           IntegerInputAnswer,
     OPTION_TYPE_CHOICES.FLOAT:             FloatInputAnswer,
@@ -225,18 +227,18 @@ class SubmissionForm(ModelForm):
 
     def __init__(self, survey, *args, **kwargs):
         super(SubmissionForm, self).__init__(*args, **kwargs)
-        self.survey=survey
+        self.survey = survey
         
     class Meta:
-        model=Submission
-        exclude=('survey', 'submitted_at','ip_address','user', 'is_public')
+        model = Submission
+        exclude = ('survey', 'submitted_at','ip_address','user', 'is_public')
 
 
 def forms_for_survey(survey, request, submission=None):
-    session_key=request.session.session_key.lower()
-    posted_data=request.POST or None
-    files=request.FILES or None
-    main_form=SubmissionForm(survey, data=posted_data, files=files)
+    session_key = request.session.session_key.lower()
+    posted_data = request.POST or None
+    files = request.FILES or None
+    main_form = SubmissionForm(survey, data=posted_data, files=files)
     return [main_form] + [
         QTYPE_FORM[q.option_type](question=q,
                                   session_key=session_key,
