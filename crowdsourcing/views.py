@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import httplib
 import logging
 
+from django.conf import settings
 from django.db.models import Count
 from djview import *
 from djview.jsonutil import dump, dumps
@@ -30,10 +31,11 @@ def _get_remote_ip(request):
     return request.META['REMOTE_ADDR']
 
 
-def _filter_submissions(requestdata, submissions):
+def _filter_submissions(requestdata, survey):
+    submissions = survey.public_submissions()
     qs_filters = {}
     for fld in (f.fieldname for f in survey.get_filters()):
-        v= requestdata.get(fld)
+        v = requestdata.get(fld)
         if v:
             qs_filters[fld] = v
     if qs_filters:
@@ -135,8 +137,7 @@ def survey_detail(request, slug):
 
 
 def _survey_results_redirect(request, survey, thanks=False):
-    url = reverse('survey_report', kwargs={'slug': survey.slug,
-                                           'report' : ''})
+    url = reverse('survey_default_report', kwargs={'slug': survey.slug})
     response = HttpResponseRedirect(url)
     if thanks:
         request.session['survey_thanks_%s' % survey.slug] = '1'
@@ -160,12 +161,15 @@ def allowed_actions(request, slug):
 
 def _survey_questions_api(survey, questionData):
     response = HttpResponse(mimetype='application/json')
-    url = reverse('survey_detail', kwargs={'slug': survey.slug})
+    kwargs = {'slug': survey.slug}
+    submit_url = reverse('survey_detail', kwargs=kwargs)
+    report_url = reverse('survey_default_report', kwargs=kwargs)
     dump({"id": survey.id,
           "title": survey.title,
           "tease": survey.tease,
           "description": survey.description,
-          "submit_url": url,
+          "submit_url": submit_url,
+          "report_url": report_url,
           "questions": questionData},
          response)
     return response
@@ -225,20 +229,6 @@ def survey_results_json(request, slug):
     return response
     
 
-<<<<<<< local
-def survey_results_grid(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    submissions=survey.public_submissions()
-    # this might call the JSON view, or not.
-    return render_with_request(['crowdsourcing/%s_survey_grid.html' % survey.slug,
-                                'crowdsourcing/survey_grid.html'],
-                               dict(survey=survey,
-                                    submissions=submissions),
-                               request)
-
-
-=======
->>>>>>> other
 def survey_results_map(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
     location_fields=list(survey.get_public_location_fields())
@@ -260,8 +250,7 @@ def survey_results_archive(request, slug, page=None):
     archive_fields = list(survey.get_public_archive_fields())
     if not archive_fields:
         raise Http404
-    submissions = _filter_submissions(request.GET,
-                                      survey.public_submissions())
+    submissions = _filter_submissions(request.GET, survey)
     paginator, page_obj = paginate_or_404(submissions, page)
     return render_with_request(
         ['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
@@ -272,11 +261,7 @@ def survey_results_archive(request, slug, page=None):
              page_obj=page_obj),
         request)
     
-<<<<<<< local
-    
-=======
 
->>>>>>> other
 def survey_results_aggregate(request, slug):
     """
     this is where we generate graphs and all that good stuff.
@@ -285,8 +270,7 @@ def survey_results_aggregate(request, slug):
     aggregate_fields = list(survey.get_public_aggregate_fields())
     if not aggregate_fields:
         raise Http404
-    submissions = _filter_submissions(request.GET,
-                                      survey.public_submissions())
+    submissions = _filter_submissions(request.GET, survey)
     return render_with_request(
         ['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
          'crowdsourcing/survey_results_aggregate.html'],
@@ -301,15 +285,12 @@ def survey_report(request, slug, report='', page=None):
     show a report for the survey
     """
     page = 1 if page is None else get_int_or_404(page)     
-    survey = get_object_or_404(Survey.live,
-                               slug=slug,
-                               site__id=settings.SITE_ID)
+    survey = _get_survey_or_404(slug)
     # is the survey anything we can actually have a report on?
     if not survey.can_have_public_submissions():
         raise Http404
 
-    submissions = _filter_submissions(request.GET,
-                                      survey.public_submissions())
+    submissions = _filter_submissions(request.GET, survey)
     paginator, page_obj = paginate_or_404(submissions, page)
     reports = survey.surveyreport_set.all()    
     if not reports:
@@ -319,21 +300,15 @@ def survey_report(request, slug, report='', page=None):
             the_report = reports.get(slug=report)
         except SurveyReport.DoesNotExist:
             if report == '' and len(reports) == 1:
-            the_report = reports[0]
+                the_report = reports[0]
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
                  'crowdsourcing/survey_report.html']
 
     return render_with_request(templates,
                                dict(survey=survey,
-<<<<<<< local
-                                    aggregate_fields=aggregate_fields,
-                                    submissions=submissions),
-                               request)    
-=======
                                     submissions=submissions,
                                     paginator=paginator,
                                     page_obj=page_obj,
                                     reports=reports,
                                     report=the_report),
                                request)
->>>>>>> other

@@ -15,7 +15,7 @@ from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
-from positions.fields import PositionField
+#from positions.fields import PositionField
 
 try:
     from .flickrsupport import sync_to_flickr, get_group_id
@@ -147,7 +147,7 @@ class Survey(models.Model):
         return self.submission_set.filter(is_public=True)
 
     def get_filters(self):
-        return self.questions.filter(use_filterable=True,
+        return self.questions.filter(use_as_filter=True,
                                      answer_is_public=True,
                                      option_type__in=FILTERABLE_OPTION_TYPES)
 
@@ -177,10 +177,10 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
                                         key=itemgetter(1)))
 
 
-FILTERABLE_OPTIONS_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
-                            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-                            OPTION_TYPE_CHOICES.RADIO_LIST,
-                            OPTION_TYPE_CHOICES.CHECKBOX_LIST)
+FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
+                           OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+                           OPTION_TYPE_CHOICES.RADIO_LIST,
+                           OPTION_TYPE_CHOICES.CHECKBOX_LIST)
 
 
 class Question(models.Model):
@@ -194,8 +194,10 @@ class Question(models.Model):
     question = models.TextField()
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    # use PositionField @TBD
-    order = PositionField(collection=('survey',))
+    # use PositionField @TBD. Google code is down at the moment so just use an
+    # integer for now.
+    # order = PositionField(collection=('survey',))
+    order = models.IntegerField()
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -385,5 +387,6 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True)
     annotation = models.TextField(blank=True)
-    order = PositionField(collection=('report',))
+    #order = PositionField(collection=('report',))
+    order = models.IntegerField()
 

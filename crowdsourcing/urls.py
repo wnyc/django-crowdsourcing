@@ -7,7 +7,8 @@ from .views import (aggregate_results,
                     can_enter,
                     questions,
                     survey_detail,
-                    survey_results,
+                    survey_report,
+                    survey_report,
                     survey_results_json,
                     survey_results_map,
                     survey_results_archive,
@@ -18,10 +19,6 @@ urlpatterns=patterns(
     url(r'^(?P<slug>[-a-z0-9_]+)/$',
         survey_detail,
         name="survey_detail"),
-
-    url(r'^(?P<slug>[-a-z0-9_]+)/results/$',
-        survey_results,
-        name="survey_results"),
 
     url(r'^(?P<slug>[-a-z0-9_]+)/results/map/$',
         survey_results_map,
@@ -54,5 +51,16 @@ urlpatterns=patterns(
     url(r'^(?P<slug>[-a-z0-9_]+)/api/aggregate_results/$',
         aggregate_results,
         name="aggregate_results"),
-    )
 
+    url(r'^(?P<slug>[-a-z0-9_]+)/report/$',
+        survey_report,
+        name="survey_default_report"),
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/(?P<report>[-a-z0-9_]+)/$',
+        survey_report,
+        name="survey_report_page_1"),
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/(?P<report>[-a-z0-9_]+)/(?P<page>\d+)/$',
+        survey_report,
+        name="survey_report")
+    )
