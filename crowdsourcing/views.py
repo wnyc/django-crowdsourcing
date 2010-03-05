@@ -41,17 +41,24 @@ def _filter_submissions(requestdata, submissions):
     return submissions
 
 
-def login_url(request):
+def _login_url(request):
     return reverse("auth_login") + '?next=%s' % request.path
+
+
+def _get_survey_or_404(slug):
+    return get_object_or_404(Survey.live,
+                             slug=slug,
+                             site__id=settings.SITE_ID)
 
 
 def _survey_submit(request, survey):
     if survey.require_login and request.user.is_anonymous():
         # again, the form should only be shown after the user is logged in, but
         # to be safe...
-        return HttpResponseRedirect(login_url(request))
+        return HttpResponseRedirect(_login_url(request))
     if not hasattr(request, 'session'):
-        return HttpResponse("Cookies must be enabled to use this application.", status=httplib.FORBIDDEN)
+        return HttpResponse("Cookies must be enabled to use this application.",
+                            status=httplib.FORBIDDEN)
     if (_user_too_many_entries(request, survey)):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
@@ -71,12 +78,11 @@ def _survey_submit(request, survey):
         submission.save()
         for form in forms[1:]:
             answer = form.save(commit=False)
-            if isinstance(answer, (list,tuple)):
+            if isinstance(answer, (list, tuple)):
                 for a in answer:
                     a.submission=submission
                     a.save()
             else:
-                print form, answer
                 if answer:
                     answer.submission=submission
                     answer.save()
@@ -96,11 +102,11 @@ def _survey_show_form(request, survey, forms):
                                dict(survey=survey,
                                     forms=forms,
                                     entered=entered,
-                                    login_url=login_url(request)),
+                                    login_url=_login_url(request)),
                                request)
 
 
-def can_show_form(request, survey):
+def _can_show_form(request, survey):
     authenticated = request.user.is_authenticated()
     return all((
         survey.is_open,
@@ -109,13 +115,13 @@ def can_show_form(request, survey):
     
 
 def survey_detail(request, slug):
-    survey = get_object_or_404(Survey, slug=slug, is_published=True)
+    survey = _get_survey_or_404(slug)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
     need_login = (survey.is_open 
                   and survey.require_login
                   and not request.user.is_authenticated())
-    if can_show_form(request, survey):
+    if _can_show_form(request, survey):
         if request.method == 'POST':
             return _survey_submit(request, survey)
         forms = forms_for_survey(survey, request)
@@ -128,34 +134,9 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-def survey_results(request, slug, page=None):
-    """
-    This should use some logic to show the most likely-to-be-relevant
-    results -- and also consider the archive policy.
-    """
-    if page is None:
-        page = 1
-    else:
-        page = get_int_or_404(page)
-
-    survey = get_object_or_404(Survey.live, slug=slug)
-    if not survey.can_have_public_submissions():
-        raise Http404
-    submissions = _filter_submissions(request, survey.public_submissions())
-    paginator, page_obj = paginate_or_404(submissions, page)
-    # clean this out?
-    thanks = request.session.get('survey_thanks_%s' % survey.slug)
-    return render_with_request(['crowdsourcing/%s_survey_results.html' % survey.slug,
-                                'crowdsourcing/survey_results.html'],
-                               dict(survey=survey,
-                                    thanks=thanks,
-                                    paginator=paginator,
-                                    page_obj=page_obj),
-                               request)
-    
-
 def _survey_results_redirect(request, survey, thanks=False):
-    url = reverse('survey_results', kwargs={'slug': survey.slug})
+    url = reverse('survey_report', kwargs={'slug': survey.slug,
+                                           'report' : ''})
     response = HttpResponseRedirect(url)
     if thanks:
         request.session['survey_thanks_%s' % survey.slug] = '1'
@@ -163,16 +144,16 @@ def _survey_results_redirect(request, survey, thanks=False):
 
 
 def can_enter(request, slug):
-    survey = get_object_or_404(Survey.live, slug=slug)
+    survey = _get_survey_or_404(slug)
     response = HttpResponse(mimetype='application/json')
     dump(not _user_too_many_entries(request, survey), response)
     return response
 
 
 def allowed_actions(request, slug):
-    survey = get_object_or_404(Survey.live, slug=slug)
+    survey = _get_survey_or_404(slug)
     response = HttpResponse(mimetype='application/json')
-    dump({"enter": can_show_form(request, survey),
+    dump({"enter": _can_show_form(request, survey),
           "view": survey.can_have_public_submissions()}, response)
     return response
 
@@ -189,7 +170,7 @@ def _survey_questions_api(survey, questionData):
     
 
 def questions(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey = _get_survey_or_404(slug)
     questionData = {}
     for q in survey.questions.all():
         questionData[q.id] = {"question": q.question,
@@ -198,7 +179,7 @@ def questions(request, slug):
 
 
 def aggregate_results(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey = _get_survey_or_404(slug)
     questionData = {}
     for question in survey.questions.all():
         subData = {}
@@ -210,7 +191,7 @@ def aggregate_results(request, slug):
 
 
 def survey_results_json(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
+    survey = _get_survey_or_404(slug)
     qs=survey.public_submissions()
     vars=dict((k.encode('utf-8', 'ignore'), v) \
               for k, v in (request.POST
@@ -244,18 +225,6 @@ def survey_results_json(request, slug):
         dump(data, response)
     return response
     
-
-def survey_results_grid(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    submissions=survey.public_submissions()
-    # this might call the JSON view, or not.
-    return render_with_request(
-        ['crowdsourcing/%s_survey_grid.html' % survey.slug,
-         'crowdsourcing/survey_grid.html'],
-        dict(survey=survey,
-             submissions=submissions),
-        request)
-
 
 def survey_results_map(request, slug):
     survey=get_object_or_404(Survey.live, slug=slug)
