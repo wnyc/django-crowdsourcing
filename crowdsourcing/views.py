@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import httplib
 import logging
 import simplejson
+from textwrap import fill
 
 from django.conf import settings
 from django.db.models import Count
@@ -11,7 +12,6 @@ from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
-from puppy.util import insert_newlines
 
 
 def _user_entered_survey(request, survey):
@@ -184,7 +184,7 @@ class AggregateResult:
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         answer_counts = []
         for answer in self.answer_set:
-            text = insert_newlines(answer["text_answer"], 30, '\n')
+            text = fill(answer["text_answer"], 30)
             answer_counts.append({"response": text, "count": answer["count"]})
         self.yahoo_answer_string = simplejson.dumps(answer_counts)
 
