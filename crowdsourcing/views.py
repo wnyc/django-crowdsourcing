@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import httplib
 import logging
+import simplejson
 
 from django.conf import settings
 from django.db.models import Count
@@ -10,6 +11,7 @@ from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import Survey, Submission, Answer
+from puppy.util import insert_newlines
 
 
 def _user_entered_survey(request, survey):
@@ -68,7 +70,7 @@ def _survey_submit(request, survey):
                                    request)
 
     forms = forms_for_survey(survey, request)
-    
+
     if all(form.is_valid() for form in forms):
         submission_form = forms[0]
         submission = submission_form.save(commit=False)
@@ -114,13 +116,13 @@ def _can_show_form(request, survey):
         survey.is_open,
         authenticated or not survey.require_login,
         not _user_too_many_entries(request, survey)))
-    
+
 
 def survey_detail(request, slug):
     survey = _get_survey_or_404(slug)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
-    need_login = (survey.is_open 
+    need_login = (survey.is_open
                   and survey.require_login
                   and not request.user.is_authenticated())
     if _can_show_form(request, survey):
@@ -137,17 +139,10 @@ def survey_detail(request, slug):
 
 
 def _survey_results_redirect(request, survey, thanks=False):
-    url = reverse('survey_default_report', kwargs={'slug': survey.slug})
+    url = reverse('survey_default_report_page_1', kwargs={'slug': survey.slug})
     response = HttpResponseRedirect(url)
     if thanks:
         request.session['survey_thanks_%s' % survey.slug] = '1'
-    return response
-
-
-def can_enter(request, slug):
-    survey = _get_survey_or_404(slug)
-    response = HttpResponse(mimetype='application/json')
-    dump(not _user_too_many_entries(request, survey), response)
     return response
 
 
@@ -163,7 +158,7 @@ def _survey_questions_api(survey, questionData):
     response = HttpResponse(mimetype='application/json')
     kwargs = {'slug': survey.slug}
     submit_url = reverse('survey_detail', kwargs=kwargs)
-    report_url = reverse('survey_default_report', kwargs=kwargs)
+    report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
     dump({"id": survey.id,
           "title": survey.title,
           "tease": survey.tease,
@@ -173,7 +168,7 @@ def _survey_questions_api(survey, questionData):
           "questions": questionData},
          response)
     return response
-    
+
 
 def questions(request, slug):
     survey = _get_survey_or_404(slug)
@@ -181,118 +176,45 @@ def questions(request, slug):
     return _survey_questions_api(survey, [q.to_jsondata() for q in questions])
 
 
-def aggregate_results(request, slug):
-    survey = _get_survey_or_404(slug)
-    questionData = {}
-    for question in survey.questions.all():
-        subData = {}
-        for answer in question.answer_set.values('text_answer')\
-                .annotate(count=Count("id")):
-            subData[answer['text_answer']] = answer['count']
-        questionData[question.question] = subData
-    return _survey_questions_api(survey, questionData)
-
-
-def survey_results_json(request, slug):
-    survey = _get_survey_or_404(slug)
-    qs=survey.public_submissions()
-    vars=dict((k.encode('utf-8', 'ignore'), v) \
-              for k, v in (request.POST
-                           if request.method=='POST'
-                           else request.GET).items())
-    limit=vars.pop('limit', 30)
-    offset=vars.pop('offset', 0)
-    order=vars.pop('order', None)
-    cntonly=vars.pop('countonly', False)
-    callback=vars.pop('callback', None)
-    if vars:
-        qs=qs.filter(**vars)
-    cnt=qs.count()
-    if cntonly:
-        data=dict(count=cnt,
-                  survey=survey.to_jsondata())
-    else:
-        if order:
-            qs=qs.order_by(order)
-        res=qs[offset:limit]
-        data=dict(results=[x.to_jsondata() for x in res],
-                  survey=survey.to_jsondata(),
-                  count=cnt)
-
-    if callback:
-        body='<script type="text/javascript">%s(%s);</script>' % (callback,
-                                                                  dumps(data))
-        return HttpResponse(body, mimetype='application/javascript')        
-    else:
-        response=HttpResponse(mimetype='application/json')
-        dump(data, response)
-    return response
-    
-
-def survey_results_map(request, slug):
-    survey=get_object_or_404(Survey.live, slug=slug)
-    location_fields=list(survey.get_public_location_fields())
-    if not location_fields:
-        raise Http404
-    submissions=survey.public_submissions()    
-    return render_with_request(
-        ['crowdsourcing/%s_survey_results_map.html' % survey.slug,
-         'crowdsourcing/survey_results_map.html'],
-        dict(survey=survey,
-             submissions=submissions,
-             location_fields=location_fields),
-        request)
-    
-
-def survey_results_archive(request, slug, page=None):    
-    page = 1 if page is None else get_int_or_404(page) 
-    survey = get_object_or_404(Survey.live, slug=slug)
-    archive_fields = list(survey.get_public_archive_fields())
-    if not archive_fields:
-        raise Http404
-    submissions = _filter_submissions(request.GET, survey)
-    paginator, page_obj = paginate_or_404(submissions, page)
-    return render_with_request(
-        ['crowdsourcing/%s_survey_results_archive.html' % survey.slug,
-         'crowdsourcing/survey_results_archive.html'],
-        dict(survey=survey,
-             archive_fields=archive_fields,
-             paginator=paginator,
-             page_obj=page_obj),
-        request)
-    
-
-def survey_results_aggregate(request, slug):
-    """
-    this is where we generate graphs and all that good stuff.
-    """
-    survey = get_object_or_404(Survey.live, slug=slug)
-    aggregate_fields = list(survey.get_public_aggregate_fields())
-    if not aggregate_fields:
-        raise Http404
-    submissions = _filter_submissions(request.GET, survey)
-    return render_with_request(
-        ['crowdsourcing/%s_survey_results_aggregate.html' % survey.slug,
-         'crowdsourcing/survey_results_aggregate.html'],
-        dict(survey=survey,
-             aggregate_fields=aggregate_fields,
-             submissions=submissions),
-        request)
-    
+class AggregateResult:
+    def __init__(self, field):
+        self.field = field
+        self.id = field.id
+        self.answer_set = field.answer_set.values('text_answer')
+        self.answer_set = self.answer_set.annotate(count=Count("id"))
+        answer_counts = []
+        for answer in self.answer_set:
+            text = insert_newlines(answer["text_answer"], 30, '\n')
+            answer_counts.append({"response": text, "count": answer["count"]})
+        self.yahoo_answer_string = simplejson.dumps(answer_counts)
 
 def survey_report(request, slug, report='', page=None):
     """
     show a report for the survey
     """
-    page = 1 if page is None else get_int_or_404(page)     
+    page = 1 if page is None else get_int_or_404(page)
     survey = _get_survey_or_404(slug)
     # is the survey anything we can actually have a report on?
     if not survey.can_have_public_submissions():
         raise Http404
 
+    location_fields = list(survey.get_public_location_fields())
+    archive_fields = list(survey.get_public_archive_fields())
+    aggregate_fields = list(survey.get_public_aggregate_fields())
+    aggregate_results = [AggregateResult(f) for f in aggregate_fields]
+    fields = list(survey.get_public_fields())
+
     submissions = _filter_submissions(request.GET, survey)
     paginator, page_obj = paginate_or_404(submissions, page)
-    reports = survey.surveyreport_set.all()    
+    pages_to_link = []
+    for i in range(page - 5, page + 5):
+        if 1 <= i <= paginator.num_pages:
+            pages_to_link.append(i)
+    if pages_to_link[0] > 1:
+        pages_to_link = [1, False] + pages_to_link
+    if pages_to_link[-1] < paginator.num_pages:
+        pages_to_link = pages_to_link + [False, paginator.num_pages]
+    reports = survey.surveyreport_set.all()
     if not reports:
         the_report = None
     else:
@@ -309,6 +231,12 @@ def survey_report(request, slug, report='', page=None):
                                     submissions=submissions,
                                     paginator=paginator,
                                     page_obj=page_obj,
+                                    pages_to_link=pages_to_link,
+                                    fields=fields,
+                                    location_fields=location_fields,
+                                    archive_fields=archive_fields,
+                                    aggregate_fields=aggregate_fields,
+                                    aggregate_results=aggregate_results,
                                     reports=reports,
                                     report=the_report),
                                request)

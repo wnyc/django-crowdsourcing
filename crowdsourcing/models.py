@@ -41,14 +41,6 @@ class LiveSurveyManager(models.Manager):
             models.Q(ends_at__gt=now))
 
 
-class SurveyGroup(models.Model):
-    name = models.CharField(max_length=80)
-    slug = models.SlugField(unique=True)
-
-    def __unicode__(self):
-        return self.name
-
-
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -67,7 +59,6 @@ class Survey(models.Model):
     ends_at = models.DateTimeField(null=True, blank=True)
     is_published = models.BooleanField(default=False)
     site = models.ForeignKey(Site)
-    survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
     flickr_group_id = models.CharField(
         max_length=60,
         blank=True,
@@ -75,7 +66,7 @@ class Survey(models.Model):
     flickr_group_name = models.CharField(
         max_length=255,
         blank=True,
-        help_text="E.g. WNYC Brian Lehrer Show's \"10 Questions That Count\"")
+        help_text="Use the exact group name from flickr.com")
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -101,6 +92,9 @@ class Survey(models.Model):
         if self.ends_at:
             return self.starts_at <= now < self.ends_at
         return self.starts_at <= now
+
+    def get_public_fields(self):
+        return self.questions.filter(answer_is_public=True)
 
     def get_public_location_fields(self):
         return self.questions.filter(
@@ -185,13 +179,15 @@ FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
 
 class Question(models.Model):
     survey = models.ForeignKey(Survey, related_name="questions")
-    label = models.CharField(max_length=32)
     fieldname = models.CharField(
         max_length=32,
         help_text=_('a single-word identifier used to track this value; '
                     'it must begin with a letter and may contain '
                     'alphanumerics and underscores (no spaces).'))
-    question = models.TextField()
+    question = models.TextField(help_text=_(
+        "Appears on the survey entry page."))
+    label = models.CharField(max_length=32, help_text=_(
+        "Appears on the results page."))
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
     # use PositionField @TBD. Google code is down at the moment so just use an
@@ -378,7 +374,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie bar grid')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie bar grid map')
 
 
 class SurveyReportDisplay(models.Model):
@@ -389,4 +385,3 @@ class SurveyReportDisplay(models.Model):
     annotation = models.TextField(blank=True)
     #order = PositionField(collection=('report',))
     order = models.IntegerField()
-
