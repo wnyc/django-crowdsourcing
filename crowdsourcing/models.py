@@ -16,7 +16,7 @@ from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
-#from positions.fields import PositionField
+from positions.fields import PositionField
 
 try:
     from .flickrsupport import sync_to_flickr, get_group_id
@@ -199,10 +199,7 @@ class Question(models.Model):
         "Appears on the results page."))
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    # use PositionField @TBD. Google code is down at the moment so just use an
-    # integer for now.
-    # order = PositionField(collection=('survey',))
-    order = models.IntegerField()
+    order = PositionField(collection=('survey',))
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -392,5 +389,4 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True)
     annotation = models.TextField(blank=True)
-    #order = PositionField(collection=('report',))
-    order = models.IntegerField()
+    order = PositionField(collection=('report',))
