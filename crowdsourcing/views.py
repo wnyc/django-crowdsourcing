@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import httplib
+from itertools import count
 import logging
 import simplejson
 from textwrap import fill
@@ -11,7 +12,8 @@ from djview import *
 from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
-from .models import Survey, Submission, Answer
+from .models import (Survey, Submission, Answer, SurveyReportDisplay,
+                     SURVEY_DISPLAY_TYPE_CHOICES)
 
 
 def _user_entered_survey(request, survey):
@@ -179,17 +181,27 @@ class AggregateResult:
         self.yahoo_answer_string = simplejson.dumps(answer_counts)
 
 
-class DummySurveyReport:
+class DummyReport:
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
 def _default_report(survey):
-    return DummySurveyReport(
+    surveyreportdisplay_set = []
+    field_count = count(1)
+    for field in survey.get_public_aggregate_fields():
+        display = SurveyReportDisplay(
+            display_type=SURVEY_DISPLAY_TYPE_CHOICES.PIE,
+            fieldnames="blah",
+            annotation="blue",
+            order=field_count.next())
+        surveyreportdisplay_set.append(display)
+    return DummyReport(**dict(
         survey=survey,
         title=survey.title,
         slug='',
-        summary=survey.tease or survey.description)
+        summary=survey.tease or survey.description,
+        surveyreportdisplay_set=surveyreportdisplay_set))
 
 
 def survey_report(request, slug, report='', page=None):
@@ -223,7 +235,7 @@ def survey_report(request, slug, report='', page=None):
         args = {"slug": survey.slug, "report": reports[0].slug}
         return HttpResponseRedirect(reverse("survey_report_page_1", args))
     else:
-        the_report = _default_report()
+        the_report = _default_report(survey)
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
                  'crowdsourcing/survey_report.html']
 
