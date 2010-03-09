@@ -16,6 +16,8 @@ def _get_flickr():
     global _flickr
     if not _flickr:
         _flickr = flickrapi.FlickrAPI(local_settings.FLICKR_API_KEY, local_settings.FLICKR_API_SECRET)
+        if local_settings.FLICKR_TOKENCACHE_PATH:
+            _flickr.token.path = local_settings.FLICKR_TOKENCACHE_PATH
         _flickr.get_token_part_two((local_settings.FLICKR_TOKEN, local_settings.FLICKR_FROB))
     return _flickr
 
