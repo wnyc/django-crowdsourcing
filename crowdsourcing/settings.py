@@ -34,3 +34,7 @@ FLICKR_FROB = getattr(_gs, 'CROWDSOURCING_FLICKR_FROB', '')
 
 
 FLICKR_LIVE = getattr(_gs, 'CROWDSOURCING_FLICKR_LIVE', False)
+
+FLICKR_TOKENCACHE_PATH = getattr(_gs,
+                                 'CROWDSOURCING_FLICKR_TOKENCACHE_PATH',
+                                 '/tmp/flickr_tokencache')
