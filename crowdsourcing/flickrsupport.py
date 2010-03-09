@@ -18,7 +18,6 @@ def _get_flickr():
         _flickr = flickrapi.FlickrAPI(local_settings.FLICKR_API_KEY,
                                       local_settings.FLICKR_API_SECRET,
                                       token=local_settings.FLICKR_TOKEN)
-        _flickr.get_token_part_two((local_settings.FLICKR_TOKEN, local_settings.FLICKR_FROB))
     return _flickr
 
 
