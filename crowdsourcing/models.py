@@ -16,11 +16,11 @@ from .util import ChoiceEnum
 from . import settings as local_settings
 
 try:
-    from .flickrsupport import sync_to_flickr
+    from .flickrsupport import sync_to_flickr, get_group_id
 except ImportError:
     logging.warn('no flickr support available')
     
-    sync_to_flickr=None
+    sync_to_flickr = None
 
 
 
@@ -47,6 +47,7 @@ class SurveyGroup(models.Model):
     def __unicode__(self):
         return self.name
 
+
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -68,8 +69,14 @@ class Survey(models.Model):
 
     site = models.ForeignKey(Site)
     survey_group = models.ForeignKey(SurveyGroup, null=True, blank=True)
-    # Flickr integration
-    flickr_set_id = models.CharField(max_length=60, blank=True)
+    flickr_group_id = models.CharField(
+        max_length=60,
+        blank=True,
+        editable=False)
+    flickr_group_name = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="E.g. WNYC Brian Lehrer Show's \"10 Questions That Count\"")
 
     def to_jsondata(self):
         return dict(title=self.title,
@@ -77,9 +84,11 @@ class Survey(models.Model):
                     description=self.description,
                     questions=[q.to_jsondata() for q in self.questions.filter(answer_is_public=True)])
     
-
     def save(self, **kwargs):
-        self.survey_date=self.starts_at.date()
+        self.survey_date = self.starts_at.date()
+        self.flickr_group_id = ""
+        if self.flickr_group_name and sync_to_flickr:
+            self.flickr_group_id = get_group_id(self.flickr_group_name)
         super(Survey, self).save(**kwargs)
 
     class Meta:
@@ -162,25 +171,29 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
 
                                  
 class Question(models.Model):
-    survey=models.ForeignKey(Survey, related_name="questions")
-    fieldname=models.CharField('field name',
-                               max_length=32,
-                               help_text=_('a single-word identifier used to track this value; '
-                                           'it must begin with a letter and may contain alphanumerics and underscores (no spaces).'))
-    question=models.TextField()
-    help_text=models.TextField(blank=True)
-    required=models.BooleanField(default=False)
-    order=models.IntegerField(null=True, blank=True)
-    option_type=models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
-    options=models.TextField(blank=True, default='')
-    answer_is_public=models.BooleanField(default=True)
+    survey = models.ForeignKey(Survey, related_name="questions")
+    fieldname = models.CharField(
+        'field name',
+        max_length=32,
+        help_text=_('a single-word identifier used to track this value; '
+                    'it must begin with a letter and may contain alphanumerics'
+                    ' and underscores (no spaces).'))
+    question = models.TextField()
+    help_text = models.TextField(blank=True)
+    required = models.BooleanField(default=False)
+    order = models.IntegerField(null=True, blank=True)
+    option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
+    options = models.TextField(blank=True, default='')
+    answer_is_public = models.BooleanField(default=True)
 
     def to_jsondata(self):
         return dict(fieldname=self.fieldname,
                     question=self.question,
                     required=self.required,
                     option_type=self.option_type,
-                    options=self.parsed_options)
+                    options=self.parsed_options,
+                    cms_id=self.id,
+                    help_text=self.help_text)
                     
 
     class Meta:
@@ -293,15 +306,15 @@ class Answer(models.Model):
         ordering=('question',)
 
     def save(self, **kwargs):
-        if sync_to_flickr:
-            survey=self.question.survey
-            if survey.flickr_set_id:
-                try:
-                    sync_to_flickr(self, survey.flickr_set_id)
-                except:
-                    logging.exception("error in syncing to flickr")
-                    
         super(Answer, self).save(**kwargs)
+        if sync_to_flickr:
+            survey = self.question.survey
+            if survey.flickr_group_id:
+                try:
+                    sync_to_flickr(self, survey.flickr_group_id)
+                except Exception as ex:
+                    message = "error in syncing to flickr: %s" % str(ex)
+                    logging.exception(message)
     
     def __unicode__(self):
         return unicode(self.question)
