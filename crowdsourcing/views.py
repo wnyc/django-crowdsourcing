@@ -154,26 +154,10 @@ def allowed_actions(request, slug):
     return response
 
 
-def _survey_questions_api(survey, questionData):
-    response = HttpResponse(mimetype='application/json')
-    kwargs = {'slug': survey.slug}
-    submit_url = reverse('survey_detail', kwargs=kwargs)
-    report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
-    dump({"id": survey.id,
-          "title": survey.title,
-          "tease": survey.tease,
-          "description": survey.description,
-          "submit_url": submit_url,
-          "report_url": report_url,
-          "questions": questionData},
-         response)
-    return response
-
-
 def questions(request, slug):
-    survey = _get_survey_or_404(slug)
-    questions = survey.questions.all().order_by("order")
-    return _survey_questions_api(survey, [q.to_jsondata() for q in questions])
+    response = HttpResponse(mimetype='application/json')
+    dump(_get_survey_or_404(slug).to_jsondata(), response)
+    return response
 
 
 class AggregateResult:
