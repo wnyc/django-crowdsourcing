@@ -66,10 +66,12 @@ class SurveyAdmin(admin.ModelAdmin):
     prepopulated_fields = {'slug' : ('title',)}
     list_display = (
         'title',
+        'slug',
         'survey_date',
         'ends_at',
-        'is_published')
-    list_filter = ('survey_date', 'is_published')
+        'is_published',
+        'site')
+    list_filter = ('survey_date', 'is_published', 'site')
     date_hierarchy = 'survey_date'
     inlines = [QuestionInline]
 
