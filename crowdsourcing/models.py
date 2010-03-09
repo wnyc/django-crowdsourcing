@@ -9,13 +9,14 @@ from django.contrib.sites.models import Site
 from django.db import models
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
+from djview import reverse
 
 from .fields import ImageWithThumbnailsField
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
-#from positions.fields import PositionField
+from positions.fields import PositionField
 
 try:
     from .flickrsupport import sync_to_flickr, get_group_id
@@ -69,11 +70,19 @@ class Survey(models.Model):
         help_text="Use the exact group name from flickr.com")
 
     def to_jsondata(self):
+        kwargs = {'slug': self.slug}
+        submit_url = reverse('survey_detail', kwargs=kwargs)
+        report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
+        questions = self.questions.filter(answer_is_public=True)
+        questions = questions.order_by("order")
         return dict(title=self.title,
+                    id=self.id,
                     slug=self.slug,
                     description=self.description,
-                    questions=[q.to_jsondata() for q in \
-                               self.questions.filter(answer_is_public=True)])
+                    tease=self.tease,
+                    submit_url=submit_url,
+                    report_url=report_url,
+                    questions=[q.to_jsondata() for q in questions])
 
     def save(self, **kwargs):
         self.survey_date = self.starts_at.date()
@@ -190,10 +199,7 @@ class Question(models.Model):
         "Appears on the results page."))
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    # use PositionField @TBD. Google code is down at the moment so just use an
-    # integer for now.
-    # order = PositionField(collection=('survey',))
-    order = models.IntegerField()
+    order = PositionField(collection=('survey',))
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -383,5 +389,4 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True)
     annotation = models.TextField(blank=True)
-    #order = PositionField(collection=('report',))
-    order = models.IntegerField()
+    order = PositionField(collection=('report',))

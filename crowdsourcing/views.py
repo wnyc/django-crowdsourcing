@@ -20,7 +20,8 @@ def _user_entered_survey(request, survey):
         request.session.session_key.lower()).count())
 
 
-def _user_too_many_entries(request, survey):
+def _entered_no_more_allowed(request, survey):
+    """ The user entered the survey and the survey allows only one entry. """
     return all((
         not survey.allow_multiple_submissions,
         _user_entered_survey(request, survey),))
@@ -34,6 +35,8 @@ def _get_remote_ip(request):
 
 
 def _filter_submissions(requestdata, survey):
+    """ Based on the query string, limit the survey results displayed
+    both in agregate and listed format. """
     submissions = survey.public_submissions()
     qs_filters = {}
     for fld in (f.fieldname for f in survey.get_filters()):
@@ -50,9 +53,7 @@ def _login_url(request):
 
 
 def _get_survey_or_404(slug):
-    return get_object_or_404(Survey.live,
-                             slug=slug,
-                             site__id=settings.SITE_ID)
+    return get_object_or_404(Survey.live, slug=slug)
 
 
 def _survey_submit(request, survey):
@@ -63,7 +64,7 @@ def _survey_submit(request, survey):
     if not hasattr(request, 'session'):
         return HttpResponse("Cookies must be enabled to use this application.",
                             status=httplib.FORBIDDEN)
-    if (_user_too_many_entries(request, survey)):
+    if (_entered_no_more_allowed(request, survey)):
         return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
                                     'crowdsourcing/already_submitted.html'],
                                    dict(survey=survey),
@@ -115,10 +116,13 @@ def _can_show_form(request, survey):
     return all((
         survey.is_open,
         authenticated or not survey.require_login,
-        not _user_too_many_entries(request, survey)))
+        not _entered_no_more_allowed(request, survey)))
 
 
 def survey_detail(request, slug):
+    """ When you load the survey, this view decides what to do. It displays
+    the form, redirects to the results page, displays messages, or whatever
+    makes sense based on the survey, the user, and the user's entries. """
     survey = _get_survey_or_404(slug)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
@@ -154,29 +158,15 @@ def allowed_actions(request, slug):
     return response
 
 
-def _survey_questions_api(survey, questionData):
+def questions(request, slug):
     response = HttpResponse(mimetype='application/json')
-    kwargs = {'slug': survey.slug}
-    submit_url = reverse('survey_detail', kwargs=kwargs)
-    report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
-    dump({"id": survey.id,
-          "title": survey.title,
-          "tease": survey.tease,
-          "description": survey.description,
-          "submit_url": submit_url,
-          "report_url": report_url,
-          "questions": questionData},
-         response)
+    dump(_get_survey_or_404(slug).to_jsondata(), response)
     return response
 
 
-def questions(request, slug):
-    survey = _get_survey_or_404(slug)
-    questions = survey.questions.all().order_by("order")
-    return _survey_questions_api(survey, [q.to_jsondata() for q in questions])
-
-
 class AggregateResult:
+    """ This helper class makes it easier to write templates that display
+    aggregate results. """
     def __init__(self, field):
         self.field = field
         self.id = field.id
@@ -188,10 +178,22 @@ class AggregateResult:
             answer_counts.append({"response": text, "count": answer["count"]})
         self.yahoo_answer_string = simplejson.dumps(answer_counts)
 
+
+class DummySurveyReport:
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+def _default_report(survey):
+    return DummySurveyReport(
+        survey=survey,
+        title=survey.title,
+        slug='',
+        summary=survey.tease or survey.description)
+
+
 def survey_report(request, slug, report='', page=None):
-    """
-    show a report for the survey
-    """
+    """ Show a report for the survey. """
     page = 1 if page is None else get_int_or_404(page)
     survey = _get_survey_or_404(slug)
     # is the survey anything we can actually have a report on?
@@ -215,14 +217,13 @@ def survey_report(request, slug, report='', page=None):
     if pages_to_link[-1] < paginator.num_pages:
         pages_to_link = pages_to_link + [False, paginator.num_pages]
     reports = survey.surveyreport_set.all()
-    if not reports:
-        the_report = None
+    if report:
+        the_report = get_object_or_404(reports, slug=report)
+    elif reports:
+        args = {"slug": survey.slug, "report": reports[0].slug}
+        return HttpResponseRedirect(reverse("survey_report_page_1", args))
     else:
-        try:
-            the_report = reports.get(slug=report)
-        except SurveyReport.DoesNotExist:
-            if report == '' and len(reports) == 1:
-                the_report = reports[0]
+        the_report = _default_report()
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
                  'crowdsourcing/survey_report.html']
 
