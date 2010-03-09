@@ -73,8 +73,7 @@ class Survey(models.Model):
         kwargs = {'slug': self.slug}
         submit_url = reverse('survey_detail', kwargs=kwargs)
         report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
-        questions = self.questions.filter(answer_is_public=True)
-        questions = questions.order_by("order")
+        questions = self.questions.order_by("order")
         return dict(title=self.title,
                     id=self.id,
                     slug=self.slug,
