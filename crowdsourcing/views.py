@@ -3,17 +3,14 @@ from __future__ import absolute_import
 import httplib
 from itertools import count
 import logging
-import simplejson
-from textwrap import fill
 
 from django.conf import settings
-from django.db.models import Count
 from djview import *
 from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
-                     SURVEY_DISPLAY_TYPE_CHOICES)
+                     SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport)
 
 
 def _user_entered_survey(request, survey):
@@ -166,42 +163,20 @@ def questions(request, slug):
     return response
 
 
-class AggregateResult:
-    """ This helper class makes it easier to write templates that display
-    aggregate results. """
-    def __init__(self, field):
-        self.field = field
-        self.id = field.id
-        self.answer_set = field.answer_set.values('text_answer')
-        self.answer_set = self.answer_set.annotate(count=Count("id"))
-        answer_counts = []
-        for answer in self.answer_set:
-            text = fill(answer["text_answer"], 30)
-            answer_counts.append({"response": text, "count": answer["count"]})
-        self.yahoo_answer_string = simplejson.dumps(answer_counts)
-
-
-class DummyReport:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
-
 def _default_report(survey):
-    surveyreportdisplay_set = []
     field_count = count(1)
-    for field in survey.get_public_aggregate_fields():
-        display = SurveyReportDisplay(
-            display_type=SURVEY_DISPLAY_TYPE_CHOICES.PIE,
-            fieldnames="blah",
-            annotation="blue",
-            order=field_count.next())
-        surveyreportdisplay_set.append(display)
-    return DummyReport(**dict(
+    fields = survey.get_public_aggregate_fields()
+    report = SurveyReport(
         survey=survey,
         title=survey.title,
-        slug='',
-        summary=survey.tease or survey.description,
-        surveyreportdisplay_set=surveyreportdisplay_set))
+        summary=survey.description or survey.tease)
+    report.survey_report_displays = [SurveyReportDisplay(
+        report=report,
+        display_type=SURVEY_DISPLAY_TYPE_CHOICES.PIE,
+        fieldnames=field.fieldname,
+        annotation=field.label,
+        order=field_count.next()) for field in fields]
+    return report
 
 
 def survey_report(request, slug, report='', page=None):
@@ -215,7 +190,6 @@ def survey_report(request, slug, report='', page=None):
     location_fields = list(survey.get_public_location_fields())
     archive_fields = list(survey.get_public_archive_fields())
     aggregate_fields = list(survey.get_public_aggregate_fields())
-    aggregate_results = [AggregateResult(f) for f in aggregate_fields]
     fields = list(survey.get_public_fields())
 
     submissions = _filter_submissions(request.GET, survey)
@@ -249,7 +223,6 @@ def survey_report(request, slug, report='', page=None):
                                     location_fields=location_fields,
                                     archive_fields=archive_fields,
                                     aggregate_fields=aggregate_fields,
-                                    aggregate_results=aggregate_results,
                                     reports=reports,
                                     report=the_report),
                                request)

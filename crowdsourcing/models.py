@@ -3,10 +3,13 @@ from __future__ import absolute_import
 import datetime
 import logging
 from operator import itemgetter
+import simplejson
+from textwrap import fill
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.db import models
+from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
 from djview import reverse
@@ -125,7 +128,7 @@ class Survey(models.Model):
                              OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                              OPTION_TYPE_CHOICES.RADIO_LIST,
                              OPTION_TYPE_CHOICES.CHECKBOX_LIST),
-            answer_is_public=True)
+            answer_is_public=True).order_by("order")
 
     def submissions_for(self, user, session_key):
         q = models.Q(survey=self)
@@ -203,6 +206,7 @@ class Question(models.Model):
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
     use_as_filter = models.BooleanField(default=True)
+    _aggregate_result = None
 
     @property
     def is_filterable(self):
@@ -231,6 +235,23 @@ class Question(models.Model):
     @property
     def parsed_options(self):
         return filter(None, (s.strip() for s in self.options.splitlines()))
+
+    def aggregate_result(self):
+        if None == self._aggregate_result:
+            self._aggregate_result = AggregateResult(self)
+        return self._aggregate_result
+
+class AggregateResult:
+    """ This helper class makes it easier to write templates that display
+    aggregate results. """
+    def __init__(self, field):
+        self.answer_set = field.answer_set.values('text_answer')
+        self.answer_set = self.answer_set.annotate(count=Count("id"))
+        answer_counts = []
+        for answer in self.answer_set:
+            text = fill(answer["text_answer"], 30)
+            answer_counts.append({"response": text, "count": answer["count"]})
+        self.yahoo_answer_string = simplejson.dumps(answer_counts)
 
 
 class Submission(models.Model):
@@ -365,6 +386,9 @@ class SurveyReport(models.Model):
     slug = models.CharField(max_length=50, blank=True)
     # some text at the beginning
     summary = models.TextField(blank=True)
+    # A useful variable for holding different report displays so they don't
+    # get saved to the database.
+    survey_report_displays = None
 
     @models.permalink
     def get_absolute_url(self):
@@ -386,6 +410,10 @@ class SurveyReportDisplay(models.Model):
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
-    fieldnames = models.TextField(blank=True)
+    fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
     order = PositionField(collection=('report',))
+
+    def questions(self):
+        names = self.fieldnames.split(" ")
+        return self.report.survey.questions.filter(fieldname__in=names)
