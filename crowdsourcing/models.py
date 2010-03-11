@@ -236,17 +236,24 @@ class Question(models.Model):
     def parsed_options(self):
         return filter(None, (s.strip() for s in self.options.splitlines()))
 
-    def aggregate_result(self):
-        if None == self._aggregate_result:
-            self._aggregate_result = AggregateResult(self)
-        return self._aggregate_result
 
 class AggregateResult:
     """ This helper class makes it easier to write templates that display
     aggregate results. """
-    def __init__(self, field):
+    def __init__(self, field, data_filters):
         self.answer_set = field.answer_set.values('text_answer')
         self.answer_set = self.answer_set.annotate(count=Count("id"))
+        if data_filters:
+            for field, value in data_filters:
+                where = (
+                    "submission_id IN (SELECT crowdsourcing_submission.id "
+                    "FROM crowdsourcing_submission JOIN crowdsourcing_answer "
+                    "ON crowdsourcing_submission.id = "
+                    "crowdsourcing_answer.submission_id WHERE "
+                    "crowdsourcing_answer.question_id = %d AND "
+                    "crowdsourcing_answer.text_answer = %%s)") % field.id
+                self.answer_set = self.answer_set.extra(where=[where],
+                                                        params=[value])
         answer_counts = []
         for answer in self.answer_set:
             text = fill(answer["text_answer"], 30)

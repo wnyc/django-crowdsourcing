@@ -33,17 +33,27 @@ def _get_remote_ip(request):
     return request.META['REMOTE_ADDR']
 
 
-def _filter_submissions(requestdata, survey):
+def get_filters(requestdata, survey):
+    data_filters = []
+    for field in survey.get_filters():
+        value = requestdata.get(field.fieldname)
+        if value:
+            data_filters.append((field, value,))
+    return data_filters
+
+
+def _filter_submissions(survey, data_filters):
     """ Based on the query string, limit the survey results displayed
     both in agregate and listed format. """
     submissions = survey.public_submissions()
-    qs_filters = {}
-    for fld in (f.fieldname for f in survey.get_filters()):
-        v = requestdata.get(fld)
-        if v:
-            qs_filters[fld] = v
-    if qs_filters:
-        submissions = submissions.filter(**qs_filters)
+    if data_filters:
+        for field, value in data_filters:
+            where = (
+                "crowdsourcing_submission.id in (SELECT submission_id FROM "
+                "crowdsourcing_answer WHERE text_answer = %%s AND "
+                "question_id = %d)") % field.id
+            kwargs = dict(where=[where], params=[value])
+            submissions = submissions.extra(**kwargs)
     return submissions
 
 
@@ -179,6 +189,14 @@ def _default_report(survey):
     return report
 
 
+class Filter:
+    def __init__(self, field, request):
+        self.key = field.fieldname
+        self.label = field.label
+        self.choices = field.parsed_options
+        self.value = request.GET.get(self.key, "")
+
+
 def survey_report(request, slug, report='', page=None):
     """ Show a report for the survey. """
     page = 1 if page is None else get_int_or_404(page)
@@ -191,8 +209,10 @@ def survey_report(request, slug, report='', page=None):
     archive_fields = list(survey.get_public_archive_fields())
     aggregate_fields = list(survey.get_public_aggregate_fields())
     fields = list(survey.get_public_fields())
+    filters = [Filter(f, request) for f in aggregate_fields if f.is_filterable]
 
-    submissions = _filter_submissions(request.GET, survey)
+    data_filters = get_filters(request.GET, survey)
+    submissions = _filter_submissions(survey, data_filters)
     paginator, page_obj = paginate_or_404(submissions, page)
     pages_to_link = []
     for i in range(page - 5, page + 5):
@@ -223,6 +243,8 @@ def survey_report(request, slug, report='', page=None):
                                     location_fields=location_fields,
                                     archive_fields=archive_fields,
                                     aggregate_fields=aggregate_fields,
+                                    filters=filters,
+                                    data_filters=data_filters,
                                     reports=reports,
                                     report=the_report),
                                request)
