@@ -10,7 +10,11 @@ from djview.jsonutil import dump, dumps
 
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
-                     SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport)
+                     SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport,
+                     extra_from_filters, OPTION_TYPE_CHOICES, get_filters)
+
+
+from .util import ChoiceEnum
 
 
 def _user_entered_survey(request, survey):
@@ -33,28 +37,13 @@ def _get_remote_ip(request):
     return request.META['REMOTE_ADDR']
 
 
-def get_filters(requestdata, survey):
-    data_filters = []
-    for field in survey.get_filters():
-        value = requestdata.get(field.fieldname)
-        if value:
-            data_filters.append((field, value,))
-    return data_filters
-
-
-def _filter_submissions(survey, data_filters):
+def _filter_submissions(survey, request_data):
     """ Based on the query string, limit the survey results displayed
     both in agregate and listed format. """
-    submissions = survey.public_submissions()
-    if data_filters:
-        for field, value in data_filters:
-            where = (
-                "crowdsourcing_submission.id in (SELECT submission_id FROM "
-                "crowdsourcing_answer WHERE text_answer = %%s AND "
-                "question_id = %d)") % field.id
-            kwargs = dict(where=[where], params=[value])
-            submissions = submissions.extra(**kwargs)
-    return submissions
+    return extra_from_filters(survey.public_submissions(),
+                              "crowdsourcing_submission.id",
+                              survey,
+                              request_data)
 
 
 def _login_url(request):
@@ -175,7 +164,10 @@ def questions(request, slug):
 
 def _default_report(survey):
     field_count = count(1)
-    fields = survey.get_public_aggregate_fields()
+    fields = survey.get_public_fields().filter(option_type__in=(
+        OPTION_TYPE_CHOICES.BOOLEAN,
+        OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+        OPTION_TYPE_CHOICES.RADIO_LIST))
     report = SurveyReport(
         survey=survey,
         title=survey.title,
@@ -187,14 +179,6 @@ def _default_report(survey):
         annotation=field.label,
         order=field_count.next()) for field in fields]
     return report
-
-
-class Filter:
-    def __init__(self, field, request):
-        self.key = field.fieldname
-        self.label = field.label
-        self.choices = field.parsed_options
-        self.value = request.GET.get(self.key, "")
 
 
 def survey_report(request, slug, report='', page=None):
@@ -209,10 +193,9 @@ def survey_report(request, slug, report='', page=None):
     archive_fields = list(survey.get_public_archive_fields())
     aggregate_fields = list(survey.get_public_aggregate_fields())
     fields = list(survey.get_public_fields())
-    filters = [Filter(f, request) for f in aggregate_fields if f.is_filterable]
+    filters = get_filters(survey, request.GET)
 
-    data_filters = get_filters(request.GET, survey)
-    submissions = _filter_submissions(survey, data_filters)
+    submissions = _filter_submissions(survey, request.GET)
     paginator, page_obj = paginate_or_404(submissions, page)
     pages_to_link = []
     for i in range(page - 5, page + 5):
@@ -244,7 +227,6 @@ def survey_report(request, slug, report='', page=None):
                                     archive_fields=archive_fields,
                                     aggregate_fields=aggregate_fields,
                                     filters=filters,
-                                    data_filters=data_filters,
                                     reports=reports,
                                     report=the_report),
                                request)
