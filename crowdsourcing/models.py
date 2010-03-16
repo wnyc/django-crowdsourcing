@@ -3,10 +3,13 @@ from __future__ import absolute_import
 import datetime
 import logging
 from operator import itemgetter
+import simplejson
+from textwrap import fill
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.db import models
+from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
 from djview import reverse
@@ -102,12 +105,12 @@ class Survey(models.Model):
         return self.starts_at <= now
 
     def get_public_fields(self):
-        return self.questions.filter(answer_is_public=True)
+        return self.questions.filter(answer_is_public=True).order_by("order")
 
     def get_public_location_fields(self):
         return self.questions.filter(
             option_type=OPTION_TYPE_CHOICES.LOCATION_FIELD,
-            answer_is_public=True)
+            answer_is_public=True).order_by("order")
 
     def get_public_archive_fields(self):
         return self.questions.filter(
@@ -115,7 +118,7 @@ class Survey(models.Model):
                              OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
                              OPTION_TYPE_CHOICES.VIDEO_LINK,
                              OPTION_TYPE_CHOICES.TEXT_AREA),
-            answer_is_public=True)
+            answer_is_public=True).order_by("order")
 
     def get_public_aggregate_fields(self):
         return self.questions.filter(
@@ -125,7 +128,7 @@ class Survey(models.Model):
                              OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                              OPTION_TYPE_CHOICES.RADIO_LIST,
                              OPTION_TYPE_CHOICES.CHECKBOX_LIST),
-            answer_is_public=True)
+            answer_is_public=True).order_by("order")
 
     def submissions_for(self, user, session_key):
         q = models.Q(survey=self)
@@ -182,7 +185,8 @@ OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
 FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
                            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                            OPTION_TYPE_CHOICES.RADIO_LIST,
-                           OPTION_TYPE_CHOICES.CHECKBOX_LIST)
+                           OPTION_TYPE_CHOICES.INTEGER,
+                           OPTION_TYPE_CHOICES.FLOAT)
 
 
 class Question(models.Model):
@@ -203,6 +207,7 @@ class Question(models.Model):
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
     use_as_filter = models.BooleanField(default=True)
+    _aggregate_result = None
 
     @property
     def is_filterable(self):
@@ -230,7 +235,97 @@ class Question(models.Model):
 
     @property
     def parsed_options(self):
+        if OPTION_TYPE_CHOICES.BOOLEAN == self.option_type:
+            return [True, False]
         return filter(None, (s.strip() for s in self.options.splitlines()))
+
+
+FILTER_TYPE = ChoiceEnum("choice range")
+
+
+class Filter:
+    def __init__(self, field, request_data):
+        self.field = field
+        self.key = field.fieldname
+        self.label = field.label
+        self.choices = field.parsed_options
+        self.value = self.from_value = self.to_value = ""
+        if field.option_type in (OPTION_TYPE_CHOICES.BOOLEAN,
+                                 OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+                                 OPTION_TYPE_CHOICES.RADIO_LIST):
+            self.type = FILTER_TYPE.CHOICE
+            self.value = request_data.get(self.key, "")
+        elif field.option_type in (OPTION_TYPE_CHOICES.INTEGER,
+                                   OPTION_TYPE_CHOICES.FLOAT):
+            self.type = FILTER_TYPE.RANGE
+            self.from_value = request_data.get(self.key + "_from", "")
+            self.to_value = request_data.get(self.key + "_to", "")
+
+
+def get_filters(survey, request_data):
+    fields = list(survey.get_public_fields())
+    return [Filter(f, request_data) for f in fields if f.is_filterable]
+
+
+def extra_from_filters(set, submission_id_column, survey, request_data):
+    for filter in get_filters(survey, request_data):
+        if filter.value or filter.from_value or filter.to_value:
+            try:
+                type = filter.field.option_type
+                is_float = OPTION_TYPE_CHOICES.FLOAT == type
+                is_integer = OPTION_TYPE_CHOICES.INTEGER == type
+                where = "".join((
+                    submission_id_column,
+                    " IN (SELECT submission_id FROM ",
+                    "crowdsourcing_answer WHERE question_id = %d ",
+                    "AND ")) % filter.field.id
+                if OPTION_TYPE_CHOICES.BOOLEAN == filter.field.option_type:
+                    f = ("0", "f",)
+                    length = len(filter.value)
+                    params = [length and not filter.value[0].lower() in f]
+                    where += "boolean_answer = %s)"
+                elif is_float or is_integer:
+                    convert = float if is_float else int
+                    column = "float_answer" if is_float else "integer_answer"
+                    params = []
+                    wheres = []
+                    if filter.from_value:
+                        params.append(convert(filter.from_value))
+                        wheres.append("%s <= " + column)
+                    if filter.to_value:
+                        params.append(convert(filter.to_value))
+                        wheres.append(column + " <= %s")
+                    where += " AND ".join(wheres) + ")"
+                else:
+                    params = [filter.value]
+                    where += "text_answer = %s)"
+                set = set.extra(where=[where], params=params)
+            except ValueError:
+                pass
+    return set
+
+
+class AggregateResult:
+    """ This helper class makes it easier to write templates that display
+    aggregate results. """
+    def __init__(self, field, request_data):
+        self.answer_set = field.answer_set.values('text_answer',
+                                                  'boolean_answer')
+        self.answer_set = self.answer_set.annotate(count=Count("id"))
+        self.answer_set = extra_from_filters(self.answer_set,
+                                             "submission_id",
+                                             field.survey,
+                                             request_data)
+        self.answer_counts = []
+        for answer in self.answer_set:
+            if field.option_type == OPTION_TYPE_CHOICES.BOOLEAN:
+                text = str(answer["boolean_answer"])
+            else:
+                text = fill(answer["text_answer"], 30)
+            if answer["count"]:
+                self.answer_counts.append({"response": text,
+                                      "count": answer["count"]})
+        self.yahoo_answer_string = simplejson.dumps(self.answer_counts)
 
 
 class Submission(models.Model):
@@ -365,6 +460,9 @@ class SurveyReport(models.Model):
     slug = models.CharField(max_length=50, blank=True)
     # some text at the beginning
     summary = models.TextField(blank=True)
+    # A useful variable for holding different report displays so they don't
+    # get saved to the database.
+    survey_report_displays = None
 
     @models.permalink
     def get_absolute_url(self):
@@ -379,13 +477,17 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie bar grid map')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie') # TODO: bar grid map
 
 
 class SurveyReportDisplay(models.Model):
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
-    fieldnames = models.TextField(blank=True)
+    fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
     order = PositionField(collection=('report',))
+
+    def questions(self):
+        names = self.fieldnames.split(" ")
+        return self.report.survey.questions.filter(fieldname__in=names)

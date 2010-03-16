@@ -236,14 +236,23 @@ class SubmissionForm(ModelForm):
 
 def forms_for_survey(survey, request, submission=None):
     session_key = request.session.session_key.lower()
-    posted_data = request.POST or None
+    post = request.POST or None
     files = request.FILES or None
-    main_form = SubmissionForm(survey, data=posted_data, files=files)
+    main_form = SubmissionForm(survey, data=post, files=files)
     return [main_form] + [
-        QTYPE_FORM[q.option_type](question=q,
-                                  session_key=session_key,
-                                  submission=submission,
-                                  prefix='%s_%s' % (survey.id, q.id),
-                                  data=posted_data,
-                                  files=files)
+        _form_for_question(q, session_key, submission, post, files)
         for q in survey.questions.all().order_by("order")]
+
+
+def _form_for_question(question,
+                       session_key="",
+                       submission=None,
+                       data=None,
+                       files=None):
+    return QTYPE_FORM[question.option_type](
+        question=question,
+        session_key=session_key,
+        submission=submission,
+        prefix='%s_%s' % (question.survey.id, question.id),
+        data=data,
+        files=files)
