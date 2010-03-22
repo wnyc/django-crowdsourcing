@@ -10,6 +10,8 @@ MODERATE_SUBMISSIONS = getattr(_gs,
 
 # youtube has a lot of characters in their ids now so use [^&]
 # youtube also likes to add additional query arguments, so no trailing $
+# If you have oembed installed, use the oembed configuration and ignore
+# this.
 VIDEO_URL_PATTERNS = getattr(
     _gs,
     'CROWDSOURCING_VIDEO_URL_PATTERNS',
