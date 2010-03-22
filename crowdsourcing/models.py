@@ -55,6 +55,9 @@ class Survey(models.Model):
     allow_multiple_submissions = models.BooleanField(default=False)
     moderate_submissions = models.BooleanField(
         default=local_settings.MODERATE_SUBMISSIONS)
+    allow_comments = models.BooleanField(
+        default=False,
+        help_text="Allow comments on user submissions.") 
     archive_policy = models.IntegerField(
         choices=ARCHIVE_POLICY_CHOICES,
         default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
