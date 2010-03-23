@@ -337,6 +337,7 @@ class Submission(models.Model):
     ip_address = models.IPAddressField()
     submitted_at = models.DateTimeField(default=datetime.datetime.now)
     session_key = models.CharField(max_length=40, blank=True, editable=False)
+    featured = models.BooleanField(default=False)
 
     # for moderation
     is_public = models.BooleanField(default=True)
