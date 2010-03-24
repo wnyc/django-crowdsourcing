@@ -57,7 +57,10 @@ class Survey(models.Model):
         default=local_settings.MODERATE_SUBMISSIONS)
     allow_comments = models.BooleanField(
         default=False,
-        help_text="Allow comments on user submissions.") 
+        help_text="Allow comments on user submissions.")
+    allow_voting = models.BooleanField(
+        default=False,
+        help_text="Users can vote on submissions.")
     archive_policy = models.IntegerField(
         choices=ARCHIVE_POLICY_CHOICES,
         default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
@@ -153,6 +156,9 @@ class Survey(models.Model):
         if not self.can_have_public_submissions():
             return self.submission_set.none()
         return self.submission_set.filter(is_public=True)
+
+    def featured_submissions(self):
+        return self.public_submissions().filter(featured=True)
 
     def get_filters(self):
         return self.questions.filter(use_as_filter=True,
@@ -447,7 +453,7 @@ class Answer(models.Model):
                 except Exception as ex:
                     message = "error in syncing to flickr: %s" % str(ex)
                     logging.exception(message)
-    
+
     def __unicode__(self):
         return unicode(self.question)
 
@@ -472,7 +478,7 @@ class SurveyReport(models.Model):
     def get_absolute_url(self):
         return ('survey_report', (), {'slug': self.survey.slug,
                                       'report': self.slug})
-    
+
     class Meta:
         unique_together = (('survey', 'slug'),)
         ordering = ('title',)
