@@ -40,3 +40,10 @@ FLICKR_LIVE = getattr(_gs, 'CROWDSOURCING_FLICKR_LIVE', False)
 FLICKR_TOKENCACHE_PATH = getattr(_gs,
                                  'CROWDSOURCING_FLICKR_TOKENCACHE_PATH',
                                  '/tmp/flickr_tokencache')
+
+
+# You can set a function that does additional processing on the submission
+# list before rendering. For example, if your user interface has sorting
+# based on votes, you could set this value. Use a python path to a function
+# that takes a submission list and a request object.
+PRE_REPORT = getattr(_gs, 'CROWDSOURCING_PRE_REPORT', '')

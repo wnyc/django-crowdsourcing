@@ -7,6 +7,7 @@ import logging
 from django.conf import settings
 from djview import *
 from djview.jsonutil import dump, dumps
+from django.utils.importlib import import_module
 
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
@@ -15,6 +16,7 @@ from .models import (Survey, Submission, Answer, SurveyReportDisplay,
 
 
 from .util import ChoiceEnum
+from . import settings as local_settings
 
 
 def _user_entered_survey(request, survey):
@@ -40,10 +42,6 @@ def _get_remote_ip(request):
 def _filter_submissions(survey, request_data):
     """ Based on the query string, limit the survey results displayed
     both in agregate and listed format. """
-    return extra_from_filters(survey.public_submissions(),
-                              "crowdsourcing_submission.id",
-                              survey,
-                              request_data)
 
 
 def _login_url(request):
@@ -181,6 +179,11 @@ def _default_report(survey):
     return report
 
 
+def load_function(path):
+    parts = path.split(".")
+    module = import_module(".".join(parts[:-1]))
+    return getattr(module, parts[-1])
+    
 def survey_report(request, slug, report='', page=None):
     """ Show a report for the survey. """
     page = 1 if page is None else get_int_or_404(page)
@@ -195,7 +198,13 @@ def survey_report(request, slug, report='', page=None):
     fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
 
-    submissions = _filter_submissions(survey, request.GET)
+    public = survey.public_submissions()
+    id_field = "crowdsourcing_submission.id"
+    submissions = extra_from_filters(public, id_field, survey, request.GET)
+    if local_settings.PRE_REPORT:
+        pre_report = load_function(local_settings.PRE_REPORT)
+        submissions = pre_report(submissions, request)
+
     paginator, page_obj = paginate_or_404(submissions, page)
     pages_to_link = []
     for i in range(page - 5, page + 5):
