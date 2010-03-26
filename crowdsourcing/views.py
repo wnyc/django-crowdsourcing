@@ -1,10 +1,12 @@
 from __future__ import absolute_import
 
+from datetime import datetime
 import httplib
 from itertools import count
 import logging
 
 from django.conf import settings
+from django.core.exceptions import FieldError
 from djview import *
 from djview.jsonutil import dump, dumps
 from django.utils.importlib import import_module
@@ -37,11 +39,6 @@ def _get_remote_ip(request):
     if forwarded:
         return forwarded.split(',')[-1].strip()
     return request.META['REMOTE_ADDR']
-
-
-def _filter_submissions(survey, request_data):
-    """ Based on the query string, limit the survey results displayed
-    both in agregate and listed format. """
 
 
 def _login_url(request):
@@ -160,6 +157,61 @@ def questions(request, slug):
     return response
 
 
+def submissions(request):
+    """ Use this view to make arbitrary queries on submissions. Use the query
+    string to pass keys and values. For example,
+    /crowdsourcing/submissions/?survey=my-survey will return all submissions
+    for the survey with slug my-survey.
+    survey - the slug for the survey
+    user - the username of the submittor. Leave blank for submissions without
+        a logged in user.
+    submitted_from and submitted_to - strings in the format YYYY-mm-ddThh:mm:ss
+        For example, 2010-04-05T13:02:03
+    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean not
+        featured. Everything else means featured. """
+    response = HttpResponse(mimetype='application/json')
+    results = Submission.objects.filter(is_public=True)
+    valid_filters = (
+        'survey',
+        'user',
+        'submitted_from',
+        'submitted_to',
+        'featured')
+    for field in request.GET.keys():
+        if field in valid_filters:
+            value = request.GET[field]
+            if 'survey' == field:
+                field = 'survey__slug'
+            elif 'user' == field:
+                if '' == value:
+                    field = 'user'
+                    value = None
+                else:
+                    field = 'user__username'
+            elif field in ('submitted_from', 'submitted_to'):
+                format = "%Y-%m-%dT%H:%M:%S"
+                try:
+                    value = datetime.strptime(value, format)
+                except ValueError:
+                    return HttpResponse(
+                        ("Invalid %s format. Try, for example, "
+                         "%s") % (field, datetime.now().strftime(format),))
+                if 'submitted_from' == field:
+                    field = 'submitted_at__gte'
+                else:
+                    field = 'submitted_at__lte'
+            elif 'featured' == field:
+                falses = ('f', 'false', 'no', 'n', '0',)
+                value = len(value) and not value.lower() in falses
+            # field is unicode but needs to be ascii.
+            results = results.filter(**{str(field): value})
+        else:
+            return HttpResponse(("You can't filter on %s. Valid options are "
+                                 "%s.") % (field, valid_filters))
+    dump([result.to_jsondata() for result in results], response)
+    return response
+
+
 def _default_report(survey):
     field_count = count(1)
     fields = survey.get_public_fields().filter(option_type__in=(
@@ -179,7 +231,7 @@ def _default_report(survey):
     return report
 
 
-def load_function(path):
+def _get_function(path):
     parts = path.split(".")
     module = import_module(".".join(parts[:-1]))
     return getattr(module, parts[-1])
@@ -202,7 +254,7 @@ def survey_report(request, slug, report='', page=None):
     id_field = "crowdsourcing_submission.id"
     submissions = extra_from_filters(public, id_field, survey, request.GET)
     if local_settings.PRE_REPORT:
-        pre_report = load_function(local_settings.PRE_REPORT)
+        pre_report = _get_function(local_settings.PRE_REPORT)
         submissions = pre_report(submissions, request)
 
     paginator, page_obj = paginate_or_404(submissions, page)

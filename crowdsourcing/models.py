@@ -352,15 +352,19 @@ class Submission(models.Model):
         ordering = ('-submitted_at',)
 
     def to_jsondata(self):
-
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
-        return dict(data=dict(
-            (a.question.fieldname, to_json(a.value))
-            for a in self.answer_set.filter(question__answer_is_public=True)),
-                    submitted_at=self.submitted_at)
+        return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
+                                      for a in self.answer_set.filter(
+                                      question__answer_is_public=True)),
+                            survey=self.survey.slug,
+                            submitted_at=self.submitted_at,
+                            featured=self.featured)
+        if self.user:
+            return_value["user"] = self.user.username
+        return return_value
 
     def get_answer_dict(self):
         try:

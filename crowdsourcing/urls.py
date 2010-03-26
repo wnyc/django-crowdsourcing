@@ -4,11 +4,16 @@ from django.conf.urls.defaults import patterns, url
 
 from .views import (allowed_actions,
                     questions,
+                    submissions,
                     survey_detail,
                     survey_report)
 
 urlpatterns=patterns(
     "",
+    url(r'^submissions/$',
+        submissions,
+        name='submissions'),
+
     url(r'^(?P<slug>[-a-z0-9_]+)/$',
         survey_detail,
         name="survey_detail"),
