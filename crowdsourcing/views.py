@@ -102,7 +102,9 @@ def _url_for_edit(request, obj):
                                     args=(obj.id,))
     admin_url = local_settings.SURVEY_ADMIN_SITE
     if not admin_url:
-        admin_url = request.META["HTTP_HOST"]
+        admin_url = "http://" + request.META["HTTP_HOST"]
+    elif len(admin_url) < 4 or admin_url[:4].lower() != "http":
+        admin_url = "http://" + admin_url
     return admin_url + edit_url
 
 
@@ -113,9 +115,9 @@ def _send_survey_email(request, survey, submission):
     links = [(_url_for_edit(request, submission), "Edit Submission"),
              (_url_for_edit(request, survey), "Edit Survey"),]
     if survey.can_have_public_submissions():
-        links.append((request.META["HTTP_HOST"] + _survey_report_url(survey),
-                      "View Survey",))
-    parts = ["<a href=\"http://%s\">%s</a>" % link for link in links]
+        u = "http://" + request.META["HTTP_HOST"] + _survey_report_url(survey)
+        links.append((u, "View Survey",))
+    parts = ["<a href=\"%s\">%s</a>" % link for link in links]
     set = submission.answer_set.all()
     parts.extend(["%s: %s" % (a.question.label, str(a.value),) for a in set])
     html_email = "<br/>\n".join(parts)
