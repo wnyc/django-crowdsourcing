@@ -15,10 +15,9 @@ _flickr = None
 def _get_flickr():
     global _flickr
     if not _flickr:
-        _flickr = flickrapi.FlickrAPI(
-            local_settings.FLICKR_API_KEY,
-            local_settings.FLICKR_API_SECRET,
-            token=local_settings.FLICKR_TOKEN)
+        _flickr = flickrapi.FlickrAPI(local_settings.FLICKR_API_KEY,
+                                      local_settings.FLICKR_API_SECRET,
+                                      token=local_settings.FLICKR_TOKEN)
     return _flickr
 
 
