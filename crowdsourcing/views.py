@@ -6,7 +6,9 @@ from itertools import count
 import logging
 
 from django.conf import settings
+from django.core import urlresolvers
 from django.core.exceptions import FieldError
+from django.core.mail import EmailMultiAlternatives
 from djview import *
 from djview.jsonutil import dump, dumps
 from django.utils.importlib import import_module
@@ -85,11 +87,49 @@ def _survey_submit(request, survey):
                     answer.submission=submission
                     answer.save()
         # go to survey results/thanks page
+        if survey.email:
+            _send_survey_email(request, survey, submission)
         if survey.can_have_public_submissions():
             return _survey_results_redirect(request, survey, thanks=True)
         return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
+
+
+def _url_for_edit(request, obj):
+    view_args = (obj._meta.app_label, obj._meta.module_name,)
+    edit_url = urlresolvers.reverse("admin:%s_%s_change" % view_args,
+                                    args=(obj.id,))
+    admin_url = local_settings.SURVEY_ADMIN_SITE
+    if not admin_url:
+        admin_url = request.META["HTTP_HOST"]
+    return admin_url + edit_url
+
+
+def _send_survey_email(request, survey, submission):
+    subject = survey.title
+    sender = local_settings.SURVEY_EMAIL_FROM
+    recipient = survey.email
+    links = [(_url_for_edit(request, submission), "Edit Submission"),
+             (_url_for_edit(request, survey), "Edit Survey"),]
+    if survey.can_have_public_submissions():
+        links.append((request.META["HTTP_HOST"] + _survey_report_url(survey),
+                      "View Survey",))
+    parts = ["<a href=\"http://%s\">%s</a>" % link for link in links]
+    set = submission.answer_set.all()
+    parts.extend(["%s: %s" % (a.question.label, str(a.value),) for a in set])
+    html_email = "<br/>\n".join(parts)
+    email_msg = EmailMultiAlternatives(subject,
+                                       html_email,
+                                       sender,
+                                       [recipient])
+    email_msg.attach_alternative(html_email, 'text/html')
+    try:
+        email_msg.send()
+    except smtplib.SMTPException as ex:
+        logging.exception("SMTP error sending email: %s" % str(ex))
+    except Exception as ex:
+        logging.exception("Unexpected error sending email: %s" % str(ex))
 
 
 def _survey_show_form(request, survey, forms):
@@ -136,11 +176,14 @@ def survey_detail(request, slug):
 
 
 def _survey_results_redirect(request, survey, thanks=False):
-    url = reverse('survey_default_report_page_1', kwargs={'slug': survey.slug})
-    response = HttpResponseRedirect(url)
+    response = HttpResponseRedirect(_survey_report_url(survey))
     if thanks:
         request.session['survey_thanks_%s' % survey.slug] = '1'
     return response
+
+
+def _survey_report_url(survey):
+    return reverse('survey_default_report_page_1', kwargs={'slug': survey.slug})
 
 
 def allowed_actions(request, slug):

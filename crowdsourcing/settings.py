@@ -37,6 +37,7 @@ FLICKR_FROB = getattr(_gs, 'CROWDSOURCING_FLICKR_FROB', '')
 
 FLICKR_LIVE = getattr(_gs, 'CROWDSOURCING_FLICKR_LIVE', False)
 
+
 FLICKR_TOKENCACHE_PATH = getattr(_gs,
                                  'CROWDSOURCING_FLICKR_TOKENCACHE_PATH',
                                  '/tmp/flickr_tokencache')
@@ -47,3 +48,9 @@ FLICKR_TOKENCACHE_PATH = getattr(_gs,
 # based on votes, you could set this value. Use a python path to a function
 # that takes a submission list and a request object.
 PRE_REPORT = getattr(_gs, 'CROWDSOURCING_PRE_REPORT', '')
+
+
+SURVEY_EMAIL_FROM = getattr(_gs, 'CROWDSOURCING_SURVEY_EMAIL_FROM', 'donotreply@donotreply.com')
+
+
+SURVEY_ADMIN_SITE = getattr(_gs, 'CROWDSOURCING_SURVEY_ADMIN_SITE', '')

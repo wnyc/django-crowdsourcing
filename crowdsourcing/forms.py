@@ -224,13 +224,20 @@ class SubmissionForm(ModelForm):
         
     class Meta:
         model = Submission
-        exclude = ('survey', 'submitted_at','ip_address','user', 'is_public')
+        exclude = (
+            'survey',
+            'submitted_at',
+            'ip_address',
+            'user',
+            'is_public',
+            'featured')
 
 
-def forms_for_survey(survey, request, submission=None):
-    session_key = request.session.session_key.lower()
-    post = request.POST or None
-    files = request.FILES or None
+def forms_for_survey(survey, request='testing', submission=None):
+    testing = 'testing' == request
+    session_key = "" if testing else request.session.session_key.lower()
+    post = None if testing else request.POST or None
+    files = None if testing else request.FILES or None
     main_form = SubmissionForm(survey, data=post, files=files)
     return [main_form] + [
         _form_for_question(q, session_key, submission, post, files)

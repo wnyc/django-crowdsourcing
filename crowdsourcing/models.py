@@ -68,6 +68,10 @@ class Survey(models.Model):
     survey_date = models.DateField(blank=True, null=True, editable=False)
     ends_at = models.DateTimeField(null=True, blank=True)
     is_published = models.BooleanField(default=False)
+    email = models.EmailField(
+        blank=True,
+        help_text=("Send a notification to this e-mail whenever someone "
+                   "submits an entry to this survey."))
     site = models.ForeignKey(Site)
     flickr_group_id = models.CharField(
         max_length=60,
