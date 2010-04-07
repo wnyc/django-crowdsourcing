@@ -1,25 +1,36 @@
 from __future__ import absolute_import
 
+
 import datetime
 import logging
 from operator import itemgetter
 import simplejson
 from textwrap import fill
 
+
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
-from djview import reverse
+from django.utils.safestring import mark_safe
+
 
 from .fields import ImageWithThumbnailsField
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
-from positions.fields import PositionField
+
+try:
+    from positions.fields import PositionField
+except ImportError:
+    logging.warn('positions not installed. '
+                 'Will just use integers for position fields.')
+    PositionField = None
+
 
 try:
     from .flickrsupport import sync_to_flickr, get_group_id
@@ -34,7 +45,6 @@ ARCHIVE_POLICY_CHOICES = ChoiceEnum(('immediate',
 
 
 class LiveSurveyManager(models.Manager):
-
     def get_query_set(self):
         now = datetime.datetime.now()
         return super(LiveSurveyManager, self).get_query_set().filter(
@@ -215,7 +225,10 @@ class Question(models.Model):
         "Appears on the results page."))
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    order = PositionField(collection=('survey',))
+    if PositionField:
+        order = PositionField(collection=('survey',))
+    else:
+        order = models.IntegerField()
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -274,6 +287,31 @@ class Filter:
             self.from_value = request_data.get(self.key + "_from", "")
             self.to_value = request_data.get(self.key + "_to", "")
 
+    def as_li(self):
+        output = ['<li>',
+                  '<label for="%s">%s</label>' % (self.key, self.label,)]
+        if FILTER_TYPE.CHOICE == self.type:
+            output.append('<select id="%s" name="%s">' % (self.key, self.key,))
+            output.append('<option value="">---------</option>')
+            for choice in self.choices:
+                output.append('<option value="%s"' % choice)
+                if self.value == u"%s" % choice:
+                    output.append('selected="selected"')
+                output.append('>%s</option>' % choice)
+            output.append('</select>')
+        if FILTER_TYPE.RANGE == self.type:
+            output.extend([
+                '<span id="%s">' % self.key,
+                '<label for="%s_from">From:</label>' % self.key,
+                '<input type="text" id="%s_from"' % self.key,
+                'name="%s_from" value="%s" />' % (self.key, self.from_value),
+                '<label for="%s_to">To:</label>' % self.key,
+                '<input type="text" id="%s_to"' % self.key,
+                'name="%s_to" value="%s" />' % (self.key, self.to_value),
+                '</span>'])
+        output.append("</li>")
+        return mark_safe("\n".join(output))
+        
 
 def get_filters(survey, request_data):
     fields = list(survey.get_public_fields())
@@ -504,8 +542,16 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
-    order = PositionField(collection=('report',))
+    if PositionField:
+        order = PositionField(collection=('report',))
+    else:
+        order = models.IntegerField()
 
+    def is_text(self):
+        return SURVEY_DISPLAY_TYPE_CHOICES.TEXT == self.display_type
+
+    def is_pie(self):
+        return SURVEY_DISPLAY_TYPE_CHOICES.PIE == self.display_type
     def questions(self):
         names = self.fieldnames.split(" ")
         return self.report.survey.questions.filter(fieldname__in=names)

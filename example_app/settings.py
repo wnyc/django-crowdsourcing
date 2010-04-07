@@ -1,7 +1,6 @@
 # Django settings for example_app project.
 import os
-PROJECT_ROOT=os.path.dirname(os.path.abspath(__file__))
-
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -56,7 +55,6 @@ SECRET_KEY = '%n@##5o0%d@qd5l4^+(zt5ih@90a7ch4k3m7a^!5unw45)i=ly'
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.load_template_source',
     'django.template.loaders.app_directories.load_template_source',
-#     'django.template.loaders.eggs.load_template_source',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -81,6 +79,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.admin',
     'crowdsourcing',
+    'cms',
 )
 
 try:

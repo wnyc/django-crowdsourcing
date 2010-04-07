@@ -3,3 +3,4 @@ syntax: glob
 *.swp
 Crowdsourcing.egg*
 build/lib/crowdsourcing/*
+example_app/local_settings.py

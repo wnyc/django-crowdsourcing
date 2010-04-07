@@ -9,15 +9,18 @@ from django.conf import settings
 from django.core import urlresolvers
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
-from djview import *
-from djview.jsonutil import dump, dumps
+from django.core.paginator import Paginator
+from django.core.urlresolvers import reverse
+from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.shortcuts import get_object_or_404, render_to_response
+from django.template import RequestContext as _rc
 from django.utils.importlib import import_module
 
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
                      SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport,
                      extra_from_filters, OPTION_TYPE_CHOICES, get_filters)
-
+from .jsonutils import dump, dumps
 
 from .util import ChoiceEnum
 from . import settings as local_settings
@@ -60,10 +63,11 @@ def _survey_submit(request, survey):
         return HttpResponse("Cookies must be enabled to use this application.",
                             status=httplib.FORBIDDEN)
     if (_entered_no_more_allowed(request, survey)):
-        return render_with_request(['crowdsourcing/%s_already_submitted.html' % survey.slug,
-                                    'crowdsourcing/already_submitted.html'],
-                                   dict(survey=survey),
-                                   request)
+        slug_template = 'crowdsourcing/%s_already_submitted.html' % survey.slug
+        return render_to_response([slug_template,
+                                   'crowdsourcing/already_submitted.html'],
+                                  dict(survey=survey),
+                                  _rc(request))
 
     forms = forms_for_survey(survey, request)
 
@@ -137,13 +141,13 @@ def _send_survey_email(request, survey, submission):
 def _survey_show_form(request, survey, forms):
     specific_template = 'crowdsourcing/%s_survey_detail.html' % survey.slug
     entered = _user_entered_survey(request, survey)
-    return render_with_request([specific_template,
-                                'crowdsourcing/survey_detail.html'],
-                               dict(survey=survey,
-                                    forms=forms,
-                                    entered=entered,
-                                    login_url=_login_url(request)),
-                               request)
+    return render_to_response([specific_template,
+                               'crowdsourcing/survey_detail.html'],
+                              dict(survey=survey,
+                                   forms=forms,
+                                   entered=entered,
+                                   login_url=_login_url(request)),
+                              _rc(request))
 
 
 def _can_show_form(request, survey):
@@ -185,7 +189,8 @@ def _survey_results_redirect(request, survey, thanks=False):
 
 
 def _survey_report_url(survey):
-    return reverse('survey_default_report_page_1', kwargs={'slug': survey.slug})
+    return reverse('survey_default_report_page_1',
+                   kwargs={'slug': survey.slug})
 
 
 def allowed_actions(request, slug):
@@ -280,7 +285,8 @@ def _get_function(path):
     parts = path.split(".")
     module = import_module(".".join(parts[:-1]))
     return getattr(module, parts[-1])
-    
+
+
 def survey_report(request, slug, report='', page=None):
     """ Show a report for the survey. """
     page = 1 if page is None else get_int_or_404(page)
@@ -322,17 +328,35 @@ def survey_report(request, slug, report='', page=None):
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
                  'crowdsourcing/survey_report.html']
 
-    return render_with_request(templates,
-                               dict(survey=survey,
-                                    submissions=submissions,
-                                    paginator=paginator,
-                                    page_obj=page_obj,
-                                    pages_to_link=pages_to_link,
-                                    fields=fields,
-                                    location_fields=location_fields,
-                                    archive_fields=archive_fields,
-                                    aggregate_fields=aggregate_fields,
-                                    filters=filters,
-                                    reports=reports,
-                                    report=the_report),
-                               request)
+    return render_to_response(templates,
+                              dict(survey=survey,
+                                   submissions=submissions,
+                                   paginator=paginator,
+                                   page_obj=page_obj,
+                                   pages_to_link=pages_to_link,
+                                   fields=fields,
+                                   location_fields=location_fields,
+                                   archive_fields=archive_fields,
+                                   aggregate_fields=aggregate_fields,
+                                   filters=filters,
+                                   reports=reports,
+                                   report=the_report,
+                                   request=request),
+                              _rc(request))
+
+
+def paginate_or_404(queryset, page, num_per_page=20):
+    """
+    paginate a queryset (or other iterator) for the given page, returning the
+    paginator and page object. Raises a 404 for an invalid page.
+    """
+    if page is None:
+        page = 1
+    paginator = Paginator(queryset, num_per_page)
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    except InvalidPage:
+        raise Http404
+    return paginator, page_obj

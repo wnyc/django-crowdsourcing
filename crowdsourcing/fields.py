@@ -8,6 +8,3 @@ except ImportError:
         def __init__(self, *args, **kwargs):
             kwargs.pop('thumbnail', None)
             super(ImageWithThumbnailsField, self).__init__(*args, **kwargs)
-
-
-

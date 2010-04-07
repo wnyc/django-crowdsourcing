@@ -1,0 +1,39 @@
+{% load crowdsourcing %}
+<html>
+<head>
+  <title>{{ survey.title }}</title>
+  {% if aggregate_fields %}
+    {% yahoo_pie_chart_header %}
+  {% endif %}
+</head>
+<body>
+
+<h1>{{ survey.title }}</h1>
+
+{% if thanks %}
+  <p>Thanks for your submission.</p>
+{% endif %}
+
+{% filters_as_ul filters %}
+
+{% if not fields %}
+  All questions in this survey have private answers.
+{% endif %}
+
+{% for display in report.survey_report_displays %}
+  {% if display.is_text %}
+    {{display.annotation}}
+  {% else %}{% if display.is_pie %}
+    {% for question in display.questions %}
+      {% yahoo_pie_chart display question request.GET %}
+    {% endfor %}
+  {% endif %}{% endif %}
+{% endfor %}
+
+{% if archive_fields %}
+  {% submissions page_obj.object_list %}
+  {% paginator survey report paginator page_obj %}
+{% endif %}
+
+</body>
+</html>

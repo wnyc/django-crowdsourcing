@@ -1,0 +1,10 @@
+# This pip requirements file contains all the basic requirements of
+# django-crowdsourcing. To run this file you will need to
+# $ easy_install pip
+# $ pip install -r crowdsourcing_requirements.txt
+
+# Python Image Library for processing image answers.
+PIL>=1.1.6
+
+# The API functions all return json. See crowdsourcing/views.py
+simplejson==2.0.9
