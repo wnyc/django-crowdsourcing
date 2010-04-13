@@ -105,6 +105,7 @@ class SurveyReportDisplayInline(admin.StackedInline):
 
 
 class SurveyReportAdmin(admin.ModelAdmin):
+    prepopulated_fields = {'slug': ('title', )}
     inlines = [SurveyReportDisplayInline]
 
 

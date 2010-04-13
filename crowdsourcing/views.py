@@ -9,12 +9,12 @@ from django.conf import settings
 from django.core import urlresolvers
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, InvalidPage
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext as _rc
-from django.utils.importlib import import_module
+from django.utils.html import escape
 
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
@@ -22,7 +22,7 @@ from .models import (Survey, Submission, Answer, SurveyReportDisplay,
                      extra_from_filters, OPTION_TYPE_CHOICES, get_filters)
 from .jsonutils import dump, dumps
 
-from .util import ChoiceEnum
+from .util import ChoiceEnum, get_function
 from . import settings as local_settings
 
 
@@ -47,7 +47,9 @@ def _get_remote_ip(request):
 
 
 def _login_url(request):
-    return reverse("auth_login") + '?next=%s' % request.path
+    if local_settings.LOGIN_VIEW:
+        return reverse(local_settings.LOGIN_VIEW) + '?next=%s' % request.path
+    return "/?login_required=true"
 
 
 def _get_survey_or_404(slug):
@@ -123,7 +125,8 @@ def _send_survey_email(request, survey, submission):
         links.append((u, "View Survey",))
     parts = ["<a href=\"%s\">%s</a>" % link for link in links]
     set = submission.answer_set.all()
-    parts.extend(["%s: %s" % (a.question.label, str(a.value),) for a in set])
+    val = escape(a.value)
+    parts.extend(["%s: %s" % (a.question.label, val,) for a in set])
     html_email = "<br/>\n".join(parts)
     email_msg = EmailMultiAlternatives(subject,
                                        html_email,
@@ -281,15 +284,15 @@ def _default_report(survey):
     return report
 
 
-def _get_function(path):
-    parts = path.split(".")
-    module = import_module(".".join(parts[:-1]))
-    return getattr(module, parts[-1])
-
-
 def survey_report(request, slug, report='', page=None):
     """ Show a report for the survey. """
-    page = 1 if page is None else get_int_or_404(page)
+    if page is None:
+        page = 1
+    else:
+        try:
+            page = int(page)
+        except ValueError:
+            raise Http404
     survey = _get_survey_or_404(slug)
     # is the survey anything we can actually have a report on?
     if not survey.can_have_public_submissions():
@@ -305,7 +308,7 @@ def survey_report(request, slug, report='', page=None):
     id_field = "crowdsourcing_submission.id"
     submissions = extra_from_filters(public, id_field, survey, request.GET)
     if local_settings.PRE_REPORT:
-        pre_report = _get_function(local_settings.PRE_REPORT)
+        pre_report = get_function(local_settings.PRE_REPORT)
         submissions = pre_report(submissions, request)
 
     paginator, page_obj = paginate_or_404(submissions, page)

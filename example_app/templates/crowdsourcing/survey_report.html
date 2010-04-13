@@ -31,8 +31,8 @@
 {% endfor %}
 
 {% if archive_fields %}
-  {% submissions page_obj.object_list %}
-  {% paginator survey report paginator page_obj %}
+  {% submissions page_obj.object_list fields %}
+  {% paginator survey report pages_to_link page_obj %}
 {% endif %}
 
 </body>

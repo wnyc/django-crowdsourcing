@@ -286,31 +286,6 @@ class Filter:
             self.type = FILTER_TYPE.RANGE
             self.from_value = request_data.get(self.key + "_from", "")
             self.to_value = request_data.get(self.key + "_to", "")
-
-    def as_li(self):
-        output = ['<li>',
-                  '<label for="%s">%s</label>' % (self.key, self.label,)]
-        if FILTER_TYPE.CHOICE == self.type:
-            output.append('<select id="%s" name="%s">' % (self.key, self.key,))
-            output.append('<option value="">---------</option>')
-            for choice in self.choices:
-                output.append('<option value="%s"' % choice)
-                if self.value == u"%s" % choice:
-                    output.append('selected="selected"')
-                output.append('>%s</option>' % choice)
-            output.append('</select>')
-        if FILTER_TYPE.RANGE == self.type:
-            output.extend([
-                '<span id="%s">' % self.key,
-                '<label for="%s_from">From:</label>' % self.key,
-                '<input type="text" id="%s_from"' % self.key,
-                'name="%s_from" value="%s" />' % (self.key, self.from_value),
-                '<label for="%s_to">To:</label>' % self.key,
-                '<input type="text" id="%s_to"' % self.key,
-                'name="%s_to" value="%s" />' % (self.key, self.to_value),
-                '</span>'])
-        output.append("</li>")
-        return mark_safe("\n".join(output))
         
 
 def get_filters(survey, request_data):
@@ -519,6 +494,11 @@ class SurveyReport(models.Model):
     # A useful variable for holding different report displays so they don't
     # get saved to the database.
     survey_report_displays = None
+
+    def get_survey_report_displays(self):
+        if self.pk:
+            return self.surveyreportdisplay_set.all()
+        return self.survey_report_displays
 
     @models.permalink
     def get_absolute_url(self):
