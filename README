@@ -7,7 +7,6 @@ of Doug Napoleone's django-survey to meet a couple of objectives:
 4. depending on the nature of a survey, submissions may be  displayed in 
    archives as well as aggregated in various ways.
 
-
 Running The Example App
 1. $ easy_install pip
 2. $ pip install -r crowdsourcing_requirements.txt
@@ -18,3 +17,7 @@ Running The Example App
 6. $ ./manage.py syncdb
 7. $ ./manage.py runserver 
 8. Add some surveys in /admin/
+
+Notes
+1. Should work under Django 1.1 and 1.2
+2. Only tested on Python 2.6

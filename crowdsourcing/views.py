@@ -6,7 +6,6 @@ from itertools import count
 import logging
 
 from django.conf import settings
-from django.core import urlresolvers
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
@@ -104,8 +103,8 @@ def _survey_submit(request, survey):
 
 def _url_for_edit(request, obj):
     view_args = (obj._meta.app_label, obj._meta.module_name,)
-    edit_url = urlresolvers.reverse("admin:%s_%s_change" % view_args,
-                                    args=(obj.id,))
+    edit_url = reverse("admin:%s_%s_change" % view_args,
+                       args=(obj.id,))
     admin_url = local_settings.SURVEY_ADMIN_SITE
     if not admin_url:
         admin_url = "http://" + request.META["HTTP_HOST"]
@@ -125,8 +124,8 @@ def _send_survey_email(request, survey, submission):
         links.append((u, "View Survey",))
     parts = ["<a href=\"%s\">%s</a>" % link for link in links]
     set = submission.answer_set.all()
-    val = escape(a.value)
-    parts.extend(["%s: %s" % (a.question.label, val,) for a in set])
+    lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in set]
+    parts.extend(lines)
     html_email = "<br/>\n".join(parts)
     email_msg = EmailMultiAlternatives(subject,
                                        html_email,
