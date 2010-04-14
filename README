@@ -19,3 +19,7 @@ Running The Example App
 8. $ ./manage.py syncdb
 9. $ ./manage.py runserver
 10. Add some surveys in /admin/
+
+Notes
+1. Should work under Django 1.1 and 1.2
+2. Only tested on Python 2.6
