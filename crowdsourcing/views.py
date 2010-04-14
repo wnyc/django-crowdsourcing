@@ -124,8 +124,8 @@ def _send_survey_email(request, survey, submission):
         links.append((u, "View Survey",))
     parts = ["<a href=\"%s\">%s</a>" % link for link in links]
     set = submission.answer_set.all()
-    val = escape(a.value)
-    parts.extend(["%s: %s" % (a.question.label, val,) for a in set])
+    lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in set]
+    parts.extend(lines)
     html_email = "<br/>\n".join(parts)
     email_msg = EmailMultiAlternatives(subject,
                                        html_email,
