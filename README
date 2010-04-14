@@ -12,10 +12,9 @@ Running The Example App
 1. $ easy_install pip
 2. $ pip install -r crowdsourcing_requirements.txt
 3. $ pip install -r example_app/example_app_requirements.txt
-4. Create a database.
-5. Install whatever libraries you need to run your database.
-6. Put the connection settings for your database in example_app/local_settings.py
-7. $ cd example_app
-8. $ ./manage.py syncdb
-9. $ ./manage.py runserver
-10. Add some surveys in /admin/
+4. By default the example app will use a sqlite db; if if you want to
+   change that, modify example_app/local_settings.py accordingly.
+5. $ cd example_app
+6. $ ./manage.py syncdb
+7. $ ./manage.py runserver 
+8. Add some surveys in /admin/
