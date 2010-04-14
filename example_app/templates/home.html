@@ -1,0 +1,25 @@
+<html>
+<head>
+  <title>Example App Home</title>
+  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+  <script type="text/javascript">
+    google.load("jquery", "1.4");
+  </script>
+  <script type="text/javascript" src="/media/jquery.form.js"></script>
+  <script type="text/javascript" src="/media/survey.js"></script>
+</head>
+<body>
+
+{% if latest_survey %}
+  <h1>{{ latest_survey.title }}</h1>
+  <p>{{ latest_survey.description }}</p>
+  <div id="latest_survey_div"></div>
+  <script type="text/javascript">
+    loadSurvey('{{ latest_survey.slug }}', 'latest_survey_div');
+  </script>
+{% else %}
+  No live surveys at this time.
+{% endif %}
+
+</body>
+</html>

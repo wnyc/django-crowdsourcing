@@ -1,6 +1,15 @@
 import itertools
 import re
 
+from django.utils.importlib import import_module
+
+
+def get_function(path):
+    parts = path.split(".")
+    module = import_module(".".join(parts[:-1]))
+    return getattr(module, parts[-1])
+
+
 class ChoiceEnum(object):
     def __init__(self, choices):
         if isinstance(choices, basestring):
@@ -16,4 +25,3 @@ class ChoiceEnum(object):
 
     def __getitem__(self, idx):
         return self._choices[idx]
-

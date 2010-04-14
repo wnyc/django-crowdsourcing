@@ -1,25 +1,36 @@
 from __future__ import absolute_import
 
+
 import datetime
 import logging
 from operator import itemgetter
 import simplejson
 from textwrap import fill
 
+
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django.core.urlresolvers import reverse
 from django.db import models
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
-from djview import reverse
+from django.utils.safestring import mark_safe
+
 
 from .fields import ImageWithThumbnailsField
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
-from positions.fields import PositionField
+
+try:
+    from positions.fields import PositionField
+except ImportError:
+    logging.warn('positions not installed. '
+                 'Will just use integers for position fields.')
+    PositionField = None
+
 
 try:
     from .flickrsupport import sync_to_flickr, get_group_id
@@ -34,7 +45,6 @@ ARCHIVE_POLICY_CHOICES = ChoiceEnum(('immediate',
 
 
 class LiveSurveyManager(models.Manager):
-
     def get_query_set(self):
         now = datetime.datetime.now()
         return super(LiveSurveyManager, self).get_query_set().filter(
@@ -55,6 +65,12 @@ class Survey(models.Model):
     allow_multiple_submissions = models.BooleanField(default=False)
     moderate_submissions = models.BooleanField(
         default=local_settings.MODERATE_SUBMISSIONS)
+    allow_comments = models.BooleanField(
+        default=False,
+        help_text="Allow comments on user submissions.")
+    allow_voting = models.BooleanField(
+        default=False,
+        help_text="Users can vote on submissions.")
     archive_policy = models.IntegerField(
         choices=ARCHIVE_POLICY_CHOICES,
         default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
@@ -62,6 +78,10 @@ class Survey(models.Model):
     survey_date = models.DateField(blank=True, null=True, editable=False)
     ends_at = models.DateTimeField(null=True, blank=True)
     is_published = models.BooleanField(default=False)
+    email = models.EmailField(
+        blank=True,
+        help_text=("Send a notification to this e-mail whenever someone "
+                   "submits an entry to this survey."))
     site = models.ForeignKey(Site)
     flickr_group_id = models.CharField(
         max_length=60,
@@ -151,6 +171,9 @@ class Survey(models.Model):
             return self.submission_set.none()
         return self.submission_set.filter(is_public=True)
 
+    def featured_submissions(self):
+        return self.public_submissions().filter(featured=True)
+
     def get_filters(self):
         return self.questions.filter(use_as_filter=True,
                                      answer_is_public=True,
@@ -202,7 +225,10 @@ class Question(models.Model):
         "Appears on the results page."))
     help_text = models.TextField(blank=True)
     required = models.BooleanField(default=False)
-    order = PositionField(collection=('survey',))
+    if PositionField:
+        order = PositionField(collection=('survey',))
+    else:
+        order = models.IntegerField()
     option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
     options = models.TextField(blank=True, default='')
     answer_is_public = models.BooleanField(default=True)
@@ -260,7 +286,7 @@ class Filter:
             self.type = FILTER_TYPE.RANGE
             self.from_value = request_data.get(self.key + "_from", "")
             self.to_value = request_data.get(self.key + "_to", "")
-
+        
 
 def get_filters(survey, request_data):
     fields = list(survey.get_public_fields())
@@ -334,6 +360,7 @@ class Submission(models.Model):
     ip_address = models.IPAddressField()
     submitted_at = models.DateTimeField(default=datetime.datetime.now)
     session_key = models.CharField(max_length=40, blank=True, editable=False)
+    featured = models.BooleanField(default=False)
 
     # for moderation
     is_public = models.BooleanField(default=True)
@@ -342,15 +369,19 @@ class Submission(models.Model):
         ordering = ('-submitted_at',)
 
     def to_jsondata(self):
-
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
-        return dict(data=dict(
-            (a.question.fieldname, to_json(a.value))
-            for a in self.answer_set.filter(question__answer_is_public=True)),
-                    submitted_at=self.submitted_at)
+        return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
+                                      for a in self.answer_set.filter(
+                                      question__answer_is_public=True)),
+                            survey=self.survey.slug,
+                            submitted_at=self.submitted_at,
+                            featured=self.featured)
+        if self.user:
+            return_value["user"] = self.user.username
+        return return_value
 
     def get_answer_dict(self):
         try:
@@ -443,7 +474,7 @@ class Answer(models.Model):
                 except Exception as ex:
                     message = "error in syncing to flickr: %s" % str(ex)
                     logging.exception(message)
-    
+
     def __unicode__(self):
         return unicode(self.question)
 
@@ -464,11 +495,16 @@ class SurveyReport(models.Model):
     # get saved to the database.
     survey_report_displays = None
 
+    def get_survey_report_displays(self):
+        if self.pk:
+            return self.surveyreportdisplay_set.all()
+        return self.survey_report_displays
+
     @models.permalink
     def get_absolute_url(self):
         return ('survey_report', (), {'slug': self.survey.slug,
                                       'report': self.slug})
-    
+
     class Meta:
         unique_together = (('survey', 'slug'),)
         ordering = ('title',)
@@ -486,8 +522,16 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
-    order = PositionField(collection=('report',))
+    if PositionField:
+        order = PositionField(collection=('report',))
+    else:
+        order = models.IntegerField()
 
+    def is_text(self):
+        return SURVEY_DISPLAY_TYPE_CHOICES.TEXT == self.display_type
+
+    def is_pie(self):
+        return SURVEY_DISPLAY_TYPE_CHOICES.PIE == self.display_type
     def questions(self):
         names = self.fieldnames.split(" ")
         return self.report.survey.questions.filter(fieldname__in=names)

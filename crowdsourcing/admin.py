@@ -61,6 +61,7 @@ class SurveyAdminForm(ModelForm):
 
 
 class SurveyAdmin(admin.ModelAdmin):
+    save_as = True
     form = SurveyAdminForm
     search_fields = ('title', 'slug', 'tease', 'description')
     prepopulated_fields = {'slug' : ('title',)}
@@ -104,6 +105,7 @@ class SurveyReportDisplayInline(admin.StackedInline):
 
 
 class SurveyReportAdmin(admin.ModelAdmin):
+    prepopulated_fields = {'slug': ('title', )}
     inlines = [SurveyReportDisplayInline]
 
 

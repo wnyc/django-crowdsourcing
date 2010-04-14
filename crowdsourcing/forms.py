@@ -31,6 +31,11 @@ from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
 
+try:
+    from .oembedutils import oembed_expand
+except ImportError:
+    oembed_expand = None
+
 
 class BaseAnswerForm(Form):
     def __init__(self,
@@ -120,36 +125,24 @@ class VideoAnswer(BaseAnswerForm):
     def clean_answer(self):
         value = self.cleaned_data['answer']
         if value:
-            matches = [re.match(v, value) for v in VIDEO_URL_PATTERNS]
-            first_match = reduce(lambda x, y: x or y, matches)
-            if first_match:
-                return first_match.group(0)
-            raise ValidationError(_("I don't recognize this video url format. "
-            "Try something like http://www.youtube.com/watch?v=Bfli1yuby58."))
+            if oembed_expand:
+                if oembed_expand(value):
+                    return value
+                else:
+                    print "Couldn't expand %s" % value
+            else:
+                matches = [re.match(v, value) for v in VIDEO_URL_PATTERNS]
+                first_match = reduce(lambda x, y: x or y, matches)
+                if first_match:
+                    return first_match.group(0)
+            raise ValidationError(_(
+                "I don't recognize this video url format. Try something like "
+                "http://www.youtube.com/watch?v=Bfli1yuby58."))
         return value
 
 
 class PhotoUpload(BaseAnswerForm):
     answer = ImageField()
-
-##     def clean_answer(self):
-##         value=self.cleaned_data['answer']
-##         if value:
-##             mediaroot=settings.MEDIA_ROOT
-##             subpath=datetime.datetime.now().strftime(IMAGE_UPLOAD_PATTERN)
-##             dirpath=os.path.join(mediaroot, subpath)
-##             if not os.path.exists(dirpath):
-##                 os.makedirs(dirpath)
-##             dest=os.path.join(subpath, value.name)
-##             fullpath=os.path.join(mediaroot, dest)
-##             while os.path.exists(fullpath):
-##                 dest+='_'
-##                 fullpath=os.path.join(mediaroot, dest)
-##             with open(fullpath, 'wb+') as fp:
-##                 for chunk in value.chunks():
-##                     fp.write(chunk)
-##             return dest
-##         return value
 
 
 class LocationAnswer(BaseAnswerForm):
@@ -231,13 +224,20 @@ class SubmissionForm(ModelForm):
         
     class Meta:
         model = Submission
-        exclude = ('survey', 'submitted_at','ip_address','user', 'is_public')
+        exclude = (
+            'survey',
+            'submitted_at',
+            'ip_address',
+            'user',
+            'is_public',
+            'featured')
 
 
-def forms_for_survey(survey, request, submission=None):
-    session_key = request.session.session_key.lower()
-    post = request.POST or None
-    files = request.FILES or None
+def forms_for_survey(survey, request='testing', submission=None):
+    testing = 'testing' == request
+    session_key = "" if testing else request.session.session_key.lower()
+    post = None if testing else request.POST or None
+    files = None if testing else request.FILES or None
     main_form = SubmissionForm(survey, data=post, files=files)
     return [main_form] + [
         _form_for_question(q, session_key, submission, post, files)
