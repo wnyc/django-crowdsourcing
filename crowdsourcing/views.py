@@ -324,7 +324,8 @@ def survey_report(request, slug, report='', page=None):
         the_report = get_object_or_404(reports, slug=report)
     elif reports:
         args = {"slug": survey.slug, "report": reports[0].slug}
-        return HttpResponseRedirect(reverse("survey_report_page_1", args))
+        return HttpResponseRedirect(reverse("survey_report_page_1",
+                                    kwargs=args))
     else:
         the_report = _default_report(survey)
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,

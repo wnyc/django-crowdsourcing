@@ -20,7 +20,7 @@
   All questions in this survey have private answers.
 {% endif %}
 
-{% for display in report.survey_report_displays %}
+{% for display in report.get_survey_report_displays() %}
   {% if display.is_text %}
     {{display.annotation}}
   {% else %}{% if display.is_pie %}
