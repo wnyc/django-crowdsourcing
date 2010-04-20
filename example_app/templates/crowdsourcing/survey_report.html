@@ -5,6 +5,7 @@
   {% if aggregate_fields %}
     {% yahoo_pie_chart_header %}
   {% endif %}
+  <link rel="stylesheet" href="/media/styles.css" type="text/css">
 </head>
 <body>
 
@@ -14,13 +15,16 @@
   <p>Thanks for your submission.</p>
 {% endif %}
 
-{% filters_as_ul filters %}
+{% if filters %}
+  <h2>Filters</h2>
+  {% filters_as_ul filters %}
+{% endif %}
 
 {% if not fields %}
   All questions in this survey have private answers.
 {% endif %}
 
-{% for display in report.get_survey_report_displays() %}
+{% for display in report.get_survey_report_displays %}
   {% if display.is_text %}
     {{display.annotation}}
   {% else %}{% if display.is_pie %}
