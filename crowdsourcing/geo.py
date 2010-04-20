@@ -27,7 +27,7 @@ def get_latitude_and_longitude(location):
                 place, (lat, long) = some[0]
             else:
                 lat = long = None
-        except ValueError as ex:
+        except (ValueError, GQueryError) as ex:
             logging.exception("error in geocoding: %s" % str(ex))
             lat = long = None
     finally:
