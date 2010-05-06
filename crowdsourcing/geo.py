@@ -3,7 +3,7 @@ import logging
 import sys
 
 try:
-    from geopy import geocoders
+    import geopy
 except ImportError:
     logging.warn('no geocoding support available')
     geopy = None
@@ -15,9 +15,9 @@ def get_latitude_and_longitude(location):
         raise ImportError("No module named geopy")
     google_key = getattr(settings, 'GOOGLE_API_KEY', None)
     if google_key:
-        g = geocoders.Google(settings.GOOGLE_API_KEY)
+        g = geopy.geocoders.Google(settings.GOOGLE_API_KEY)
     else:
-        g = geocoders.GeoNames(output_format='json')
+        g = geopy.geocoders.GeoNames(output_format='json')
     oldstdout = sys.stdout
     try:
         sys.stdout = cStringIO.StringIO()
