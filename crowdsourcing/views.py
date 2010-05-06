@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
-from django.core.urlresolvers import reverse
+from django.core.urlresolvers import reverse, NoReverseMatch
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext as _rc
@@ -103,8 +103,12 @@ def _survey_submit(request, survey):
 
 def _url_for_edit(request, obj):
     view_args = (obj._meta.app_label, obj._meta.module_name,)
-    edit_url = reverse("admin:%s_%s_change" % view_args,
-                       args=(obj.id,))
+    try:
+        edit_url = reverse("admin:%s_%s_change" % view_args, args=(obj.id,))
+    except NoReverseMatch:
+        # Probably 'admin' is not a registered namespace on a site without an
+        # admin. Just fake it.
+        edit_url = "/admin/%s/%s/%d/" % (view_args + (obj.id,))
     admin_url = local_settings.SURVEY_ADMIN_SITE
     if not admin_url:
         admin_url = "http://" + request.META["HTTP_HOST"]
