@@ -9,7 +9,7 @@ readme_file = os.path.join(os.path.dirname(__file__),
 long_description = open(readme_file).read()    
 
 setup(name='django-crowdsourcing',
-      version='1.1.1',
+      version='1.1.2',
       description='Django app for collecting and displaying surveys.',
       long_description=long_description,
       author='Jacob Smullyan, Dave Smith',
