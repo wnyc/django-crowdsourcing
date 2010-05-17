@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 from django.utils.html import escape
 
 from ..crowdsourcing.models import (AggregateResult, FILTER_TYPE,
-                                    OPTION_TYPE_CHOICES)
+                                    OPTION_TYPE_CHOICES, get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -187,13 +187,15 @@ def video_html(vid, maxheight, maxwidth):
     return value
 
 
-def submission_fields(submission, fields, video_height=360, video_width=288):
+def submission_fields(submission, fields, page_answers, video_height=360, video_width=288):
     out = []
+    answer_list = page_answers[submission.id]
+    answers = {}
+    for answer in answer_list:
+        answers[answer.question] = answer
     for question in fields:
         out.append('<div class="field">')
-        answer = submission.answer_set.filter(question=question)
-        if answer:
-            answer = answer[0]
+        answer = answers.get(question, None)
         if answer and answer.value:
             out.append('<label>%s</label>' % question.label)
             if answer.image_answer:
@@ -214,9 +216,10 @@ def submission_fields(submission, fields, video_height=360, video_width=288):
 
 def submissions(object_list, fields):
     out = []
+    page_answers = get_all_answers(object_list)
     for submission in object_list:
         out.append('<div class="submission">')
-        out.append(submission_fields(submission, fields))
+        out.append(submission_fields(submission, fields, page_answers))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)

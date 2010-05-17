@@ -19,7 +19,6 @@ from django.utils.safestring import mark_safe
 
 
 from .fields import ImageWithThumbnailsField
-from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
@@ -125,30 +124,32 @@ class Survey(models.Model):
         return self.starts_at <= now
 
     def get_public_fields(self):
-        return self.questions.filter(answer_is_public=True).order_by("order")
+        if not "_public_fields" in self.__dict__:
+            questions = self.questions.filter(answer_is_public=True)
+            self.__dict__["_public_fields"] = list(questions.order_by("order"))
+        return self.__dict__["_public_fields"]
 
     def get_public_location_fields(self):
-        return self.questions.filter(
-            option_type=OPTION_TYPE_CHOICES.LOCATION_FIELD,
-            answer_is_public=True).order_by("order")
+        type = OPTION_TYPE_CHOICES.LOCATION_FIELD
+        return [f for f in self.get_public_fields() if f.option_type == type]
 
     def get_public_archive_fields(self):
-        return self.questions.filter(
-            option_type__in=(OPTION_TYPE_CHOICES.TEXT_FIELD,
-                             OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
-                             OPTION_TYPE_CHOICES.VIDEO_LINK,
-                             OPTION_TYPE_CHOICES.TEXT_AREA),
-            answer_is_public=True).order_by("order")
+        types = (
+            OPTION_TYPE_CHOICES.TEXT_FIELD,
+            OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
+            OPTION_TYPE_CHOICES.VIDEO_LINK,
+            OPTION_TYPE_CHOICES.TEXT_AREA)
+        return [f for f in self.get_public_fields() if f.option_type in types]
 
     def get_public_aggregate_fields(self):
-        return self.questions.filter(
-            option_type__in=(OPTION_TYPE_CHOICES.INTEGER,
-                             OPTION_TYPE_CHOICES.FLOAT,
-                             OPTION_TYPE_CHOICES.BOOLEAN,
-                             OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-                             OPTION_TYPE_CHOICES.RADIO_LIST,
-                             OPTION_TYPE_CHOICES.CHECKBOX_LIST),
-            answer_is_public=True).order_by("order")
+        types = (
+            OPTION_TYPE_CHOICES.INTEGER,
+            OPTION_TYPE_CHOICES.FLOAT,
+            OPTION_TYPE_CHOICES.BOOLEAN,
+            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
+            OPTION_TYPE_CHOICES.RADIO_LIST,
+            OPTION_TYPE_CHOICES.CHECKBOX_LIST)
+        return [f for f in self.get_public_fields() if f.option_type in types]
 
     def submissions_for(self, user, session_key):
         q = models.Q(survey=self)
@@ -396,13 +397,6 @@ class Submission(models.Model):
     def items(self):
         return self.get_answer_dict().items()
 
-    def __getattr__(self, k):
-        d = self.get_answer_dict()
-        try:
-            return d[k]
-        except KeyError:
-            raise AttributeError("no such attribute: %s" % k)
-
     @property
     def email(self):
         return self.get_answer_dict().get('email', '')
@@ -491,6 +485,25 @@ class SurveyReport(models.Model):
     slug = models.CharField(max_length=50, blank=True)
     # some text at the beginning
     summary = models.TextField(blank=True)
+    # As crowdsourcing doesn't implement rating because we want to let you use
+    # your own, we don't actually use this flag anywhere in the crowdsourcing
+    # project. Rather, see settings.PRE_REPORT
+    sort_by_rating = models.BooleanField(
+        default=False,
+        help_text="By default, sort descending by highest rating. Otherwise, "
+                  "the default sort is by date descending.")
+    display_the_filters = models.BooleanField(
+        default=True,
+        help_text="Display the filters at the top of the report page.")
+    limit_results_to = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Only use the top X submissions.")
+    display_individual_results = models.BooleanField(
+        default=True,
+        help_text="Display separate, individual results if this field is True "
+                  "and you have archivable questions, like those with "
+                  "paragraph answers.")
     # A useful variable for holding different report displays so they don't
     # get saved to the database.
     survey_report_displays = None
@@ -517,11 +530,13 @@ SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie') # TODO: bar grid map
 
 
 class SurveyReportDisplay(models.Model):
+    """ Think of this as a line item of SurveyReport. """
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
+
     if PositionField:
         order = PositionField(collection=('report',))
     else:
@@ -532,6 +547,19 @@ class SurveyReportDisplay(models.Model):
 
     def is_pie(self):
         return SURVEY_DISPLAY_TYPE_CHOICES.PIE == self.display_type
+
     def questions(self):
         names = self.fieldnames.split(" ")
-        return self.report.survey.questions.filter(fieldname__in=names)
+        return self.report.survey.questions.filter(fieldname__in=names).select_related("survey")
+
+
+def get_all_answers(submission_list):
+    ids = [submission.id for submission in submission_list]
+    page_answers_list = Answer.objects.filter(submission__id__in=ids)
+    page_answers_list = page_answers_list.select_related("question")
+    page_answers = {}
+    for answer in page_answers_list:
+        if not answer.submission_id in page_answers:
+            page_answers[answer.submission_id] = []
+        page_answers[answer.submission_id].append(answer)
+    return page_answers
