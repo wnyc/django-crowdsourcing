@@ -59,6 +59,9 @@ class Survey(models.Model):
     slug = models.SlugField(unique=True)
     tease = models.TextField(blank=True)
     description = models.TextField(blank=True)
+    thanks = models.TextField(
+        blank=True,
+        help_text="When a user submits the survey, display this message.")
 
     require_login = models.BooleanField(default=False)
     allow_multiple_submissions = models.BooleanField(default=False)
@@ -101,6 +104,7 @@ class Survey(models.Model):
                     slug=self.slug,
                     description=self.description,
                     tease=self.tease,
+                    thanks=self.thanks,
                     submit_url=submit_url,
                     report_url=report_url,
                     questions=[q.to_jsondata() for q in questions])

@@ -87,7 +87,7 @@ class AnswerInline(admin.TabularInline):
 
 
 class SubmissionAdmin(admin.ModelAdmin):
-    search_fields = ('answer__text_answer',) #'title', 'story', 'address')
+    search_fields = ('answer__text_answer',)
     list_display = ('survey', 'submitted_at', 'user',
                     'ip_address', 'email', 'is_public',)
     list_editable = ('is_public',)
@@ -105,8 +105,9 @@ class SurveyReportDisplayInline(admin.StackedInline):
 
 
 class SurveyReportAdmin(admin.ModelAdmin):
-    prepopulated_fields = {'slug': ('title', )}
+    list_display = ('__unicode__', 'slug', 'survey',)
+    prepopulated_fields = {'slug': ('title',)}
     inlines = [SurveyReportDisplayInline]
 
 
-admin.site.register(SurveyReport, SurveyReportAdmin)    
+admin.site.register(SurveyReport, SurveyReportAdmin)
