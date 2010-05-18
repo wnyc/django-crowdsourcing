@@ -1,3 +1,14 @@
+var commentToggles = {};
+function toggleComments(id) {
+  if (commentToggles[id]) {
+    $("#" + id).hide("slow");
+  } else {
+    $("#" + id).show("slow");
+  }
+  commentToggles[id] = !commentToggles[id];
+  return false;
+}
+
 function loadSurvey(slug, elementId) {
   $(document).ready(function() {
     var url = "/crowdsourcing/" + slug + "/api/allowed_actions/";
@@ -71,18 +82,30 @@ function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
       submit.appendTo(div);
     }
     var error = $("<span />").attr("id", "error_" + slug).addClass("error");
-    error.appendTo(div);
+    error.html("Fix the problems above.");
+    error.appendTo(div).hide();
     form.ajaxForm({beforeSubmit: function() {
       var valid = validateForm(form, survey);
       if (valid) {
         error.hide();
         submit.attr("value", "Submitting...").attr("disabled", true);
       } else {
-        error.html("Fix the problems above.").show();
+        error.show();
       }
       return valid;
-    }, success: function() {
-      $("#inner_" + slug).html("Thanks for responding!");
+    }, success: function(responseText) {
+      var errors = $(responseText).find("ul.errorlist");
+      if (errors.length) {
+        errors.each(function(i) {
+          var nextError = $(this);
+          var id = nextError.next().find("label").attr("for");
+          $("#" + id + "_error").html(nextError.find("li").html()).show()
+        });
+        error.show();
+        submit.attr("value", "Submit").attr("disabled", false);
+      } else {
+        $("#inner_" + slug).html(survey.thanks || "Thanks for responding!");
+      }
     }});
     if (canView) {
       appendSeeResults(form, survey);
@@ -124,7 +147,7 @@ function setNameAndId(element, survey, question) {
 function appendChoiceButtons(survey, question, wrapper) {
   var answerInput = $("<input type='hidden' />").appendTo(wrapper);
   answerInput.attr("name", questionName(survey, question));
-  var ul = $("<ul class='voteList' />").appendTo(wrapper);
+  var ul = $("<ul class='voteList clearfix' />").appendTo(wrapper);
   for (var i = 0; i < question.options.length; i++) {
     var answer = question.options[i];
     var li = $("<li/>").appendTo(ul);
@@ -170,7 +193,7 @@ function questionId(survey, question) {
 }
 
 function appendSeeResults(appendTo, survey) {
-  var a = $("<a/>").text("Survey Results");
+  var a = $("<a/>").text("See Results");
   a.attr("href", survey.report_url);
   $("<p/>").addClass("results").appendTo(appendTo).append(a);
 }
@@ -215,3 +238,23 @@ function validateForm(form, survey) {
   }
   return valid;
 }
+
+$(function() {
+  $("input:hidden.enlargeable").each(function() {
+    var url = $(this).attr("value");
+    var id = $(this).attr("id").match(/(img_\d+)_full_url/)[1];
+    var img = $("#" + id);
+    var css = {height: img.outerHeight(), width: img.outerWidth()};
+    var div = $("<div/>").addClass("enlarge_div").css(css);
+    var makeA = function() {
+      return $("<a/>").attr("href", "#").appendTo(div).click(function(e) {
+        e.preventDefault();
+        enlargeImage(id, url);
+      });
+    }
+    var a_outer = makeA();
+    var a_inner = makeA().addClass("enlarge_link").text("Enlarge");
+    img.replaceWith(div);
+    a_outer.append(img)
+  });
+});
