@@ -4,6 +4,7 @@ from datetime import datetime
 import httplib
 from itertools import count
 import logging
+import smtplib
 
 from django.conf import settings
 from django.core.exceptions import FieldError
@@ -121,7 +122,6 @@ def _url_for_edit(request, obj):
 def _send_survey_email(request, survey, submission):
     subject = survey.title
     sender = local_settings.SURVEY_EMAIL_FROM
-    recipient = survey.email
     links = [(_url_for_edit(request, submission), "Edit Submission"),
              (_url_for_edit(request, survey), "Edit Survey"),]
     if survey.can_have_public_submissions():
@@ -132,10 +132,11 @@ def _send_survey_email(request, survey, submission):
     lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in set]
     parts.extend(lines)
     html_email = "<br/>\n".join(parts)
+    recipients = [a.strip() for a in survey.email.split(",")]
     email_msg = EmailMultiAlternatives(subject,
                                        html_email,
                                        sender,
-                                       [recipient])
+                                       recipients)
     email_msg.attach_alternative(html_email, 'text/html')
     try:
         email_msg.send()
