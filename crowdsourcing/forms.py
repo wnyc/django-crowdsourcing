@@ -67,11 +67,8 @@ class BaseAnswerForm(Form):
         t = loader.get_template('forms/form.html')
         return t.render(c)
 
-    def answer(self):
-        return self.cleaned_data['answer']
-
     def save(self, commit=True):
-        if self.answer() is None:
+        if self.cleaned_data['answer'] is None:
             if self.fields['answer'].required:
                 raise ValidationError, _('This field is required.')
             return
