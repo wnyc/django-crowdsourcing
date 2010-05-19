@@ -95,6 +95,14 @@ class Survey(models.Model):
         max_length=255,
         blank=True,
         help_text="Use the exact group name from flickr.com")
+    default_report = models.ForeignKey(
+        'SurveyReport',
+        blank=True,
+        null=True,
+        related_name='reports',
+        help_text=("Whenever we automatically generate a link to the results "
+                   "of this survey we'll use this report. If it's left blank, "
+                   "we'll use the default report behavior."))
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
@@ -402,6 +410,10 @@ class Submission(models.Model):
 
     def items(self):
         return self.get_answer_dict().items()
+
+    def get_absolute_url(self):
+        view = 'crowdsourcing.views.submission'
+        return reverse(view, kwargs={"id": self.pk})
 
     @property
     def email(self):

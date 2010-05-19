@@ -225,8 +225,8 @@ def submissions(request):
         a logged in user.
     submitted_from and submitted_to - strings in the format YYYY-mm-ddThh:mm:ss
         For example, 2010-04-05T13:02:03
-    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean not
-        featured. Everything else means featured. """
+    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean ignore 
+        the featured flag. Everything else means display only featured. """
     response = HttpResponse(mimetype='application/json')
     results = Submission.objects.filter(is_public=True)
     valid_filters = (
@@ -270,12 +270,18 @@ def submissions(request):
     return response
 
 
+def submission(request, id):
+    template = 'crowdsourcing/submission.html'
+    sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
+    return render_to_response(template, dict(submission=sub), _rc(request))
+    
+
 def _default_report(survey):
     field_count = count(1)
-    fields = survey.get_public_fields().filter(option_type__in=(
+    fields = [f for f in survey.get_public_fields() if f.option_type in (
         OPTION_TYPE_CHOICES.BOOLEAN,
         OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-        OPTION_TYPE_CHOICES.RADIO_LIST))
+        OPTION_TYPE_CHOICES.RADIO_LIST)]
     report = SurveyReport(
         survey=survey,
         title=survey.title,
@@ -307,8 +313,8 @@ def survey_report(request, slug, report='', page=None):
     reports = survey.surveyreport_set.all()
     if report:
         report_obj = get_object_or_404(reports, slug=report)
-    elif reports:
-        args = {"slug": survey.slug, "report": reports[0].slug}
+    elif survey.default_report:
+        args = {"slug": survey.slug, "report": survey.default_report.slug}
         return HttpResponseRedirect(reverse("survey_report_page_1",
                                     kwargs=args))
     else:

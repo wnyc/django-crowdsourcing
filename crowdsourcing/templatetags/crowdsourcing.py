@@ -34,8 +34,8 @@ else:
 
 
 """ We originally developed for Mako templates, but we also want to support
-Django templates. We provide every function as both a template tag and as
-a function that returns a safe string. """
+Django templates. We use simple tags which work both as tags and as functions
+returning safe strings. """
 
 
 register = template.Library()
@@ -189,10 +189,14 @@ def video_html(vid, maxheight, maxwidth):
 
 
 def submission_fields(submission,
-                      fields,
-                      page_answers,
+                      fields=None,
+                      page_answers=None,
                       video_height=360,
                       video_width=288):
+    if not page_answers:
+        page_answers = get_all_answers([submission])
+    if not fields:
+        fields = list(submission.survey.get_public_fields())
     out = []
     answer_list = page_answers[submission.id]
     answers = {}
@@ -206,15 +210,17 @@ def submission_fields(submission,
             if answer.image_answer:
                 try:
                     thmb = answer.image_answer.thumbnail.absolute_url
-                    out.append('<img src="%s" id="img_%d" />' % (thmb, answer.id,))
-                    # In case you want to enlarge images. Don't bother enlarging
-                    # images unless we'll increase their dimensions by at least
-                    # 10%.
+                    args = (thmb, answer.id,)
+                    out.append('<img src="%s" id="img_%d" />' % args)
+                    # This extra hidden input is in case you want to enlarge
+                    # images. Don't bother enlarging images unless we'll
+                    # increase their dimensions by at least 10%.
                     thumb_width = answer.image_answer.thumbnail.width()
                     if float(answer.image_answer.width) / thumb_width > 1.1:
                         format = ('<input type="hidden" id="img_%d_full_url" '
                                   'value="%s" class="enlargeable" />')
-                        out.append(format % (answer.id, answer.image_answer.url))
+                        args = (answer.id, answer.image_answer.url)
+                        out.append(format % args)
                 except ThumbnailException as ex:
                     out.append('<div class="error">%s</div>' % str(ex))
             elif question.option_type == OPTION_TYPE_CHOICES.VIDEO_LINK:
@@ -228,6 +234,7 @@ def submission_fields(submission,
                 out.append(escape(answer.value))
         out.append('</div>')
     return mark_safe("\n".join(out))
+register.simple_tag(submission_fields)
 
 
 def submissions(object_list, fields):
@@ -236,9 +243,29 @@ def submissions(object_list, fields):
     for submission in object_list:
         out.append('<div class="submission">')
         out.append(submission_fields(submission, fields, page_answers))
+        out.append(submission_link(submission, on_detail_page=False))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)
+
+
+def submission_link(submission, on_detail_page=True):
+    out = ['<div class="permalink">']
+    if on_detail_page:
+        text = "Back to %s" % submission.survey.title
+        kwargs = {"slug": submission.survey.slug}
+        view = "survey_default_report_page_1"
+        if submission.survey.default_report:
+            kwargs["report"] = submission.survey.default_report.slug
+            view = "survey_report_page_1"
+        url = reverse(view, kwargs=kwargs)
+    else:
+        url = submission.get_absolute_url()
+        text = "Permalink"
+    out.append('<a href="%s">%s</a>' % (url, text,))
+    out.append('</div>')
+    return mark_safe("\n".join(out))
+register.simple_tag(submission_link)
 
 
 def paginator(survey, report, pages_to_link, page_obj):

@@ -1,50 +1,42 @@
+{% extends "crowdsourcing/base.html" %}
 {% load crowdsourcing %}
-<html>
-<head>
-  <title>{{ survey.title }}</title>
-  <link rel="stylesheet" href="/media/styles.css" type="text/css"></link>
-  <link rel="stylesheet" href="/media/enlarge.css" type="text/css"></link>
+
+{% block title %}{{ survey.title }}{% endblock %}
+
+{% block extra_header %}
   {% if aggregate_fields %}
     {% yahoo_pie_chart_header %}
   {% endif %}
-  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
-  <script type="text/javascript">
-    google.load("jquery", "1.4");
-  </script>
-  <script type="text/javascript" src="/media/survey.js"></script>
-  <script type="text/javascript" src="/media/enlarge.js"></script>
-</head>
-<body>
+{% endblock %}
 
-<h1>{{ survey.title }}</h1>
+{% block content %}
+  <h1>{{ survey.title }}</h1>
 
-{% if thanks %}
-  <p>Thanks for your submission.</p>
-{% endif %}
+  {% if thanks %}
+    <p>Thanks for your submission.</p>
+  {% endif %}
 
-{% if filters %}
-  <h2>Filters</h2>
-  {% filters_as_ul filters %}
-{% endif %}
+  {% if filters %}
+    <h2>Filters</h2>
+    {% filters_as_ul filters %}
+  {% endif %}
 
-{% if not fields %}
-  All questions in this survey have private answers.
-{% endif %}
+  {% if not fields %}
+    All questions in this survey have private answers.
+  {% endif %}
 
-{% for display in report.get_survey_report_displays %}
-  {% if display.is_text %}
-    {{ display.annotation|safe }}
-  {% else %}{% if display.is_pie %}
-    {% for question in display.questions %}
-      {% yahoo_pie_chart display question request.GET %}
-    {% endfor %}
-  {% endif %}{% endif %}
-{% endfor %}
+  {% for display in report.get_survey_report_displays %}
+    {% if display.is_text %}
+      {{ display.annotation|safe }}
+    {% else %}{% if display.is_pie %}
+      {% for question in display.questions %}
+        {% yahoo_pie_chart display question request.GET %}
+      {% endfor %}
+    {% endif %}{% endif %}
+  {% endfor %}
 
-{% if archive_fields %}
-  {% submissions page_obj.object_list fields %}
-  {% paginator survey report pages_to_link page_obj %}
-{% endif %}
-
-</body>
-</html>
+  {% if archive_fields %}
+    {% submissions page_obj.object_list fields %}
+    {% paginator survey report pages_to_link page_obj %}
+  {% endif %}
+{% endblock %}

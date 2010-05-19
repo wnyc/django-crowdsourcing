@@ -1,0 +1,17 @@
+<html>
+  <head>
+    <title>{% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="/media/styles.css" type="text/css"></link>
+    <link rel="stylesheet" href="/media/enlarge.css" type="text/css"></link>
+    {% block extra_header %}{% endblock %}
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("jquery", "1.4");
+    </script>
+    <script type="text/javascript" src="/media/survey.js"></script>
+    <script type="text/javascript" src="/media/enlarge.js"></script>
+  </head>
+  <body>
+    {% block content %}{% endblock %}
+  </body>
+</html>
