@@ -67,8 +67,11 @@ class BaseAnswerForm(Form):
         t = loader.get_template('forms/form.html')
         return t.render(c)
 
+    def answer(self):
+        return self.cleaned_data['answer']
+
     def save(self, commit=True):
-        if self.cleaned_data['answer'] is None:
+        if self.answer() is None:
             if self.fields['answer'].required:
                 raise ValidationError, _('This field is required.')
             return
@@ -150,10 +153,12 @@ class LocationAnswer(BaseAnswerForm):
 
     def save(self, commit=True):
         obj = super(LocationAnswer, self).save(commit=False)
-        obj.latitude, obj.longitude = get_latitude_and_longitude(obj.value)
-        if commit:
-            obj.save()
-        return obj
+        if obj.value:
+            obj.latitude, obj.longitude = get_latitude_and_longitude(obj.value)
+            if commit:
+                obj.save()
+            return obj
+        return None
         
 
 class BaseOptionAnswer(BaseAnswerForm):

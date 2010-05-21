@@ -1,0 +1,59 @@
+.enlarge_link {
+	cursor: pointer;
+}
+
+#enlarge_bg {
+	left: 0;
+	top: 0;
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	z-index: 1000;
+	background-color: #000;
+}
+
+#enlarge {
+	padding: 10px;
+	position: absolute;
+	z-index: 1000;
+	background-color: #fff;
+}
+
+#enlarge .close {
+	text-align: right;
+	padding-bottom: 2px;
+}
+
+#enlarge .close a {
+	cursor: pointer;
+	background-repeat: no-repeat;
+	background-position: center right;
+	background-color: transparent;
+	text-align: right;
+	padding-right: 12px;
+	font-size: 11px;
+}
+
+#enlarge .right {
+	text-align: right;
+}
+
+.enlarge_div {
+	position: relative;
+	display: block;
+	overflow: hidden;
+}
+
+.enlarge_link {
+	display: block;
+	position: absolute;
+	bottom: 3px;
+	right: 0px;
+	text-indent: -9999px;
+	background-repeat: no-repeat;
+	background-position: 0px 0px;
+	background-color: transparent;
+	width: 19px;
+	height: 19px;
+	cursor: pointer;
+}

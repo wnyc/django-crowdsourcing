@@ -4,6 +4,7 @@ from datetime import datetime
 import httplib
 from itertools import count
 import logging
+import smtplib
 
 from django.conf import settings
 from django.core.exceptions import FieldError
@@ -18,7 +19,8 @@ from django.utils.html import escape
 from .forms import forms_for_survey
 from .models import (Survey, Submission, Answer, SurveyReportDisplay,
                      SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport,
-                     extra_from_filters, OPTION_TYPE_CHOICES, get_filters)
+                     extra_from_filters, OPTION_TYPE_CHOICES, get_filters,
+                     get_all_answers)
 from .jsonutils import dump, dumps
 
 from .util import ChoiceEnum, get_function
@@ -120,7 +122,6 @@ def _url_for_edit(request, obj):
 def _send_survey_email(request, survey, submission):
     subject = survey.title
     sender = local_settings.SURVEY_EMAIL_FROM
-    recipient = survey.email
     links = [(_url_for_edit(request, submission), "Edit Submission"),
              (_url_for_edit(request, survey), "Edit Survey"),]
     if survey.can_have_public_submissions():
@@ -131,10 +132,11 @@ def _send_survey_email(request, survey, submission):
     lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in set]
     parts.extend(lines)
     html_email = "<br/>\n".join(parts)
+    recipients = [a.strip() for a in survey.email.split(",")]
     email_msg = EmailMultiAlternatives(subject,
                                        html_email,
                                        sender,
-                                       [recipient])
+                                       recipients)
     email_msg.attach_alternative(html_email, 'text/html')
     try:
         email_msg.send()
@@ -288,7 +290,9 @@ def _default_report(survey):
 
 
 def survey_report(request, slug, report='', page=None):
-    """ Show a report for the survey. """
+    """ Show a report for the survey. As rating is done in a separate
+    application we don't directly check request.GET["sort"] here.
+    local_settings.PRE_REPORT is the place for that. """
     if page is None:
         page = 1
     else:
@@ -300,6 +304,15 @@ def survey_report(request, slug, report='', page=None):
     # is the survey anything we can actually have a report on?
     if not survey.can_have_public_submissions():
         raise Http404
+    reports = survey.surveyreport_set.all()
+    if report:
+        report_obj = get_object_or_404(reports, slug=report)
+    elif reports:
+        args = {"slug": survey.slug, "report": reports[0].slug}
+        return HttpResponseRedirect(reverse("survey_report_page_1",
+                                    kwargs=args))
+    else:
+        report_obj = _default_report(survey)
 
     location_fields = list(survey.get_public_location_fields())
     archive_fields = list(survey.get_public_archive_fields())
@@ -310,11 +323,22 @@ def survey_report(request, slug, report='', page=None):
     public = survey.public_submissions()
     id_field = "crowdsourcing_submission.id"
     submissions = extra_from_filters(public, id_field, survey, request.GET)
+    # If you want to sort based on rating, wire it up here.
     if local_settings.PRE_REPORT:
         pre_report = get_function(local_settings.PRE_REPORT)
-        submissions = pre_report(submissions, request)
+        submissions = pre_report(
+            submissions=submissions,
+            report=report_obj,
+            request=request)
 
+    if report_obj.limit_results_to:
+        submissions = submissions[:report_obj.limit_results_to]
+    if not report_obj.display_individual_results:
+        submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
+
+    page_answers = get_all_answers(page_obj.object_list)
+
     pages_to_link = []
     for i in range(page - 5, page + 5):
         if 1 <= i <= paginator.num_pages:
@@ -323,15 +347,6 @@ def survey_report(request, slug, report='', page=None):
         pages_to_link = [1, False] + pages_to_link
     if pages_to_link[-1] < paginator.num_pages:
         pages_to_link = pages_to_link + [False, paginator.num_pages]
-    reports = survey.surveyreport_set.all()
-    if report:
-        the_report = get_object_or_404(reports, slug=report)
-    elif reports:
-        args = {"slug": survey.slug, "report": reports[0].slug}
-        return HttpResponseRedirect(reverse("survey_report_page_1",
-                                    kwargs=args))
-    else:
-        the_report = _default_report(survey)
     templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
                  'crowdsourcing/survey_report.html']
 
@@ -347,7 +362,8 @@ def survey_report(request, slug, report='', page=None):
                                    aggregate_fields=aggregate_fields,
                                    filters=filters,
                                    reports=reports,
-                                   report=the_report,
+                                   report=report_obj,
+                                   page_answers=page_answers,
                                    request=request),
                               _rc(request))
 

@@ -6,9 +6,10 @@ from django.core.cache import cache
 from django.template import Node
 from django.utils.safestring import mark_safe
 from django.utils.html import escape
+from sorl.thumbnail.base import ThumbnailException
 
 from ..crowdsourcing.models import (AggregateResult, FILTER_TYPE,
-                                    OPTION_TYPE_CHOICES)
+                                    OPTION_TYPE_CHOICES, get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -187,18 +188,35 @@ def video_html(vid, maxheight, maxwidth):
     return value
 
 
-def submission_fields(submission, fields, video_height=360, video_width=288):
+def submission_fields(submission,
+                      fields,
+                      page_answers,
+                      video_height=360,
+                      video_width=288):
     out = []
+    answer_list = page_answers[submission.id]
+    answers = {}
+    for answer in answer_list:
+        answers[answer.question] = answer
     for question in fields:
         out.append('<div class="field">')
-        answer = submission.answer_set.filter(question=question)
-        if answer:
-            answer = answer[0]
+        answer = answers.get(question, None)
         if answer and answer.value:
             out.append('<label>%s</label>' % question.label)
             if answer.image_answer:
-                src = answer.image_answer.thumbnail.absolute_url
-                out.append('<img src="%s" />' % src)
+                try:
+                    thmb = answer.image_answer.thumbnail.absolute_url
+                    out.append('<img src="%s" id="img_%d" />' % (thmb, answer.id,))
+                    # In case you want to enlarge images. Don't bother enlarging
+                    # images unless we'll increase their dimensions by at least
+                    # 10%.
+                    thumb_width = answer.image_answer.thumbnail.width()
+                    if float(answer.image_answer.width) / thumb_width > 1.1:
+                        format = ('<input type="hidden" id="img_%d_full_url" '
+                                  'value="%s" class="enlargeable" />')
+                        out.append(format % (answer.id, answer.image_answer.url))
+                except ThumbnailException as ex:
+                    out.append('<div class="error">%s</div>' % str(ex))
             elif question.option_type == OPTION_TYPE_CHOICES.VIDEO_LINK:
                 if oembed_expand:
                     html = video_html(answer.value, video_height, video_width)
@@ -214,9 +232,10 @@ def submission_fields(submission, fields, video_height=360, video_width=288):
 
 def submissions(object_list, fields):
     out = []
+    page_answers = get_all_answers(object_list)
     for submission in object_list:
         out.append('<div class="submission">')
-        out.append(submission_fields(submission, fields))
+        out.append(submission_fields(submission, fields, page_answers))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)

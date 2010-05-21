@@ -18,6 +18,32 @@ FLICKR_API_KEY = getattr(_gs, 'CROWDSOURCING_FLICKR_API_KEY', '')
 
 FLICKR_API_SECRET = getattr(_gs, 'CROWDSOURCING_FLICKR_API_SECRET', '')
 
+"""
+
+Here is how I got the token and frob using the django shell.
+
+import flickrapi
+from django.conf import settings
+_flickr = flickrapi.FlickrAPI(settings.CROWDSOURCING_FLICKR_API_KEY,
+    settings.CROWDSOURCING_FLICKR_API_SECRET)
+_flickr.web_login_url("write")
+# go there. e.g.
+"http://api.flickr.com/services/auth/?perms=write&api_sig=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&api_key=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# That sends you back to the callback url you set by "editing the
+# authentication workflow" or something like that.
+# this link will contain a frob in the form
+"xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxx-xxxxxxxx"
+_flickr.get_token("xxxxxxxxxxxxxxxxx-xxxxxxxxxxxxxxxx-xxxxxxxx")
+# that returns the token. put it, along with the frob, in your settings.
+# Then test with
+
+import flickrapi
+from django.conf import settings
+_flickr = flickrapi.FlickrAPI(settings.CROWDSOURCING_FLICKR_API_KEY,
+    settings.CROWDSOURCING_FLICKR_API_SECRET,
+    token=settings.CROWDSOURCING_FLICKR_TOKEN)
+_flickr.groups_pools_getGroups()
+"""
 
 FLICKR_TOKEN = getattr(_gs, 'CROWDSOURCING_FLICKR_TOKEN', '')
 

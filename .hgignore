@@ -4,3 +4,4 @@ syntax: glob
 Crowdsourcing.egg*
 build/lib/crowdsourcing/*
 example_app/local_settings.py
+example_app/media/shared/crowdsourcing/images/*

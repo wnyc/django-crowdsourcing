@@ -5,7 +5,13 @@
 <body>
 
 <h1>{{ survey.title }}</h1>
-<p>{{ survey.description }}</p>
+<p>
+  {% ifequal request.method "POST" %}
+    {{ survey.thanks }}
+  {% else %}
+    {{ survey.description }}
+  {% endifequal %}
+</p>
 {% if forms %}
   <form method="POST" enctype="multipart/form-data">
     {% for form in forms %}

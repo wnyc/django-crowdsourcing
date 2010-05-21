@@ -1,0 +1,10 @@
+Version 1.2.0
+-----------------------
+* You can click on images in the results to enlarge them.
+
+Version 1.1.0
+-----------------------
+* The example application is fully functional.
+* A template tag library makes new applications easier to write. It contains
+  tags for Django templates and functions for Mako templates.
+* Various bug fixes.

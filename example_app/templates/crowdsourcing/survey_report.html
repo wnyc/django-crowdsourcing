@@ -2,10 +2,17 @@
 <html>
 <head>
   <title>{{ survey.title }}</title>
+  <link rel="stylesheet" href="/media/styles.css" type="text/css"></link>
+  <link rel="stylesheet" href="/media/enlarge.css" type="text/css"></link>
   {% if aggregate_fields %}
     {% yahoo_pie_chart_header %}
   {% endif %}
-  <link rel="stylesheet" href="/media/styles.css" type="text/css">
+  <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+  <script type="text/javascript">
+    google.load("jquery", "1.4");
+  </script>
+  <script type="text/javascript" src="/media/survey.js"></script>
+  <script type="text/javascript" src="/media/enlarge.js"></script>
 </head>
 <body>
 
@@ -26,7 +33,7 @@
 
 {% for display in report.get_survey_report_displays %}
   {% if display.is_text %}
-    {{display.annotation}}
+    {{ display.annotation|safe }}
   {% else %}{% if display.is_pie %}
     {% for question in display.questions %}
       {% yahoo_pie_chart display question request.GET %}
