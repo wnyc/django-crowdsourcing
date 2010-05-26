@@ -143,10 +143,6 @@ class Survey(models.Model):
             self.__dict__["_public_fields"] = list(questions.order_by("order"))
         return self.__dict__["_public_fields"]
 
-    def get_public_location_fields(self):
-        type = OPTION_TYPE_CHOICES.LOCATION_FIELD
-        return [f for f in self.get_public_fields() if f.option_type == type]
-
     def get_public_archive_fields(self):
         types = (
             OPTION_TYPE_CHOICES.TEXT_FIELD,
@@ -155,15 +151,17 @@ class Survey(models.Model):
             OPTION_TYPE_CHOICES.TEXT_AREA)
         return [f for f in self.get_public_fields() if f.option_type in types]
 
-    def get_public_aggregate_fields(self):
-        types = (
-            OPTION_TYPE_CHOICES.INTEGER,
-            OPTION_TYPE_CHOICES.FLOAT,
-            OPTION_TYPE_CHOICES.BOOLEAN,
-            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-            OPTION_TYPE_CHOICES.RADIO_LIST,
-            OPTION_TYPE_CHOICES.CHECKBOX_LIST)
-        return [f for f in self.get_public_fields() if f.option_type in types]
+    def icon_questions(self):
+        OTC = OPTION_TYPE_CHOICES
+        return self.questions.filter(
+            ~models.Q(map_icons=""),
+            option_type__in=[OTC.SELECT_ONE_CHOICE, OTC.RADIO_LIST])
+
+    def parsed_option_icon_pairs(self):
+        icon_questions = self.icon_questions()
+        if icon_questions:
+            return icon_questions[0].parsed_option_icon_pairs()
+        return ()
 
     def submissions_for(self, user, session_key):
         q = models.Q(survey=self)
@@ -233,19 +231,42 @@ class Question(models.Model):
         max_length=32,
         help_text=_('a single-word identifier used to track this value; '
                     'it must begin with a letter and may contain '
-                    'alphanumerics and underscores (no spaces).'))
+                    'alphanumerics and underscores (no spaces). You must not '
+                    'change this field on a live survey.'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
     label = models.CharField(max_length=32, help_text=_(
         "Appears on the results page."))
-    help_text = models.TextField(blank=True)
-    required = models.BooleanField(default=False)
+    help_text = models.TextField(
+        blank=True)
+    required = models.BooleanField(
+        default=False,
+        help_text=_("Unsafe to change on live surveys."))
     if PositionField:
         order = PositionField(collection=('survey',))
     else:
         order = models.IntegerField()
-    option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
-    options = models.TextField(blank=True, default='')
+    option_type = models.CharField(
+        max_length=12,
+        choices=OPTION_TYPE_CHOICES,
+        help_text=_('You must not change this field on a live survey.'))
+    options = models.TextField(
+        blank=True,
+        default='',
+        help_text=_(
+            'You can not safely modify this field once a survey has gone '
+            'live. You can, at your own risk, add new options, but you '
+            'must not change or remove options.'))
+    map_icons = models.TextField(
+        blank=True,
+        default='',
+        help_text=('Use one icon url per line. These should line up with the '
+            'options. If the user\'s submission appears on a map, we\'ll use '
+            'the corresponding icon on the map. This field only makes sense '
+            'for Radio List and Select One Choice questions. Do not enter '
+            'these map icons on a Location Field. For Google maps '
+            'use 34px high by 20px wide .png images with a transparent '
+            'background. You can safely modify this field on live surveys.'))
     answer_is_public = models.BooleanField(default=True)
     use_as_filter = models.BooleanField(default=True)
     _aggregate_result = None
@@ -279,6 +300,21 @@ class Question(models.Model):
         if OPTION_TYPE_CHOICES.BOOLEAN == self.option_type:
             return [True, False]
         return filter(None, (s.strip() for s in self.options.splitlines()))
+
+    @property
+    def parsed_map_icons(self):
+        return filter(None, (s.strip() for s in self.map_icons.splitlines()))
+
+    def parsed_option_icon_pairs(self):
+        options = self.parsed_options
+        icons = self.parsed_map_icons
+        to_return = []
+        for i in range(len(options)):
+            if i < len(icons):
+                to_return.append((options[i], icons[i]))
+            else:
+                to_return.append((options[i], None))
+        return to_return
 
 
 FILTER_TYPE = ChoiceEnum("choice range")
@@ -527,9 +563,13 @@ class SurveyReport(models.Model):
     survey_report_displays = None
 
     def get_survey_report_displays(self):
-        if self.pk:
-            return self.surveyreportdisplay_set.all()
+        if self.pk and self.survey_report_displays is None:
+            self.survey_report_displays = self.surveyreportdisplay_set.all()
         return self.survey_report_displays
+
+    def has_display_type(self, type):
+        displays = self.get_survey_report_displays()
+        return bool([1 for srd in displays if type == srd.display_type])
 
     @models.permalink
     def get_absolute_url(self):
@@ -544,7 +584,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie') # TODO: bar grid map
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map') # TODO: bar grid
 
 
 class SurveyReportDisplay(models.Model):
@@ -554,21 +594,46 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
     annotation = models.TextField(blank=True)
-
+    limit_map_answers = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text=_('Google maps gets pretty slow if you add too many points. '
+                    'Use this field to limit the number of points that '
+                    'display on the map.'))
+    map_center_latitude = models.FloatField(
+        blank=True,
+        null=True,
+        help_text=_('If you don\'t specify latitude, longitude, or zoom, the '
+                    'map will just center and zoom so that the map shows all '
+                    'the points.'))
+    map_center_longitude = models.FloatField(blank=True, null=True)
+    map_zoom = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text=_('13 is about the right level for Manhattan. 0 shows the '
+                    'entire world.'))
     if PositionField:
         order = PositionField(collection=('report',))
     else:
         order = models.IntegerField()
 
-    def is_text(self):
-        return SURVEY_DISPLAY_TYPE_CHOICES.TEXT == self.display_type
-
-    def is_pie(self):
-        return SURVEY_DISPLAY_TYPE_CHOICES.PIE == self.display_type
-
-    def questions(self):
+    def questions(self, fields=None):
         names = self.fieldnames.split(" ")
+        if fields:
+            return [f for f in fields if f.fieldname in names]
         return self.report.survey.questions.filter(fieldname__in=names).select_related("survey")
+
+    @property
+    def is_text(self):
+        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.TEXT
+
+    @property
+    def is_pie(self):
+        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.PIE
+
+    @property
+    def is_map(self):
+        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.MAP
 
 
 def get_all_answers(submission_list):

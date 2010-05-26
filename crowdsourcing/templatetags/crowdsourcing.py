@@ -237,21 +237,29 @@ def submission_fields(submission,
 register.simple_tag(submission_fields)
 
 
+DETAIL_SURVEY_NONE = ChoiceEnum('detail survey none')
+
+
 def submissions(object_list, fields):
     out = []
     page_answers = get_all_answers(object_list)
     for submission in object_list:
         out.append('<div class="submission">')
         out.append(submission_fields(submission, fields, page_answers))
-        out.append(submission_link(submission, on_detail_page=False))
+        out.append(submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)
 
 
-def submission_link(submission, on_detail_page=True):
+def submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
     out = ['<div class="permalink">']
-    if on_detail_page:
+    if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
+        return ""
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.SURVEY:
+        url = submission.get_absolute_url()
+        text = "Permalink"
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
         text = "Back to %s" % submission.survey.title
         kwargs = {"slug": submission.survey.slug}
         view = "survey_default_report_page_1"
@@ -259,9 +267,6 @@ def submission_link(submission, on_detail_page=True):
             kwargs["report"] = submission.survey.default_report.slug
             view = "survey_report_page_1"
         url = reverse(view, kwargs=kwargs)
-    else:
-        url = submission.get_absolute_url()
-        text = "Permalink"
     out.append('<a href="%s">%s</a>' % (url, text,))
     out.append('</div>')
     return mark_safe("\n".join(out))
@@ -297,3 +302,69 @@ def paginator(survey, report, pages_to_link, page_obj):
         out.append("</div>")
     return mark_safe("\n".join(out))
 register.simple_tag(paginator)
+
+
+def google_maps_header():
+    format = "\n".join([
+        '<script',
+        'src="http://maps.google.com/maps?file=api&amp;v=2&amp;sensor=false&amp;key=%s"',
+        'type="text/javascript"></script>',
+        '<script type="text/javascript">',
+        '  $(window).unload(GUnload);',
+        '</script>'])
+    return format % local_settings.GOOGLE_MAPS_API_KEY
+register.simple_tag(google_maps_header)
+
+
+def google_map(display, question, request_GET, ids):
+    map_id = "map_%d" % question.id
+    detail_id = "map_detail_%d" % question.id
+    view = "location_question_results"
+    kwargs = {"question_id": question.pk}
+    if ids:
+        view = "location_question_results_ids"
+        kwargs["submission_ids"] = ids
+        if display.limit_map_answers:
+            split = ids.split(",")[:display.limit_map_answers]
+            kwargs["submission_ids"] = ",".join(split)
+    elif display.limit_map_answers:
+        view = "location_question_results_limit"
+        kwargs["limit_map_answers"] = display.limit_map_answers
+    data_url = reverse(view, kwargs=kwargs)
+    img = '<img class="loading" src="/media/img/loading.gif" alt="loading" />'
+    lat = number_to_javascript(display.map_center_latitude)
+    lng = number_to_javascript(display.map_center_longitude)
+    zoom = number_to_javascript(display.map_zoom)
+    map_args = (map_id, detail_id, data_url, lat, lng, zoom)
+    out = [
+        '<div class="google_map_wrapper">',
+        '  <div id="%s" class="google_map">' % map_id,
+        '    ' + img,
+        '  </div>',
+        '  <div id="%s" class="map_story"></div>' % detail_id,
+        '  <script type="text/javascript">',
+        '    loadMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
+        '  </script>',
+        '</div>']
+    out.append(map_key(question.survey))
+    return mark_safe("\n".join(out))
+register.simple_tag(google_map)
+
+
+def number_to_javascript(number):
+    if isinstance(number, (int, float,)):
+        return str(number)
+    return "null"
+
+def map_key(survey):
+    option_icon_pairs = survey.parsed_option_icon_pairs()
+    option_icon_pairs = [(o, i) for (o, i) in option_icon_pairs if i]
+    out = []
+    if option_icon_pairs:
+        out.append('<ul class="map_key">')
+        for (option, icon) in option_icon_pairs:
+            format = '<li><img src="%s" alt="%s" /> %s</li>'
+            out.append(format % (icon, option, option))
+        out.append('</ul>')
+    return mark_safe("\n".join(out))
+register.simple_tag(map_key)
