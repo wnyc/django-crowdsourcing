@@ -1,0 +1,27 @@
+.google_map {
+    height: 300px;
+    width: 480px;
+}
+
+.map_story {
+  height: 284px;
+  width: 464px;
+  margin: 8px;
+  background-color: #FFFFFF;
+  border: 1px solid #DFDFDF;
+  display: none;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  z-index: 500;
+}
+
+.google_map_wrapper {
+  position: relative;
+}
+
+.google_map_wrapper .loading {
+  margin: 140px 230px 140px 230px;
+}
