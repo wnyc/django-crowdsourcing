@@ -162,7 +162,7 @@ class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
         choices = [(x, x) for x in self.question.parsed_options]
-        if not self.question.required:
+        if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices
         
