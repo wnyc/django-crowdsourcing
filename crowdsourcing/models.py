@@ -332,20 +332,22 @@ class Filter:
         self.choices = field.parsed_options
         self.value = self.from_value = self.to_value = ""
         self.within_value = self.location_value = ""
+        def get_val(suffix):
+            return request_data.get(self.key + suffix, "").replace("+", " ")
         if field.option_type in (OPTION_TYPE_CHOICES.BOOLEAN,
                                  OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                                  OPTION_TYPE_CHOICES.RADIO_LIST):
             self.type = FILTER_TYPE.CHOICE
-            self.value = request_data.get(self.key, "")
+            self.value = get_val("")
         elif field.option_type in (OPTION_TYPE_CHOICES.INTEGER,
                                    OPTION_TYPE_CHOICES.FLOAT):
             self.type = FILTER_TYPE.RANGE
-            self.from_value = request_data.get(self.key + "_from", "")
-            self.to_value = request_data.get(self.key + "_to", "")
+            self.from_value = get_val("_from")
+            self.to_value = get_val("_to")
         elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
             self.type = FILTER_TYPE.DISTANCE
-            self.within_value = request_data.get(self.key + "_within", "")
-            self.location_value = request_data.get(self.key + "_location", "")
+            self.within_value = get_val("_within")
+            self.location_value = get_val("_location")
         
 
 def get_filters(survey, request_data):

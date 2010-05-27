@@ -11,8 +11,8 @@ function loadMap(
     $(function() {
       $.getJSON(results_url, queryParametersAsLookup(), function(data) {
         if (!data.entries.length) {
-          $("#" + div_id).html("Nobody entered any locations yet, but as " +
-            "soon as they do we'll put a map here.");
+          $("#" + div_id).html("There aren't any locations to show on this " +
+            "map, but as soon as we get some we'll put a map here.");
           return;
         }
         var map = initializeMap(div_id, data, center_lat, center_lng, zoom);

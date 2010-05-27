@@ -15,3 +15,5 @@ simplejson==2.0.9
 # for ordering inlines
 -e git://github.com/jpwatts/django-positions.git#egg=django-positions
 
+# For geocoding addresses and address lookups
+geopy
