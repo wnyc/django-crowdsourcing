@@ -62,7 +62,7 @@ def filter(wrapper_format, key, label, html):
 register.simple_tag(filter)
 
 
-def select_filter(wrapper_format, label, key, value, choices, blank=True):
+def select_filter(wrapper_format, key, label, value, choices, blank=True):
     html = ['<select id="%s" name="%s">' % (key, key,)]
     if blank:
         html.append('<option value="">---------</option>')
@@ -90,13 +90,27 @@ def range_filter(wrapper_format, key, label, from_value, to_value):
 register.simple_tag(range_filter)
 
 
+def distance_filter(wrapper_format, key, label, within_value, location_value):
+    html = [
+        '<span id="%s">' % key,
+        '<label for="%s_within">Within</label> ' % key,
+        '<input type="text" id="%s_within"' % key,
+        'name="%s_within" value="%s" /> ' % (key, escape(within_value)),
+        '<label for="%s_location">miles of</label> ' % key,
+        '<input type="text" id="%s_location"' % key,
+        'name="%s_location" value="%s" />' % (key, escape(location_value)),
+        '</span>']
+    return filter(wrapper_format, key, label, "\n".join(html))
+register.simple_tag(distance_filter)
+
+
 def filter_as_li(filter):
     output = []
     wrapper_format = "<li>%s</li>"
     if FILTER_TYPE.CHOICE == filter.type:
         output.append(select_filter(wrapper_format,
-                                    filter.label,
                                     filter.key,
+                                    filter.label,
                                     filter.value,
                                     filter.choices))
     elif FILTER_TYPE.RANGE == filter.type:
@@ -105,6 +119,12 @@ def filter_as_li(filter):
                                    filter.label,
                                    filter.from_value,
                                    filter.to_value))
+    elif FILTER_TYPE.DISTANCE == filter.type:
+        output.append(distance_filter(wrapper_format,
+                                   filter.key,
+                                   filter.label,
+                                   filter.within_value,
+                                   filter.location_value))
     return mark_safe("\n".join(output))
 register.simple_tag(filter_as_li)
 

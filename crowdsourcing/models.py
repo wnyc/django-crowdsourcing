@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import datetime
 import logging
+from math import sin, cos
 from operator import itemgetter
 import simplejson
 from textwrap import fill
@@ -10,6 +11,7 @@ from textwrap import fill
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.db import models
 from django.db.models import Count
@@ -19,6 +21,7 @@ from django.utils.safestring import mark_safe
 
 
 from .fields import ImageWithThumbnailsField
+from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
@@ -222,7 +225,8 @@ FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
                            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                            OPTION_TYPE_CHOICES.RADIO_LIST,
                            OPTION_TYPE_CHOICES.INTEGER,
-                           OPTION_TYPE_CHOICES.FLOAT)
+                           OPTION_TYPE_CHOICES.FLOAT,
+                           OPTION_TYPE_CHOICES.LOCATION_FIELD)
 
 
 class Question(models.Model):
@@ -317,7 +321,7 @@ class Question(models.Model):
         return to_return
 
 
-FILTER_TYPE = ChoiceEnum("choice range")
+FILTER_TYPE = ChoiceEnum("choice range distance")
 
 
 class Filter:
@@ -327,6 +331,7 @@ class Filter:
         self.label = field.label
         self.choices = field.parsed_options
         self.value = self.from_value = self.to_value = ""
+        self.within_value = self.location_value = ""
         if field.option_type in (OPTION_TYPE_CHOICES.BOOLEAN,
                                  OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                                  OPTION_TYPE_CHOICES.RADIO_LIST):
@@ -337,6 +342,10 @@ class Filter:
             self.type = FILTER_TYPE.RANGE
             self.from_value = request_data.get(self.key + "_from", "")
             self.to_value = request_data.get(self.key + "_to", "")
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+            self.type = FILTER_TYPE.DISTANCE
+            self.within_value = request_data.get(self.key + "_within", "")
+            self.location_value = request_data.get(self.key + "_location", "")
         
 
 def get_filters(survey, request_data):
@@ -346,11 +355,13 @@ def get_filters(survey, request_data):
 
 def extra_from_filters(set, submission_id_column, survey, request_data):
     for filter in get_filters(survey, request_data):
-        if filter.value or filter.from_value or filter.to_value:
+        loc = filter.location_value and filter.within_value
+        if filter.value or filter.from_value or filter.to_value or loc:
             try:
                 type = filter.field.option_type
                 is_float = OPTION_TYPE_CHOICES.FLOAT == type
                 is_integer = OPTION_TYPE_CHOICES.INTEGER == type
+                is_distance = OPTION_TYPE_CHOICES.LOCATION_FIELD == type
                 where = "".join((
                     submission_id_column,
                     " IN (SELECT submission_id FROM ",
@@ -360,7 +371,7 @@ def extra_from_filters(set, submission_id_column, survey, request_data):
                     f = ("0", "f",)
                     length = len(filter.value)
                     params = [length and not filter.value[0].lower() in f]
-                    where += "boolean_answer = %s)"
+                    where += "boolean_answer = %s"
                 elif is_float or is_integer:
                     convert = float if is_float else int
                     column = "float_answer" if is_float else "integer_answer"
@@ -372,14 +383,69 @@ def extra_from_filters(set, submission_id_column, survey, request_data):
                     if filter.to_value:
                         params.append(convert(filter.to_value))
                         wheres.append(column + " <= %s")
-                    where += " AND ".join(wheres) + ")"
+                    where += " AND ".join(wheres)
+                elif is_distance:
+                    e = _extra_from_distance(filter, submission_id_column)
+                    if e:
+                        d_where, params = e
+                        where += d_where
+                    else:
+                        break
                 else:
                     params = [filter.value]
-                    where += "text_answer = %s)"
+                    where += "text_answer = %s"
+                where += ")"
                 set = set.extra(where=[where], params=params)
             except ValueError:
                 pass
     return set
+
+
+def _extra_from_distance(filter, submission_id_column): 
+    """ This uses the Spherical Law of Cosines for a close enough approximation
+    of distances. distance = acos(sin(lat1) * sin(lat2) +
+                                  cos(lat1) * cos(lat2) *
+                                  cos(lng2 - lng1)) * 3959
+    The "radius" of the earth varies between 3,950 and 3,963 miles. """
+    key = "lat_lng_of_" + str(filter.location_value.lower())
+    lat_lng = cache.get(key, None)
+    if lat_lng is None:
+        lat_lng = get_latitude_and_longitude(filter.location_value)
+        cache.set(key, lat_lng)
+    (lat, lng) = lat_lng
+    if lat is None or lng is None:
+        return
+    acos_of_args = (
+        sin(_radians(lat)),
+        _D_TO_R,
+        cos(_radians(lat)),
+        _D_TO_R,
+        lng,
+        _D_TO_R)
+    acos_of = (
+        "%f * sin(latitude / %f) + "
+        "%f * cos(latitude / %f) * "
+        "cos((longitude - %f) / %f)") % acos_of_args
+    where = "".join((
+        submission_id_column,
+        " IN (SELECT ca.submission_id FROM ",
+        "crowdsourcing_answer AS ca JOIN crowdsourcing_submission AS cs ",
+        "ON ca.submission_id = cs.id ",
+        "WHERE cs.survey_id = %s AND latitude IS NOT NULL ",
+        "AND longitude IS NOT NULL AND ",
+        acos_of,
+        " < 1 AND 3959.0 * acos(",
+        acos_of,
+        ") <= %s)"))
+    params = [int(filter.field.survey_id), int(filter.within_value)]
+    return where, params
+
+
+_D_TO_R = 57.295779
+
+
+def _radians(degrees):
+    return degrees / _D_TO_R
 
 
 class AggregateResult:
