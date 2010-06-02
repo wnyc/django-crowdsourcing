@@ -13,7 +13,7 @@ from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.core.urlresolvers import reverse
-from django.db import models
+from django.db import models, connection
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
@@ -140,11 +140,15 @@ class Survey(models.Model):
             return self.starts_at <= now < self.ends_at
         return self.starts_at <= now
 
-    def get_public_fields(self):
+    def get_public_fields(self, fieldnames=None):
         if not "_public_fields" in self.__dict__:
             questions = self.questions.filter(answer_is_public=True)
+            questions = questions.select_related("survey")
             self.__dict__["_public_fields"] = list(questions.order_by("order"))
-        return self.__dict__["_public_fields"]
+        fields = self.__dict__["_public_fields"]
+        if fieldnames:
+            return [f for f in fields if f.fieldname in fieldnames]
+        return fields
 
     def get_public_archive_fields(self):
         types = (
@@ -320,6 +324,19 @@ class Question(models.Model):
                 to_return.append((options[i], None))
         return to_return
 
+    @property
+    def value_column(self):
+        ot = self.option_type
+        if ot == OPTION_TYPE_CHOICES.BOOLEAN:
+            return "boolean_answer"
+        elif ot == OPTION_TYPE_CHOICES.FLOAT:
+            return "float_answer"
+        elif ot == OPTION_TYPE_CHOICES.INTEGER:
+            return "integer_answer"
+        elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+            return "image_answer"
+        return "text_answer"
+
 
 FILTER_TYPE = ChoiceEnum("choice range distance")
 
@@ -348,7 +365,7 @@ class Filter:
             self.type = FILTER_TYPE.DISTANCE
             self.within_value = get_val("_within")
             self.location_value = get_val("_location")
-        
+
 
 def get_filters(survey, request_data):
     fields = list(survey.get_public_fields())
@@ -356,6 +373,14 @@ def get_filters(survey, request_data):
 
 
 def extra_from_filters(set, submission_id_column, survey, request_data):
+    sid = submission_id_column
+    for where, params in extra_clauses_from_filters(sid, survey, request_data):
+        set = set.extra(where=[where], params=params)
+    return set
+
+
+def extra_clauses_from_filters(submission_id_column, survey, request_data):
+    return_value = []
     for filter in get_filters(survey, request_data):
         loc = filter.location_value and filter.within_value
         if filter.value or filter.from_value or filter.to_value or loc:
@@ -397,13 +422,13 @@ def extra_from_filters(set, submission_id_column, survey, request_data):
                     params = [filter.value]
                     where += "text_answer = %s"
                 where += ")"
-                set = set.extra(where=[where], params=params)
+                return_value.append((where, params,))
             except ValueError:
                 pass
-    return set
+    return return_value
 
 
-def _extra_from_distance(filter, submission_id_column): 
+def _extra_from_distance(filter, submission_id_column):
     """ This uses the Spherical Law of Cosines for a close enough approximation
     of distances. distance = acos(sin(lat1) * sin(lat2) +
                                   cos(lat1) * cos(lat2) *
@@ -450,16 +475,16 @@ def _radians(degrees):
     return degrees / _D_TO_R
 
 
-class AggregateResult:
+class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     aggregate results. """
-    def __init__(self, field, request_data):
+    def __init__(self, survey, field, request_data):
         self.answer_set = field.answer_set.values('text_answer',
                                                   'boolean_answer')
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
-                                             field.survey,
+                                             survey,
                                              request_data)
         self.answer_counts = []
         for answer in self.answer_set:
@@ -468,9 +493,64 @@ class AggregateResult:
             else:
                 text = fill(answer["text_answer"], 30)
             if answer["count"]:
-                self.answer_counts.append({"response": text,
-                                      "count": answer["count"]})
+                self.answer_counts.append({
+                    "response": text,
+                    "count": answer["count"]})
         self.yahoo_answer_string = simplejson.dumps(self.answer_counts)
+
+
+class AggregateResultSum:
+    def __init__(self, y_axes, x_axis, request_data):
+        self.answer_sums = []
+        answer_sum_lookup = {}
+
+        def new_answer_sum(x_value):
+            answer_sum = {x_axis.fieldname: x_value}
+            for y_axis in y_axes:
+                answer_sum[y_axis.fieldname] = 0
+            answer_sum_lookup[x_value] = answer_sum
+            self.answer_sums.append(answer_sum)
+            return answer_sum
+
+        # We could just add new x-axis values as we encounter them. However,
+        # say someone has parsed_options ["January", ... , "December"].
+        # Then doing it this way puts them in order.
+        [new_answer_sum(x_value) for x_value in x_axis.parsed_options]
+
+        x_value_column = "x_axis." + x_axis.value_column
+        for y_axis in y_axes:
+            params = [y_axis.id, x_axis.id]
+            y_axis_column = y_axis.value_column
+            if "boolean_answer" == y_axis_column:
+                y_axis_column = "CAST(y_axis." + y_axis_column + " AS int)"
+            else:
+                y_axis_column = "y_axis." + y_axis_column
+            query = [
+                "SELECT ",
+                x_value_column,
+                " AS x_value, SUM(",
+                y_axis_column,
+                ") AS y_value FROM crowdsourcing_answer AS y_axis ",
+                "JOIN crowdsourcing_answer AS x_axis "
+                "ON y_axis.submission_id = x_axis.submission_id ",
+                "WHERE y_axis.question_id = %s ",
+                "AND x_axis.question_id = %s"]
+            y = "y_axis.submission_id"
+            extras = extra_clauses_from_filters(y, x_axis.survey, request_data)
+            for where, next_params in extras:
+                query.append(" AND ")
+                query.append(where)
+                params += next_params
+            query.append(" GROUP BY ")
+            query.append(x_value_column)
+            cursor = connection.cursor()
+            cursor.execute("".join(query), params)
+            for x_value, y_value in cursor.fetchall():
+                answer_sum = answer_sum_lookup.get(x_value)
+                if not answer_sum:
+                    answer_sum = new_answer_sum(x_value)
+                answer_sum[y_axis.fieldname] += y_value
+        self.yahoo_answer_string = simplejson.dumps(self.answer_sums)
 
 
 class Submission(models.Model):
@@ -546,18 +626,8 @@ class Answer(models.Model):
                                   editable=False)
 
     def value():
-
         def get(self):
-            ot = self.question.option_type
-            if ot == OPTION_TYPE_CHOICES.BOOLEAN:
-                return self.boolean_answer
-            elif ot == OPTION_TYPE_CHOICES.FLOAT:
-                return self.float_answer
-            elif ot == OPTION_TYPE_CHOICES.INTEGER:
-                return self.integer_answer
-            elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
-                return self.image_answer
-            return self.text_answer
+            return getattr(self, self.question.value_column)
 
         def set(self, v):
             ot = self.question.option_type
@@ -632,12 +702,21 @@ class SurveyReport(models.Model):
 
     def get_survey_report_displays(self):
         if self.pk and self.survey_report_displays is None:
-            self.survey_report_displays = self.surveyreportdisplay_set.all()
+            srds = list(self.surveyreportdisplay_set.select_related('report'))
+            self.survey_report_displays = srds
+            for srd in self.survey_report_displays:
+                srd._report = self
         return self.survey_report_displays
 
     def has_display_type(self, type):
+        if not hasattr(type, '__iter__'):
+            type = [type]
         displays = self.get_survey_report_displays()
-        return bool([1 for srd in displays if type == srd.display_type])
+        return bool([1 for srd in displays if srd.display_type in type])
+
+    def has_charts(self):
+        SRDC = SURVEY_DISPLAY_TYPE_CHOICES
+        return self.has_display_type([SRDC.PIE, SRDC.BAR, SRDC.LINE])
 
     @models.permalink
     def get_absolute_url(self):
@@ -652,7 +731,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map') # TODO: bar grid
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line')
 
 
 class SurveyReportDisplay(models.Model):
@@ -660,7 +739,15 @@ class SurveyReportDisplay(models.Model):
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
-    fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
+    fieldnames = models.TextField(
+        blank=True,
+        help_text=_("Separate by spaces. These are the y-axis of bar and line "
+                    "charts."))
+    x_axis_fieldname = models.CharField(
+        blank=True,
+        help_text=_("This only applies to bar and line charts. Use only 1 "
+                    "field."),
+        max_length=80)
     annotation = models.TextField(blank=True)
     limit_map_answers = models.IntegerField(
         null=True,
@@ -686,22 +773,46 @@ class SurveyReportDisplay(models.Model):
         order = models.IntegerField()
 
     def questions(self, fields=None):
-        names = self.fieldnames.split(" ")
+        return self._get_questions(self.fieldnames, fields)
+
+    def x_axis_question(self, fields=None):
+        return_value = self._get_questions(self.x_axis_fieldname, fields)
+        if return_value:
+            return return_value[0]
+        return None
+
+    def _get_questions(self, fieldnames, fields):
+        names = fieldnames.split(" ")
         if fields:
             return [f for f in fields if f.fieldname in names]
-        return self.report.survey.questions.filter(fieldname__in=names).select_related("survey")
+        return self.get_report().survey.get_public_fields(names)
 
-    @property
-    def is_text(self):
-        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.TEXT
+    def get_report(self):
+        if hasattr(self, '_report'):
+            return self._report
+        return self.report
 
-    @property
-    def is_pie(self):
-        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.PIE
+    def index_in_report(self):
+        assert self.report, "This display's report attribute is not set."
+        srds = self.get_report().get_survey_report_displays()
+        for i in range(len(srds)):
+            if srds[i] == self:
+                return i
+        assert False, "This display isn't in its report's displays."
 
-    @property
-    def is_map(self):
-        return self.display_type == SURVEY_DISPLAY_TYPE_CHOICES.MAP
+    class Meta:
+        ordering = ('order',)
+
+
+    def __getattribute__(self, key):
+        """ We provide is_text, is_pie, etc... as attirbutes to make it easier
+        to write conditional logic in Django templates based on
+        display_type."""
+        if "is_" == key[:3]:
+            for value, name in SURVEY_DISPLAY_TYPE_CHOICES._choices:
+                if name == key[3:]:
+                    return self.display_type == value
+        return super(SurveyReportDisplay, self).__getattribute__(key)
 
 
 def get_all_answers(submission_list):

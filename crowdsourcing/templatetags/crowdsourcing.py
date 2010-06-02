@@ -8,8 +8,9 @@ from django.utils.safestring import mark_safe
 from django.utils.html import escape
 from sorl.thumbnail.base import ThumbnailException
 
-from ..crowdsourcing.models import (AggregateResult, FILTER_TYPE,
-                                    OPTION_TYPE_CHOICES, get_all_answers)
+from ..crowdsourcing.models import (AggregateResultCount, AggregateResultSum,
+                                    FILTER_TYPE, OPTION_TYPE_CHOICES,
+                                    get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -41,7 +42,7 @@ returning safe strings. """
 register = template.Library()
 
 
-def yahoo_pie_chart_header():
+def yahoo_chart_header():
     return "\n".join([
         '<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.8.0r4/build/fonts/fonts-min.css" />',
         '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/yahoo-dom-event/yahoo-dom-event.js"></script>',
@@ -53,7 +54,7 @@ def yahoo_pie_chart_header():
         '<style>',
         '  .chart_div { width: 600px; height: 300px; }',
         '</style>'])
-register.simple_tag(yahoo_pie_chart_header)
+register.simple_tag(yahoo_chart_header)
 
 
 def filter(wrapper_format, key, label, html):
@@ -140,54 +141,125 @@ def filters_as_ul(filters):
                 '</form>'])
     return mark_safe("\n".join(out))
 register.simple_tag(filters_as_ul)
-
+    
 
 def yahoo_pie_chart(display, question, request_get):
-    out = []
-    aggregate = AggregateResult(question, request_get)
-    if aggregate.answer_counts:
-        out.extend([
-            '<h2 class="chart_title">%s</h2>' % display.annotation,
-            '<div class="chart_div" id="chart%d">' % question.id,
-            'Unable to load Flash content. The YUI Charts Control ',
-            'requires Flash Player 9.0.45 or higher. You can install the ',
-            'latest version at the ',
-            '<a href="http://www.adobe.com/go/getflashplayer">',
-            'Adobe Flash Player Download Center</a>.',
-            '</div>'])
-        args = {
-            "answer_string": aggregate.yahoo_answer_string,
-            "data_var": 'data%d' % question.id,
-            "question_id": question.id}
-        script = """
-            <script type="text/javascript">
-              YAHOO.widget.Chart.SWFURL =
-                "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
-              var answerData = %(answer_string)s;
-              var %(data_var)s = new YAHOO.util.DataSource(answerData);
-              %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
-              %(data_var)s.responseSchema = {fields: [ "response", "count" ]};
-
-              var chart%(question_id)d = new YAHOO.widget.PieChart(
-                "chart%(question_id)d",
-                data%(question_id)d,
-                {dataField: "count",
-                 categoryField: "response",
-                 expressInstall: "assets/expressinstall.swf",
-                 style: {padding: 20,
-                         legend: {display: "right",
-                                  padding: 10,
-                                  spacing: 5,
-                                  font: {family: "Arial",
-                                         size: 13
-                                        }
-                                 }
-                        }
-                });
-            </script>""" % args
-        out.append(script)
-    return mark_safe("\n".join(out))
+    survey = display.get_report().survey
+    aggregate = AggregateResultCount(survey, question, request_get)
+    if not aggregate.answer_counts:
+        return ""
+    args = {
+        "answer_string": aggregate.yahoo_answer_string,
+        "option_setup": "",
+        "chart_type": "PieChart",
+        "response_schema": '{fields: [ "response", "count" ]}',
+        "options": "dataField: 'count', categoryField: 'response'",
+        "style": """
+            {padding: 20,
+             legend: {display: "right",
+                      padding: 10,
+                      spacing: 5,
+                      font: {family: "Arial",
+                             size: 13
+                            }
+                     }
+            }"""}
+    id_args = (display.index_in_report(), question.id)
+    return _yahoo_chart(display, "%d_%d" % id_args, args)
 register.simple_tag(yahoo_pie_chart)
+
+
+def yahoo_bar_chart(display, request_get):
+    return _yahoo_bar_line_chart_helper(display, request_get, "ColumnChart")
+register.simple_tag(yahoo_bar_chart)
+
+
+def yahoo_line_chart(display, request_get):
+    return _yahoo_bar_line_chart_helper(display, request_get, "LineChart")
+register.simple_tag(yahoo_line_chart)
+
+
+def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
+    y_axes = display.questions()
+    if not y_axes:
+        return ("This chart uses y axes '%s', none of which are questions "
+                "in this survey.") % display.fieldnames
+    x_axis = display.x_axis_question()
+    if not x_axis:
+        return ("This chart uses x axis '%s' which isn't a question in "
+                "this survey.") % display.x_axis_fieldname
+    aggregate = AggregateResultSum(y_axes, x_axis, request_get)
+    if not aggregate.answer_sums:
+        return ""
+    answer_string = aggregate.yahoo_answer_string
+    series = []
+    for question in y_axes:
+        series.append("""{
+              displayName: "%s",
+              yField: "%s",
+              style: {size: 10}
+            }""" % (question.label, question.fieldname))
+    option_setup_args = (x_axis.label, ", ".join([y.label for y in y_axes]),)
+    option_setup_args = tuple(l.replace('"', r'\"') for l in option_setup_args)
+    index = display.index_in_report()
+    option_setup = """
+        var xAxis = new YAHOO.widget.CategoryAxis();
+        xAxis.title = "%s";
+        var yAxis = new YAHOO.widget.NumericAxis();
+        yAxis.title = "%s";
+        """ % option_setup_args
+    options = {
+        "series": "[%s]" % ",\n".join(series),
+        "xField": '"%s"' % x_axis.fieldname,
+        "xAxis": "xAxis",
+        "yAxis": "yAxis"}
+    options = ",\n".join(["%s: %s" % item for item in options.items()])
+    axes = list(y_axes) + [x_axis]
+    field_names = "[%s]" % ", ".join(['"%s"' % f.fieldname for f in axes])
+    args = {
+        "answer_string": answer_string,
+        "option_setup": option_setup,
+        "chart_type": chart_type,
+        "response_schema": '{fields: %s}' % field_names,
+        "style": '{xAxis: {labelRotation: -45}, yAxis: {titleRotation: -90}}',
+        "options": options}
+    return _yahoo_chart(display, str(index), args)
+
+
+def _yahoo_chart(display, unique_id, args):
+    out = [
+        '<h2 class="chart_title">%s</h2>' % display.annotation,
+        '<div class="chart_div" id="chart%s">' % unique_id,
+        'Unable to load Flash content. The YUI Charts Control ',
+        'requires Flash Player 9.0.45 or higher. You can install the ',
+        'latest version at the ',
+        '<a href="http://www.adobe.com/go/getflashplayer">',
+        'Adobe Flash Player Download Center</a>.',
+        '</div>']
+    args.update(
+        data_var='data%s' % unique_id,
+        div_id="chart%s" % unique_id)
+    script = """
+        <script type="text/javascript">
+          YAHOO.widget.Chart.SWFURL =
+            "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
+          var answerData = %(answer_string)s;
+          var %(data_var)s = new YAHOO.util.DataSource(answerData);
+          %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
+          %(data_var)s.responseSchema = %(response_schema)s;
+          %(option_setup)s
+          var %(div_id)s = new YAHOO.widget.%(chart_type)s(
+            "%(div_id)s",
+            %(data_var)s,
+            {
+             %(options)s,
+
+             style: %(style)s,
+             expressInstall: "assets/expressinstall.swf"
+            });
+        </script>""" % args
+    out.append(script)
+    return mark_safe("\n".join(out))
 
 
 def video_html(vid, maxheight, maxwidth):
