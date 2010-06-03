@@ -11,16 +11,25 @@ from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
 from django.core.urlresolvers import reverse, NoReverseMatch
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext as _rc
 from django.utils.html import escape
 
 from .forms import forms_for_survey
-from .models import (Survey, Submission, Answer, SurveyReportDisplay,
-                     SURVEY_DISPLAY_TYPE_CHOICES, SurveyReport,
-                     extra_from_filters, OPTION_TYPE_CHOICES, get_filters,
-                     get_all_answers)
+from .models import (
+    Answer,
+    OPTION_TYPE_CHOICES,
+    Question,
+    SURVEY_DISPLAY_TYPE_CHOICES,
+    Submission,
+    Survey,
+    SurveyReport,
+    SurveyReportDisplay,
+    extra_from_filters,
+    get_all_answers,
+    get_filters)
 from .jsonutils import dump, dumps
 
 from .util import ChoiceEnum, get_function
@@ -225,8 +234,8 @@ def submissions(request):
         a logged in user.
     submitted_from and submitted_to - strings in the format YYYY-mm-ddThh:mm:ss
         For example, 2010-04-05T13:02:03
-    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean not
-        featured. Everything else means featured. """
+    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean ignore 
+        the featured flag. Everything else means display only featured. """
     response = HttpResponse(mimetype='application/json')
     results = Submission.objects.filter(is_public=True)
     valid_filters = (
@@ -270,22 +279,38 @@ def submissions(request):
     return response
 
 
+def submission(request, id):
+    template = 'crowdsourcing/submission.html'
+    sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
+    return render_to_response(template, dict(submission=sub), _rc(request))
+    
+
 def _default_report(survey):
     field_count = count(1)
-    fields = survey.get_public_fields().filter(option_type__in=(
+    pie_choices = (
         OPTION_TYPE_CHOICES.BOOLEAN,
         OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-        OPTION_TYPE_CHOICES.RADIO_LIST))
+        OPTION_TYPE_CHOICES.RADIO_LIST)
+    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION_FIELD,)
+    public_fields = survey.get_public_fields()
+    fields = [f for f in public_fields if f.option_type in all_choices]
     report = SurveyReport(
         survey=survey,
         title=survey.title,
         summary=survey.description or survey.tease)
-    report.survey_report_displays = [SurveyReportDisplay(
-        report=report,
-        display_type=SURVEY_DISPLAY_TYPE_CHOICES.PIE,
-        fieldnames=field.fieldname,
-        annotation=field.label,
-        order=field_count.next()) for field in fields]
+    displays = []
+    for field in fields:
+        if field.option_type in pie_choices:
+            type = SURVEY_DISPLAY_TYPE_CHOICES.PIE
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+            type = SURVEY_DISPLAY_TYPE_CHOICES.MAP
+        displays.append(SurveyReportDisplay(
+            report=report,
+            display_type=type,
+            fieldnames=field.fieldname,
+            annotation=field.label,
+            order=field_count.next()))
+    report.survey_report_displays = displays
     return report
 
 
@@ -307,16 +332,14 @@ def survey_report(request, slug, report='', page=None):
     reports = survey.surveyreport_set.all()
     if report:
         report_obj = get_object_or_404(reports, slug=report)
-    elif reports:
-        args = {"slug": survey.slug, "report": reports[0].slug}
+    elif survey.default_report:
+        args = {"slug": survey.slug, "report": survey.default_report.slug}
         return HttpResponseRedirect(reverse("survey_report_page_1",
                                     kwargs=args))
     else:
         report_obj = _default_report(survey)
 
-    location_fields = list(survey.get_public_location_fields())
     archive_fields = list(survey.get_public_archive_fields())
-    aggregate_fields = list(survey.get_public_aggregate_fields())
     fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
 
@@ -331,8 +354,10 @@ def survey_report(request, slug, report='', page=None):
             report=report_obj,
             request=request)
 
+    ids = None
     if report_obj.limit_results_to:
         submissions = submissions[:report_obj.limit_results_to]
+        ids = ",".join([str(s.pk) for s in submissions])
     if not report_obj.display_individual_results:
         submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
@@ -355,13 +380,11 @@ def survey_report(request, slug, report='', page=None):
                                    submissions=submissions,
                                    paginator=paginator,
                                    page_obj=page_obj,
+                                   ids=ids,
                                    pages_to_link=pages_to_link,
                                    fields=fields,
-                                   location_fields=location_fields,
                                    archive_fields=archive_fields,
-                                   aggregate_fields=aggregate_fields,
                                    filters=filters,
-                                   reports=reports,
                                    report=report_obj,
                                    page_answers=page_answers,
                                    request=request),
@@ -383,3 +406,60 @@ def paginate_or_404(queryset, page, num_per_page=20):
     except InvalidPage:
         raise Http404
     return paginator, page_obj
+
+
+def location_question_results(
+    request,
+    question_id,
+    submission_ids=None,
+    limit_map_answers=None):
+    question = get_object_or_404(Question.objects.select_related("survey"),
+                                 pk=question_id,
+                                 answer_is_public=True)
+    if not question.survey.can_have_public_submissions():
+        raise Http404
+    icon_lookup = {}
+    icon_questions = question.survey.icon_questions()
+    for icon_question in icon_questions:
+        icon_by_answer = {}
+        for (option, icon) in icon_question.parsed_option_icon_pairs():
+            if icon:
+                icon_by_answer[option] = icon
+        for answer in icon_question.answer_set.all():
+            if answer.value in icon_by_answer:
+                icon = icon_by_answer[answer.value]
+                icon_lookup[answer.submission_id] = icon
+
+    answers = question.answer_set.filter(
+        ~Q(latitude=None),
+        ~Q(longitude=None),
+        submission__is_public=True)
+    answers = extra_from_filters(
+        answers,
+        "submission_id",
+        question.survey,
+        request.GET)
+    if submission_ids:
+        answers = answers.filter(submission__in=submission_ids.split(","))
+    if limit_map_answers:
+        answers = answers[:limit_map_answers]
+    entries = []
+    view = "crowdsourcing.views.submission_for_map"
+    for answer in answers:
+        kwargs = {"id": answer.submission_id}
+        d = {
+            "lat": answer.latitude,
+            "lng": answer.longitude,
+            "url": reverse(view, kwargs=kwargs)}
+        if answer.submission_id in icon_lookup:
+            d["icon"] = icon_lookup[answer.submission_id]
+        entries.append(d)
+    response = HttpResponse(mimetype='application/json')
+    dump({"entries": entries}, response)
+    return response
+
+
+def submission_for_map(request, id):
+    template = 'crowdsourcing/submission_for_map.html'
+    sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
+    return render_to_response(template, dict(submission=sub), _rc(request))

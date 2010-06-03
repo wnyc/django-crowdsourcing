@@ -239,8 +239,8 @@ function validateForm(form, survey) {
   return valid;
 }
 
-$(function() {
-  $("input:hidden.enlargeable").each(function() {
+function initEnlargeable(parent) {
+  parent.find("input:hidden.enlargeable").each(function() {
     var url = $(this).attr("value");
     var id = $(this).attr("id").match(/(img_\d+)_full_url/)[1];
     var img = $("#" + id);
@@ -257,4 +257,8 @@ $(function() {
     img.replaceWith(div);
     a_outer.append(img)
   });
+}
+
+$(function() {
+  initEnlargeable($("body"));
 });

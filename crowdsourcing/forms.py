@@ -67,11 +67,8 @@ class BaseAnswerForm(Form):
         t = loader.get_template('forms/form.html')
         return t.render(c)
 
-    def answer(self):
-        return self.cleaned_data['answer']
-
     def save(self, commit=True):
-        if self.answer() is None:
+        if self.cleaned_data['answer'] is None:
             if self.fields['answer'].required:
                 raise ValidationError, _('This field is required.')
             return
@@ -165,7 +162,7 @@ class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
         choices = [(x, x) for x in self.question.parsed_options]
-        if not self.question.required:
+        if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices
         

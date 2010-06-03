@@ -94,3 +94,9 @@ VIDEO_URL_PATTERNS = getattr(
     _gs,
     'CROWDSOURCING_VIDEO_URL_PATTERNS',
     (r'^http://www\.youtube\.com/watch\?v=[^&]+',))
+
+
+GOOGLE_MAPS_API_KEY = getattr(
+    _gs,
+    'CROWDSOURCING_GOOGLE_MAPS_API_KEY',
+    '')

@@ -4,3 +4,5 @@
 # You'll also need to install whatever apps you need to run your database
 # of choice. For postgresql, for example, you could use
 # psycopg2>=2.0.8
+
+-e git+git://github.com/smulloni/python-oembed.git#egg=python-oembed

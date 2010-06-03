@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import datetime
 import logging
+from math import sin, cos
 from operator import itemgetter
 import simplejson
 from textwrap import fill
@@ -10,8 +11,9 @@ from textwrap import fill
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django.core.cache import cache
 from django.core.urlresolvers import reverse
-from django.db import models
+from django.db import models, connection
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
 from django.utils.translation import ugettext_lazy as _
@@ -19,6 +21,7 @@ from django.utils.safestring import mark_safe
 
 
 from .fields import ImageWithThumbnailsField
+from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
 
@@ -95,6 +98,14 @@ class Survey(models.Model):
         max_length=255,
         blank=True,
         help_text="Use the exact group name from flickr.com")
+    default_report = models.ForeignKey(
+        'SurveyReport',
+        blank=True,
+        null=True,
+        related_name='reports',
+        help_text=("Whenever we automatically generate a link to the results "
+                   "of this survey we'll use this report. If it's left blank, "
+                   "we'll use the default report behavior."))
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
@@ -129,15 +140,15 @@ class Survey(models.Model):
             return self.starts_at <= now < self.ends_at
         return self.starts_at <= now
 
-    def get_public_fields(self):
+    def get_public_fields(self, fieldnames=None):
         if not "_public_fields" in self.__dict__:
             questions = self.questions.filter(answer_is_public=True)
+            questions = questions.select_related("survey")
             self.__dict__["_public_fields"] = list(questions.order_by("order"))
-        return self.__dict__["_public_fields"]
-
-    def get_public_location_fields(self):
-        type = OPTION_TYPE_CHOICES.LOCATION_FIELD
-        return [f for f in self.get_public_fields() if f.option_type == type]
+        fields = self.__dict__["_public_fields"]
+        if fieldnames:
+            return [f for f in fields if f.fieldname in fieldnames]
+        return fields
 
     def get_public_archive_fields(self):
         types = (
@@ -147,15 +158,17 @@ class Survey(models.Model):
             OPTION_TYPE_CHOICES.TEXT_AREA)
         return [f for f in self.get_public_fields() if f.option_type in types]
 
-    def get_public_aggregate_fields(self):
-        types = (
-            OPTION_TYPE_CHOICES.INTEGER,
-            OPTION_TYPE_CHOICES.FLOAT,
-            OPTION_TYPE_CHOICES.BOOLEAN,
-            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-            OPTION_TYPE_CHOICES.RADIO_LIST,
-            OPTION_TYPE_CHOICES.CHECKBOX_LIST)
-        return [f for f in self.get_public_fields() if f.option_type in types]
+    def icon_questions(self):
+        OTC = OPTION_TYPE_CHOICES
+        return self.questions.filter(
+            ~models.Q(map_icons=""),
+            option_type__in=[OTC.SELECT_ONE_CHOICE, OTC.RADIO_LIST])
+
+    def parsed_option_icon_pairs(self):
+        icon_questions = self.icon_questions()
+        if icon_questions:
+            return icon_questions[0].parsed_option_icon_pairs()
+        return ()
 
     def submissions_for(self, user, session_key):
         q = models.Q(survey=self)
@@ -216,7 +229,8 @@ FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
                            OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                            OPTION_TYPE_CHOICES.RADIO_LIST,
                            OPTION_TYPE_CHOICES.INTEGER,
-                           OPTION_TYPE_CHOICES.FLOAT)
+                           OPTION_TYPE_CHOICES.FLOAT,
+                           OPTION_TYPE_CHOICES.LOCATION_FIELD)
 
 
 class Question(models.Model):
@@ -225,19 +239,42 @@ class Question(models.Model):
         max_length=32,
         help_text=_('a single-word identifier used to track this value; '
                     'it must begin with a letter and may contain '
-                    'alphanumerics and underscores (no spaces).'))
+                    'alphanumerics and underscores (no spaces). You must not '
+                    'change this field on a live survey.'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
     label = models.CharField(max_length=32, help_text=_(
         "Appears on the results page."))
-    help_text = models.TextField(blank=True)
-    required = models.BooleanField(default=False)
+    help_text = models.TextField(
+        blank=True)
+    required = models.BooleanField(
+        default=False,
+        help_text=_("Unsafe to change on live surveys."))
     if PositionField:
         order = PositionField(collection=('survey',))
     else:
         order = models.IntegerField()
-    option_type = models.CharField(max_length=12, choices=OPTION_TYPE_CHOICES)
-    options = models.TextField(blank=True, default='')
+    option_type = models.CharField(
+        max_length=12,
+        choices=OPTION_TYPE_CHOICES,
+        help_text=_('You must not change this field on a live survey.'))
+    options = models.TextField(
+        blank=True,
+        default='',
+        help_text=_(
+            'You can not safely modify this field once a survey has gone '
+            'live. You can, at your own risk, add new options, but you '
+            'must not change or remove options.'))
+    map_icons = models.TextField(
+        blank=True,
+        default='',
+        help_text=('Use one icon url per line. These should line up with the '
+            'options. If the user\'s submission appears on a map, we\'ll use '
+            'the corresponding icon on the map. This field only makes sense '
+            'for Radio List and Select One Choice questions. Do not enter '
+            'these map icons on a Location Field. For Google maps '
+            'use 34px high by 20px wide .png images with a transparent '
+            'background. You can safely modify this field on live surveys.'))
     answer_is_public = models.BooleanField(default=True)
     use_as_filter = models.BooleanField(default=True)
     _aggregate_result = None
@@ -272,8 +309,36 @@ class Question(models.Model):
             return [True, False]
         return filter(None, (s.strip() for s in self.options.splitlines()))
 
+    @property
+    def parsed_map_icons(self):
+        return filter(None, (s.strip() for s in self.map_icons.splitlines()))
 
-FILTER_TYPE = ChoiceEnum("choice range")
+    def parsed_option_icon_pairs(self):
+        options = self.parsed_options
+        icons = self.parsed_map_icons
+        to_return = []
+        for i in range(len(options)):
+            if i < len(icons):
+                to_return.append((options[i], icons[i]))
+            else:
+                to_return.append((options[i], None))
+        return to_return
+
+    @property
+    def value_column(self):
+        ot = self.option_type
+        if ot == OPTION_TYPE_CHOICES.BOOLEAN:
+            return "boolean_answer"
+        elif ot == OPTION_TYPE_CHOICES.FLOAT:
+            return "float_answer"
+        elif ot == OPTION_TYPE_CHOICES.INTEGER:
+            return "integer_answer"
+        elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+            return "image_answer"
+        return "text_answer"
+
+
+FILTER_TYPE = ChoiceEnum("choice range distance")
 
 
 class Filter:
@@ -283,17 +348,24 @@ class Filter:
         self.label = field.label
         self.choices = field.parsed_options
         self.value = self.from_value = self.to_value = ""
+        self.within_value = self.location_value = ""
+        def get_val(suffix):
+            return request_data.get(self.key + suffix, "").replace("+", " ")
         if field.option_type in (OPTION_TYPE_CHOICES.BOOLEAN,
                                  OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
                                  OPTION_TYPE_CHOICES.RADIO_LIST):
             self.type = FILTER_TYPE.CHOICE
-            self.value = request_data.get(self.key, "")
+            self.value = get_val("")
         elif field.option_type in (OPTION_TYPE_CHOICES.INTEGER,
                                    OPTION_TYPE_CHOICES.FLOAT):
             self.type = FILTER_TYPE.RANGE
-            self.from_value = request_data.get(self.key + "_from", "")
-            self.to_value = request_data.get(self.key + "_to", "")
-        
+            self.from_value = get_val("_from")
+            self.to_value = get_val("_to")
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+            self.type = FILTER_TYPE.DISTANCE
+            self.within_value = get_val("_within")
+            self.location_value = get_val("_location")
+
 
 def get_filters(survey, request_data):
     fields = list(survey.get_public_fields())
@@ -301,12 +373,22 @@ def get_filters(survey, request_data):
 
 
 def extra_from_filters(set, submission_id_column, survey, request_data):
+    sid = submission_id_column
+    for where, params in extra_clauses_from_filters(sid, survey, request_data):
+        set = set.extra(where=[where], params=params)
+    return set
+
+
+def extra_clauses_from_filters(submission_id_column, survey, request_data):
+    return_value = []
     for filter in get_filters(survey, request_data):
-        if filter.value or filter.from_value or filter.to_value:
+        loc = filter.location_value and filter.within_value
+        if filter.value or filter.from_value or filter.to_value or loc:
             try:
                 type = filter.field.option_type
                 is_float = OPTION_TYPE_CHOICES.FLOAT == type
                 is_integer = OPTION_TYPE_CHOICES.INTEGER == type
+                is_distance = OPTION_TYPE_CHOICES.LOCATION_FIELD == type
                 where = "".join((
                     submission_id_column,
                     " IN (SELECT submission_id FROM ",
@@ -316,7 +398,7 @@ def extra_from_filters(set, submission_id_column, survey, request_data):
                     f = ("0", "f",)
                     length = len(filter.value)
                     params = [length and not filter.value[0].lower() in f]
-                    where += "boolean_answer = %s)"
+                    where += "boolean_answer = %s"
                 elif is_float or is_integer:
                     convert = float if is_float else int
                     column = "float_answer" if is_float else "integer_answer"
@@ -328,26 +410,81 @@ def extra_from_filters(set, submission_id_column, survey, request_data):
                     if filter.to_value:
                         params.append(convert(filter.to_value))
                         wheres.append(column + " <= %s")
-                    where += " AND ".join(wheres) + ")"
+                    where += " AND ".join(wheres)
+                elif is_distance:
+                    e = _extra_from_distance(filter, submission_id_column)
+                    if e:
+                        d_where, params = e
+                        where += d_where
+                    else:
+                        break
                 else:
                     params = [filter.value]
-                    where += "text_answer = %s)"
-                set = set.extra(where=[where], params=params)
+                    where += "text_answer = %s"
+                where += ")"
+                return_value.append((where, params,))
             except ValueError:
                 pass
-    return set
+    return return_value
 
 
-class AggregateResult:
+def _extra_from_distance(filter, submission_id_column):
+    """ This uses the Spherical Law of Cosines for a close enough approximation
+    of distances. distance = acos(sin(lat1) * sin(lat2) +
+                                  cos(lat1) * cos(lat2) *
+                                  cos(lng2 - lng1)) * 3959
+    The "radius" of the earth varies between 3,950 and 3,963 miles. """
+    key = "lat_lng_of_" + str(filter.location_value.lower())
+    lat_lng = cache.get(key, None)
+    if lat_lng is None:
+        lat_lng = get_latitude_and_longitude(filter.location_value)
+        cache.set(key, lat_lng)
+    (lat, lng) = lat_lng
+    if lat is None or lng is None:
+        return
+    acos_of_args = (
+        sin(_radians(lat)),
+        _D_TO_R,
+        cos(_radians(lat)),
+        _D_TO_R,
+        lng,
+        _D_TO_R)
+    acos_of = (
+        "%f * sin(latitude / %f) + "
+        "%f * cos(latitude / %f) * "
+        "cos((longitude - %f) / %f)") % acos_of_args
+    where = "".join((
+        submission_id_column,
+        " IN (SELECT ca.submission_id FROM ",
+        "crowdsourcing_answer AS ca JOIN crowdsourcing_submission AS cs ",
+        "ON ca.submission_id = cs.id ",
+        "WHERE cs.survey_id = %s AND latitude IS NOT NULL ",
+        "AND longitude IS NOT NULL AND ",
+        acos_of,
+        " < 1 AND 3959.0 * acos(",
+        acos_of,
+        ") <= %s)"))
+    params = [int(filter.field.survey_id), int(filter.within_value)]
+    return where, params
+
+
+_D_TO_R = 57.295779
+
+
+def _radians(degrees):
+    return degrees / _D_TO_R
+
+
+class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     aggregate results. """
-    def __init__(self, field, request_data):
+    def __init__(self, survey, field, request_data):
         self.answer_set = field.answer_set.values('text_answer',
                                                   'boolean_answer')
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
-                                             field.survey,
+                                             survey,
                                              request_data)
         self.answer_counts = []
         for answer in self.answer_set:
@@ -356,9 +493,64 @@ class AggregateResult:
             else:
                 text = fill(answer["text_answer"], 30)
             if answer["count"]:
-                self.answer_counts.append({"response": text,
-                                      "count": answer["count"]})
+                self.answer_counts.append({
+                    "response": text,
+                    "count": answer["count"]})
         self.yahoo_answer_string = simplejson.dumps(self.answer_counts)
+
+
+class AggregateResultSum:
+    def __init__(self, y_axes, x_axis, request_data):
+        self.answer_sums = []
+        answer_sum_lookup = {}
+
+        def new_answer_sum(x_value):
+            answer_sum = {x_axis.fieldname: x_value}
+            for y_axis in y_axes:
+                answer_sum[y_axis.fieldname] = 0
+            answer_sum_lookup[x_value] = answer_sum
+            self.answer_sums.append(answer_sum)
+            return answer_sum
+
+        # We could just add new x-axis values as we encounter them. However,
+        # say someone has parsed_options ["January", ... , "December"].
+        # Then doing it this way puts them in order.
+        [new_answer_sum(x_value) for x_value in x_axis.parsed_options]
+
+        x_value_column = "x_axis." + x_axis.value_column
+        for y_axis in y_axes:
+            params = [y_axis.id, x_axis.id]
+            y_axis_column = y_axis.value_column
+            if "boolean_answer" == y_axis_column:
+                y_axis_column = "CAST(y_axis." + y_axis_column + " AS int)"
+            else:
+                y_axis_column = "y_axis." + y_axis_column
+            query = [
+                "SELECT ",
+                x_value_column,
+                " AS x_value, SUM(",
+                y_axis_column,
+                ") AS y_value FROM crowdsourcing_answer AS y_axis ",
+                "JOIN crowdsourcing_answer AS x_axis "
+                "ON y_axis.submission_id = x_axis.submission_id ",
+                "WHERE y_axis.question_id = %s ",
+                "AND x_axis.question_id = %s"]
+            y = "y_axis.submission_id"
+            extras = extra_clauses_from_filters(y, x_axis.survey, request_data)
+            for where, next_params in extras:
+                query.append(" AND ")
+                query.append(where)
+                params += next_params
+            query.append(" GROUP BY ")
+            query.append(x_value_column)
+            cursor = connection.cursor()
+            cursor.execute("".join(query), params)
+            for x_value, y_value in cursor.fetchall():
+                answer_sum = answer_sum_lookup.get(x_value)
+                if not answer_sum:
+                    answer_sum = new_answer_sum(x_value)
+                answer_sum[y_axis.fieldname] += y_value
+        self.yahoo_answer_string = simplejson.dumps(self.answer_sums)
 
 
 class Submission(models.Model):
@@ -403,6 +595,10 @@ class Submission(models.Model):
     def items(self):
         return self.get_answer_dict().items()
 
+    def get_absolute_url(self):
+        view = 'crowdsourcing.views.submission'
+        return reverse(view, kwargs={"id": self.pk})
+
     @property
     def email(self):
         return self.get_answer_dict().get('email', '')
@@ -430,18 +626,8 @@ class Answer(models.Model):
                                   editable=False)
 
     def value():
-
         def get(self):
-            ot = self.question.option_type
-            if ot == OPTION_TYPE_CHOICES.BOOLEAN:
-                return self.boolean_answer
-            elif ot == OPTION_TYPE_CHOICES.FLOAT:
-                return self.float_answer
-            elif ot == OPTION_TYPE_CHOICES.INTEGER:
-                return self.integer_answer
-            elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
-                return self.image_answer
-            return self.text_answer
+            return getattr(self, self.question.value_column)
 
         def set(self, v):
             ot = self.question.option_type
@@ -515,9 +701,22 @@ class SurveyReport(models.Model):
     survey_report_displays = None
 
     def get_survey_report_displays(self):
-        if self.pk:
-            return self.surveyreportdisplay_set.all()
+        if self.pk and self.survey_report_displays is None:
+            srds = list(self.surveyreportdisplay_set.select_related('report'))
+            self.survey_report_displays = srds
+            for srd in self.survey_report_displays:
+                srd._report = self
         return self.survey_report_displays
+
+    def has_display_type(self, type):
+        if not hasattr(type, '__iter__'):
+            type = [type]
+        displays = self.get_survey_report_displays()
+        return bool([1 for srd in displays if srd.display_type in type])
+
+    def has_charts(self):
+        SRDC = SURVEY_DISPLAY_TYPE_CHOICES
+        return self.has_display_type([SRDC.PIE, SRDC.BAR, SRDC.LINE])
 
     @models.permalink
     def get_absolute_url(self):
@@ -532,7 +731,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie') # TODO: bar grid map
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line')
 
 
 class SurveyReportDisplay(models.Model):
@@ -540,23 +739,80 @@ class SurveyReportDisplay(models.Model):
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
-    fieldnames = models.TextField(blank=True, help_text="Separate by spaces.")
+    fieldnames = models.TextField(
+        blank=True,
+        help_text=_("Separate by spaces. These are the y-axis of bar and line "
+                    "charts."))
+    x_axis_fieldname = models.CharField(
+        blank=True,
+        help_text=_("This only applies to bar and line charts. Use only 1 "
+                    "field."),
+        max_length=80)
     annotation = models.TextField(blank=True)
-
+    limit_map_answers = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text=_('Google maps gets pretty slow if you add too many points. '
+                    'Use this field to limit the number of points that '
+                    'display on the map.'))
+    map_center_latitude = models.FloatField(
+        blank=True,
+        null=True,
+        help_text=_('If you don\'t specify latitude, longitude, or zoom, the '
+                    'map will just center and zoom so that the map shows all '
+                    'the points.'))
+    map_center_longitude = models.FloatField(blank=True, null=True)
+    map_zoom = models.IntegerField(
+        blank=True,
+        null=True,
+        help_text=_('13 is about the right level for Manhattan. 0 shows the '
+                    'entire world.'))
     if PositionField:
         order = PositionField(collection=('report',))
     else:
         order = models.IntegerField()
 
-    def is_text(self):
-        return SURVEY_DISPLAY_TYPE_CHOICES.TEXT == self.display_type
+    def questions(self, fields=None):
+        return self._get_questions(self.fieldnames, fields)
 
-    def is_pie(self):
-        return SURVEY_DISPLAY_TYPE_CHOICES.PIE == self.display_type
+    def x_axis_question(self, fields=None):
+        return_value = self._get_questions(self.x_axis_fieldname, fields)
+        if return_value:
+            return return_value[0]
+        return None
 
-    def questions(self):
-        names = self.fieldnames.split(" ")
-        return self.report.survey.questions.filter(fieldname__in=names).select_related("survey")
+    def _get_questions(self, fieldnames, fields):
+        names = fieldnames.split(" ")
+        if fields:
+            return [f for f in fields if f.fieldname in names]
+        return self.get_report().survey.get_public_fields(names)
+
+    def get_report(self):
+        if hasattr(self, '_report'):
+            return self._report
+        return self.report
+
+    def index_in_report(self):
+        assert self.report, "This display's report attribute is not set."
+        srds = self.get_report().get_survey_report_displays()
+        for i in range(len(srds)):
+            if srds[i] == self:
+                return i
+        assert False, "This display isn't in its report's displays."
+
+    class Meta:
+        ordering = ('order',)
+
+
+    def __getattribute__(self, key):
+        """ We provide is_text, is_pie, etc... as attirbutes to make it easier
+        to write conditional logic in Django templates based on
+        display_type."""
+        if "is_" == key[:3]:
+            for value, name in SURVEY_DISPLAY_TYPE_CHOICES._choices:
+                if name == key[3:]:
+                    return self.display_type == value
+        return super(SurveyReportDisplay, self).__getattribute__(key)
 
 
 def get_all_answers(submission_list):

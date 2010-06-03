@@ -34,6 +34,11 @@ class QuestionInline(admin.StackedInline):
 
 
 class SurveyAdminForm(ModelForm):
+    def __init__(self, *args, **kwargs):
+        super(SurveyAdminForm, self).__init__(*args, **kwargs)
+        qs = SurveyReport.objects.filter(survey=self.instance)
+        self.fields['default_report'].queryset = qs
+
     class Meta:
         model = Survey
 

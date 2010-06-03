@@ -8,8 +8,9 @@ from django.utils.safestring import mark_safe
 from django.utils.html import escape
 from sorl.thumbnail.base import ThumbnailException
 
-from ..crowdsourcing.models import (AggregateResult, FILTER_TYPE,
-                                    OPTION_TYPE_CHOICES, get_all_answers)
+from ..crowdsourcing.models import (AggregateResultCount, AggregateResultSum,
+                                    FILTER_TYPE, OPTION_TYPE_CHOICES,
+                                    get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -34,14 +35,14 @@ else:
 
 
 """ We originally developed for Mako templates, but we also want to support
-Django templates. We provide every function as both a template tag and as
-a function that returns a safe string. """
+Django templates. We use simple tags which work both as tags and as functions
+returning safe strings. """
 
 
 register = template.Library()
 
 
-def yahoo_pie_chart_header():
+def yahoo_chart_header():
     return "\n".join([
         '<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.8.0r4/build/fonts/fonts-min.css" />',
         '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/yahoo-dom-event/yahoo-dom-event.js"></script>',
@@ -53,7 +54,7 @@ def yahoo_pie_chart_header():
         '<style>',
         '  .chart_div { width: 600px; height: 300px; }',
         '</style>'])
-register.simple_tag(yahoo_pie_chart_header)
+register.simple_tag(yahoo_chart_header)
 
 
 def filter(wrapper_format, key, label, html):
@@ -62,7 +63,7 @@ def filter(wrapper_format, key, label, html):
 register.simple_tag(filter)
 
 
-def select_filter(wrapper_format, label, key, value, choices, blank=True):
+def select_filter(wrapper_format, key, label, value, choices, blank=True):
     html = ['<select id="%s" name="%s">' % (key, key,)]
     if blank:
         html.append('<option value="">---------</option>')
@@ -90,13 +91,27 @@ def range_filter(wrapper_format, key, label, from_value, to_value):
 register.simple_tag(range_filter)
 
 
+def distance_filter(wrapper_format, key, label, within_value, location_value):
+    html = [
+        '<span id="%s">' % key,
+        '<label for="%s_within">Within</label> ' % key,
+        '<input type="text" id="%s_within"' % key,
+        'name="%s_within" value="%s" /> ' % (key, escape(within_value)),
+        '<label for="%s_location">miles of</label> ' % key,
+        '<input type="text" id="%s_location"' % key,
+        'name="%s_location" value="%s" />' % (key, escape(location_value)),
+        '</span>']
+    return filter(wrapper_format, key, label, "\n".join(html))
+register.simple_tag(distance_filter)
+
+
 def filter_as_li(filter):
     output = []
     wrapper_format = "<li>%s</li>"
     if FILTER_TYPE.CHOICE == filter.type:
         output.append(select_filter(wrapper_format,
-                                    filter.label,
                                     filter.key,
+                                    filter.label,
                                     filter.value,
                                     filter.choices))
     elif FILTER_TYPE.RANGE == filter.type:
@@ -105,6 +120,12 @@ def filter_as_li(filter):
                                    filter.label,
                                    filter.from_value,
                                    filter.to_value))
+    elif FILTER_TYPE.DISTANCE == filter.type:
+        output.append(distance_filter(wrapper_format,
+                                   filter.key,
+                                   filter.label,
+                                   filter.within_value,
+                                   filter.location_value))
     return mark_safe("\n".join(output))
 register.simple_tag(filter_as_li)
 
@@ -120,54 +141,125 @@ def filters_as_ul(filters):
                 '</form>'])
     return mark_safe("\n".join(out))
 register.simple_tag(filters_as_ul)
-
+    
 
 def yahoo_pie_chart(display, question, request_get):
-    out = []
-    aggregate = AggregateResult(question, request_get)
-    if aggregate.answer_counts:
-        out.extend([
-            '<h2 class="chart_title">%s</h2>' % display.annotation,
-            '<div class="chart_div" id="chart%d">' % question.id,
-            'Unable to load Flash content. The YUI Charts Control ',
-            'requires Flash Player 9.0.45 or higher. You can install the ',
-            'latest version at the ',
-            '<a href="http://www.adobe.com/go/getflashplayer">',
-            'Adobe Flash Player Download Center</a>.',
-            '</div>'])
-        args = {
-            "answer_string": aggregate.yahoo_answer_string,
-            "data_var": 'data%d' % question.id,
-            "question_id": question.id}
-        script = """
-            <script type="text/javascript">
-              YAHOO.widget.Chart.SWFURL =
-                "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
-              var answerData = %(answer_string)s;
-              var %(data_var)s = new YAHOO.util.DataSource(answerData);
-              %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
-              %(data_var)s.responseSchema = {fields: [ "response", "count" ]};
-
-              var chart%(question_id)d = new YAHOO.widget.PieChart(
-                "chart%(question_id)d",
-                data%(question_id)d,
-                {dataField: "count",
-                 categoryField: "response",
-                 expressInstall: "assets/expressinstall.swf",
-                 style: {padding: 20,
-                         legend: {display: "right",
-                                  padding: 10,
-                                  spacing: 5,
-                                  font: {family: "Arial",
-                                         size: 13
-                                        }
-                                 }
-                        }
-                });
-            </script>""" % args
-        out.append(script)
-    return mark_safe("\n".join(out))
+    survey = display.get_report().survey
+    aggregate = AggregateResultCount(survey, question, request_get)
+    if not aggregate.answer_counts:
+        return ""
+    args = {
+        "answer_string": aggregate.yahoo_answer_string,
+        "option_setup": "",
+        "chart_type": "PieChart",
+        "response_schema": '{fields: [ "response", "count" ]}',
+        "options": "dataField: 'count', categoryField: 'response'",
+        "style": """
+            {padding: 20,
+             legend: {display: "right",
+                      padding: 10,
+                      spacing: 5,
+                      font: {family: "Arial",
+                             size: 13
+                            }
+                     }
+            }"""}
+    id_args = (display.index_in_report(), question.id)
+    return _yahoo_chart(display, "%d_%d" % id_args, args)
 register.simple_tag(yahoo_pie_chart)
+
+
+def yahoo_bar_chart(display, request_get):
+    return _yahoo_bar_line_chart_helper(display, request_get, "ColumnChart")
+register.simple_tag(yahoo_bar_chart)
+
+
+def yahoo_line_chart(display, request_get):
+    return _yahoo_bar_line_chart_helper(display, request_get, "LineChart")
+register.simple_tag(yahoo_line_chart)
+
+
+def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
+    y_axes = display.questions()
+    if not y_axes:
+        return ("This chart uses y axes '%s', none of which are questions "
+                "in this survey.") % display.fieldnames
+    x_axis = display.x_axis_question()
+    if not x_axis:
+        return ("This chart uses x axis '%s' which isn't a question in "
+                "this survey.") % display.x_axis_fieldname
+    aggregate = AggregateResultSum(y_axes, x_axis, request_get)
+    if not aggregate.answer_sums:
+        return ""
+    answer_string = aggregate.yahoo_answer_string
+    series = []
+    for question in y_axes:
+        series.append("""{
+              displayName: "%s",
+              yField: "%s",
+              style: {size: 10}
+            }""" % (question.label, question.fieldname))
+    option_setup_args = (x_axis.label, ", ".join([y.label for y in y_axes]),)
+    option_setup_args = tuple(l.replace('"', r'\"') for l in option_setup_args)
+    index = display.index_in_report()
+    option_setup = """
+        var xAxis = new YAHOO.widget.CategoryAxis();
+        xAxis.title = "%s";
+        var yAxis = new YAHOO.widget.NumericAxis();
+        yAxis.title = "%s";
+        """ % option_setup_args
+    options = {
+        "series": "[%s]" % ",\n".join(series),
+        "xField": '"%s"' % x_axis.fieldname,
+        "xAxis": "xAxis",
+        "yAxis": "yAxis"}
+    options = ",\n".join(["%s: %s" % item for item in options.items()])
+    axes = list(y_axes) + [x_axis]
+    field_names = "[%s]" % ", ".join(['"%s"' % f.fieldname for f in axes])
+    args = {
+        "answer_string": answer_string,
+        "option_setup": option_setup,
+        "chart_type": chart_type,
+        "response_schema": '{fields: %s}' % field_names,
+        "style": '{xAxis: {labelRotation: -45}, yAxis: {titleRotation: -90}}',
+        "options": options}
+    return _yahoo_chart(display, str(index), args)
+
+
+def _yahoo_chart(display, unique_id, args):
+    out = [
+        '<h2 class="chart_title">%s</h2>' % display.annotation,
+        '<div class="chart_div" id="chart%s">' % unique_id,
+        'Unable to load Flash content. The YUI Charts Control ',
+        'requires Flash Player 9.0.45 or higher. You can install the ',
+        'latest version at the ',
+        '<a href="http://www.adobe.com/go/getflashplayer">',
+        'Adobe Flash Player Download Center</a>.',
+        '</div>']
+    args.update(
+        data_var='data%s' % unique_id,
+        div_id="chart%s" % unique_id)
+    script = """
+        <script type="text/javascript">
+          YAHOO.widget.Chart.SWFURL =
+            "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
+          var answerData = %(answer_string)s;
+          var %(data_var)s = new YAHOO.util.DataSource(answerData);
+          %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
+          %(data_var)s.responseSchema = %(response_schema)s;
+          %(option_setup)s
+          var %(div_id)s = new YAHOO.widget.%(chart_type)s(
+            "%(div_id)s",
+            %(data_var)s,
+            {
+             %(options)s,
+
+             style: %(style)s,
+             expressInstall: "assets/expressinstall.swf"
+            });
+        </script>""" % args
+    out.append(script)
+    return mark_safe("\n".join(out))
 
 
 def video_html(vid, maxheight, maxwidth):
@@ -189,10 +281,14 @@ def video_html(vid, maxheight, maxwidth):
 
 
 def submission_fields(submission,
-                      fields,
-                      page_answers,
+                      fields=None,
+                      page_answers=None,
                       video_height=360,
                       video_width=288):
+    if not page_answers:
+        page_answers = get_all_answers([submission])
+    if not fields:
+        fields = list(submission.survey.get_public_fields())
     out = []
     answer_list = page_answers[submission.id]
     answers = {}
@@ -206,15 +302,17 @@ def submission_fields(submission,
             if answer.image_answer:
                 try:
                     thmb = answer.image_answer.thumbnail.absolute_url
-                    out.append('<img src="%s" id="img_%d" />' % (thmb, answer.id,))
-                    # In case you want to enlarge images. Don't bother enlarging
-                    # images unless we'll increase their dimensions by at least
-                    # 10%.
+                    args = (thmb, answer.id,)
+                    out.append('<img src="%s" id="img_%d" />' % args)
+                    # This extra hidden input is in case you want to enlarge
+                    # images. Don't bother enlarging images unless we'll
+                    # increase their dimensions by at least 10%.
                     thumb_width = answer.image_answer.thumbnail.width()
                     if float(answer.image_answer.width) / thumb_width > 1.1:
                         format = ('<input type="hidden" id="img_%d_full_url" '
                                   'value="%s" class="enlargeable" />')
-                        out.append(format % (answer.id, answer.image_answer.url))
+                        args = (answer.id, answer.image_answer.url)
+                        out.append(format % args)
                 except ThumbnailException as ex:
                     out.append('<div class="error">%s</div>' % str(ex))
             elif question.option_type == OPTION_TYPE_CHOICES.VIDEO_LINK:
@@ -228,6 +326,10 @@ def submission_fields(submission,
                 out.append(escape(answer.value))
         out.append('</div>')
     return mark_safe("\n".join(out))
+register.simple_tag(submission_fields)
+
+
+DETAIL_SURVEY_NONE = ChoiceEnum('detail survey none')
 
 
 def submissions(object_list, fields):
@@ -236,9 +338,31 @@ def submissions(object_list, fields):
     for submission in object_list:
         out.append('<div class="submission">')
         out.append(submission_fields(submission, fields, page_answers))
+        out.append(submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)
+
+
+def submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
+    out = ['<div class="permalink">']
+    if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
+        return ""
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.SURVEY:
+        url = submission.get_absolute_url()
+        text = "Permalink"
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
+        text = "Back to %s" % submission.survey.title
+        kwargs = {"slug": submission.survey.slug}
+        view = "survey_default_report_page_1"
+        if submission.survey.default_report:
+            kwargs["report"] = submission.survey.default_report.slug
+            view = "survey_report_page_1"
+        url = reverse(view, kwargs=kwargs)
+    out.append('<a href="%s">%s</a>' % (url, text,))
+    out.append('</div>')
+    return mark_safe("\n".join(out))
+register.simple_tag(submission_link)
 
 
 def paginator(survey, report, pages_to_link, page_obj):
@@ -270,3 +394,69 @@ def paginator(survey, report, pages_to_link, page_obj):
         out.append("</div>")
     return mark_safe("\n".join(out))
 register.simple_tag(paginator)
+
+
+def google_maps_header():
+    format = "\n".join([
+        '<script',
+        'src="http://maps.google.com/maps?file=api&amp;v=2&amp;sensor=false&amp;key=%s"',
+        'type="text/javascript"></script>',
+        '<script type="text/javascript">',
+        '  $(window).unload(GUnload);',
+        '</script>'])
+    return format % local_settings.GOOGLE_MAPS_API_KEY
+register.simple_tag(google_maps_header)
+
+
+def google_map(display, question, request_GET, ids):
+    map_id = "map_%d" % question.id
+    detail_id = "map_detail_%d" % question.id
+    view = "location_question_results"
+    kwargs = {"question_id": question.pk}
+    if ids:
+        view = "location_question_results_ids"
+        kwargs["submission_ids"] = ids
+        if display.limit_map_answers:
+            split = ids.split(",")[:display.limit_map_answers]
+            kwargs["submission_ids"] = ",".join(split)
+    elif display.limit_map_answers:
+        view = "location_question_results_limit"
+        kwargs["limit_map_answers"] = display.limit_map_answers
+    data_url = reverse(view, kwargs=kwargs)
+    img = '<img class="loading" src="/media/img/loading.gif" alt="loading" />'
+    lat = number_to_javascript(display.map_center_latitude)
+    lng = number_to_javascript(display.map_center_longitude)
+    zoom = number_to_javascript(display.map_zoom)
+    map_args = (map_id, detail_id, data_url, lat, lng, zoom)
+    out = [
+        '<div class="google_map_wrapper">',
+        '  <div id="%s" class="google_map">' % map_id,
+        '    ' + img,
+        '  </div>',
+        '  <div id="%s" class="map_story"></div>' % detail_id,
+        '  <script type="text/javascript">',
+        '    loadMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
+        '  </script>',
+        '</div>']
+    out.append(map_key(question.survey))
+    return mark_safe("\n".join(out))
+register.simple_tag(google_map)
+
+
+def number_to_javascript(number):
+    if isinstance(number, (int, float,)):
+        return str(number)
+    return "null"
+
+def map_key(survey):
+    option_icon_pairs = survey.parsed_option_icon_pairs()
+    option_icon_pairs = [(o, i) for (o, i) in option_icon_pairs if i]
+    out = []
+    if option_icon_pairs:
+        out.append('<ul class="map_key">')
+        for (option, icon) in option_icon_pairs:
+            format = '<li><img src="%s" alt="%s" /> %s</li>'
+            out.append(format % (icon, option, option))
+        out.append('</ul>')
+    return mark_safe("\n".join(out))
+register.simple_tag(map_key)
