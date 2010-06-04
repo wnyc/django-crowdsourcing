@@ -337,6 +337,11 @@ class Question(models.Model):
             return "image_answer"
         return "text_answer"
 
+    @property
+    def is_numeric(self):
+        OTC = OPTION_TYPE_CHOICES
+        return self.option_type in [OTC.FLOAT, OTC.INTEGER, OTC.BOOLEAN]
+
 
 FILTER_TYPE = ChoiceEnum("choice range distance")
 
@@ -550,6 +555,9 @@ class AggregateResultSum:
                 if not answer_sum:
                     answer_sum = new_answer_sum(x_value)
                 answer_sum[y_axis.fieldname] += y_value
+        if x_axis.is_numeric:
+            key = x_axis.fieldname
+            self.answer_sums.sort(lambda x, y: x[key] - y[key])
         self.yahoo_answer_string = simplejson.dumps(self.answer_sums)
 
 
@@ -720,8 +728,8 @@ class SurveyReport(models.Model):
 
     @models.permalink
     def get_absolute_url(self):
-        return ('survey_report', (), {'slug': self.survey.slug,
-                                      'report': self.slug})
+        return ('survey_report_page_1', (), {'slug': self.survey.slug,
+                                             'report': self.slug})
 
     class Meta:
         unique_together = (('survey', 'slug'),)
@@ -741,7 +749,8 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     fieldnames = models.TextField(
         blank=True,
-        help_text=_("Separate by spaces. These are the y-axis of bar and line "
+        help_text=_("Pull these values from Survey -> Questions -> Fieldname. "
+                    "Separate by spaces. These are the y-axes of bar and line "
                     "charts."))
     x_axis_fieldname = models.CharField(
         blank=True,
@@ -771,6 +780,11 @@ class SurveyReportDisplay(models.Model):
         order = PositionField(collection=('report',))
     else:
         order = models.IntegerField()
+
+    def __unicode__(self):
+        SDTC = SURVEY_DISPLAY_TYPE_CHOICES
+        type = [v[1] for v in SDTC._choices if v[0] == self.display_type][0]
+        return "%s: %s" % (type, self.fieldnames)
 
     def questions(self, fields=None):
         return self._get_questions(self.fieldnames, fields)

@@ -199,11 +199,14 @@ def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
               yField: "%s",
               style: {size: 10}
             }""" % (question.label, question.fieldname))
-    option_setup_args = (x_axis.label, ", ".join([y.label for y in y_axes]),)
+    option_setup_args = (
+        "NumericAxis" if x_axis.is_numeric else "CategoryAxis",
+        x_axis.label,
+        ", ".join([y.label for y in y_axes]),)
     option_setup_args = tuple(l.replace('"', r'\"') for l in option_setup_args)
     index = display.index_in_report()
     option_setup = """
-        var xAxis = new YAHOO.widget.CategoryAxis();
+        var xAxis = new YAHOO.widget.%s();
         xAxis.title = "%s";
         var yAxis = new YAHOO.widget.NumericAxis();
         yAxis.title = "%s";
@@ -349,9 +352,6 @@ def submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.SURVE
     if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
         return ""
     elif link_detail_survey_none == DETAIL_SURVEY_NONE.SURVEY:
-        url = submission.get_absolute_url()
-        text = "Permalink"
-    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
         text = "Back to %s" % submission.survey.title
         kwargs = {"slug": submission.survey.slug}
         view = "survey_default_report_page_1"
@@ -359,6 +359,9 @@ def submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.SURVE
             kwargs["report"] = submission.survey.default_report.slug
             view = "survey_report_page_1"
         url = reverse(view, kwargs=kwargs)
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
+        url = submission.get_absolute_url()
+        text = "Permalink"
     out.append('<a href="%s">%s</a>' % (url, text,))
     out.append('</div>')
     return mark_safe("\n".join(out))

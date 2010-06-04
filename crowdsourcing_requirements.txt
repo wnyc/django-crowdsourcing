@@ -17,3 +17,6 @@ simplejson==2.0.9
 
 # For geocoding addresses and address lookups
 geopy
+
+# For building the documentation
+Sphinx
