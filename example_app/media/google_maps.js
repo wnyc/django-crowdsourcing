@@ -64,8 +64,8 @@ function showSubmission(url, div_id, details_id) {
   var offset = $("#" + div_id).offset;
   details.fadeIn();
   $.get(url, function(results) {
-    var get_close = function(class) {
-      var div = $("<div />").addClass(class);
+    var get_close = function(css) {
+      var div = $("<div />").addClass(css);
       $("<a />").text("Close").click(function(event) {
         event.preventDefault();
         details.hide();
