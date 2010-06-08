@@ -42,19 +42,13 @@ returning safe strings. """
 register = template.Library()
 
 
-def yahoo_chart_header():
-    return "\n".join([
-        '<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.8.0r4/build/fonts/fonts-min.css" />',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/yahoo-dom-event/yahoo-dom-event.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/json/json-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/element/element-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/datasource/datasource-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/swf/swf-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/charts/charts-min.js"></script>',
+def yahoo_api():
+    return mark_safe("\n".join([
+        '<script src="http://yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js"></script>',
         '<style>',
         '  .chart_div { width: 600px; height: 300px; }',
-        '</style>'])
-register.simple_tag(yahoo_chart_header)
+        '</style>']))
+register.simple_tag(yahoo_api)
 
 
 def filter(wrapper_format, key, label, html):
@@ -244,22 +238,22 @@ def _yahoo_chart(display, unique_id, args):
         div_id="chart%s" % unique_id)
     script = """
         <script type="text/javascript">
-          YAHOO.widget.Chart.SWFURL =
-            "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
-          var answerData = %(answer_string)s;
-          var %(data_var)s = new YAHOO.util.DataSource(answerData);
-          %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
-          %(data_var)s.responseSchema = %(response_schema)s;
-          %(option_setup)s
-          var %(div_id)s = new YAHOO.widget.%(chart_type)s(
-            "%(div_id)s",
-            %(data_var)s,
-            {
-             %(options)s,
-
-             style: %(style)s,
-             expressInstall: "assets/expressinstall.swf"
-            });
+          yahooChartCallbacks.push(function() {
+            YAHOO.widget.Chart.SWFURL =
+              "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
+            var answerData = %(answer_string)s;
+            var %(data_var)s = new YAHOO.util.DataSource(answerData);
+            %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
+            %(data_var)s.responseSchema = %(response_schema)s;
+            %(option_setup)s
+            var %(div_id)s = new YAHOO.widget.%(chart_type)s(
+              "%(div_id)s",
+              %(data_var)s,
+              {%(options)s,
+  
+               style: %(style)s,
+               expressInstall: "assets/expressinstall.swf"});
+          });
         </script>""" % args
     out.append(script)
     return mark_safe("\n".join(out))
@@ -399,18 +393,6 @@ def paginator(survey, report, pages_to_link, page_obj):
 register.simple_tag(paginator)
 
 
-def google_maps_header():
-    format = "\n".join([
-        '<script',
-        'src="http://maps.google.com/maps?file=api&amp;v=2&amp;sensor=false&amp;key=%s"',
-        'type="text/javascript"></script>',
-        '<script type="text/javascript">',
-        '  $(window).unload(GUnload);',
-        '</script>'])
-    return format % local_settings.GOOGLE_MAPS_API_KEY
-register.simple_tag(google_maps_header)
-
-
 def google_map(display, question, request_GET, ids):
     map_id = "map_%d" % question.id
     detail_id = "map_detail_%d" % question.id
@@ -438,7 +420,7 @@ def google_map(display, question, request_GET, ids):
         '  </div>',
         '  <div id="%s" class="map_story"></div>' % detail_id,
         '  <script type="text/javascript">',
-        '    loadMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
+        '    setupMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
         '  </script>',
         '</div>']
     out.append(map_key(question.survey))
@@ -450,6 +432,7 @@ def number_to_javascript(number):
     if isinstance(number, (int, float,)):
         return str(number)
     return "null"
+
 
 def map_key(survey):
     option_icon_pairs = survey.parsed_option_icon_pairs()
@@ -463,3 +446,27 @@ def map_key(survey):
         out.append('</ul>')
     return mark_safe("\n".join(out))
 register.simple_tag(map_key)
+
+
+def jquery_and_google_api():
+    key = ""
+    if local_settings.GOOGLE_MAPS_API_KEY:
+        key = '?key=%s' % local_settings.GOOGLE_MAPS_API_KEY
+    jsapi = "".join([
+        '<script type="text/javascript" src="http://www.google.com/jsapi',
+        key,
+        '"></script>'])
+    return mark_safe("\n".join([
+        jsapi,
+        '<script type="text/javascript">',
+        '  google.load("jquery", "1.4");',
+        '</script>']))
+register.simple_tag(jquery_and_google_api)
+
+
+def load_maps_and_charts():
+    return mark_safe("\n".join([
+        '<script type="text/javascript">',
+        '  loadMapsAndCharts();',
+        '</script>']))
+register.simple_tag(load_maps_and_charts)

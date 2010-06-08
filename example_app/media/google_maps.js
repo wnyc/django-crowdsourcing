@@ -1,59 +1,53 @@
 var latestMap = null;
 var messages = [];
-function loadMap(
+function setupMap(
     div_id,
     details_id,
     results_url,
     center_lat,
     center_lng,
     zoom) {
-  if (GBrowserIsCompatible()) {
-    $(function() {
-      $.getJSON(results_url, queryParametersAsLookup(), function(data) {
-        if (!data.entries.length) {
-          $("#" + div_id).html("There aren't any locations to show on this " +
-            "map, but as soon as we get some we'll put a map here.");
-          return;
-        }
-        var map = initializeMap(div_id, data, center_lat, center_lng, zoom);
-        latestMap = map;
-        var createClickClosure = function(url) {
-          return function() {
-            showSubmission(url, div_id, details_id); 
-          };
-        };
-        for (entry_i in data.entries) {
-          var entry = data.entries[entry_i];
-          var icon = G_DEFAULT_ICON;
-          if (entry.icon) {
-            icon = new GIcon(G_DEFAULT_ICON, entry.icon);
+  var onAPILoaded = function() {
+    if (GBrowserIsCompatible()) {
+      $(function() {
+        var params = queryParametersAsLookup();
+        $.getJSON(results_url, params, function(data, status) {
+          if (status != "success") {
+            $("#" + div_id).html("The crowdsourcing API is experiencing "
+              + "problems. It returned status " + status + ".");
+            return;
           }
-          messages.push(icon.image);
-          var marker = new GMarker(new GLatLng(entry.lat, entry.lng), icon);
-          map.addOverlay(marker);
-          createClickClosure(marker, entry.url);
-          GEvent.addListener(marker, "click", createClickClosure(entry.url));
-        }
+          if (!data.entries.length) {
+            $("#" + div_id).html("There aren't any locations to show on "
+              + "this map, but as soon as we get some we'll put a map here.");
+            return;
+          }
+          var map = initializeMap(div_id, data, center_lat, center_lng, zoom);
+          latestMap = map;
+          var createClickClosure = function(url) {
+            return function() {
+              showSubmission(url, div_id, details_id); 
+            };
+          };
+          for (entry_i in data.entries) {
+            var entry = data.entries[entry_i];
+            var icon = G_DEFAULT_ICON;
+            if (entry.icon) {
+              icon = new GIcon(G_DEFAULT_ICON, entry.icon);
+            }
+            messages.push(icon.image);
+            var marker = new GMarker(new GLatLng(entry.lat, entry.lng), icon);
+            map.addOverlay(marker);
+            createClickClosure(marker, entry.url);
+            GEvent.addListener(marker, "click", createClickClosure(entry.url));
+          }
+        });
       });
-    });
-  } else {
-    $("#" + div_id).html("Sorry! Your browser doesn't support Google Maps.");
-  }
-}
-
-/* Almost identical to parametersFromQuery in main.js, but used by
- * the crowdsourcing sample app, so we need 2 copies. */
-function queryParametersAsLookup() {
-  query = window.location.search.replace("?", "");
-  var hashParts = query.split("&");
-  var variables = {};
-  for (var i in hashParts) {
-    var subParts = hashParts[i].split("=");
-    if (subParts.length > 1 && subParts[1].length) {
-      variables[unescape(subParts[0])] = unescape(subParts[1]);
+    } else {
+      $("#" + div_id).html("Sorry! Your browser doesn't support Google Maps.");
     }
   }
-  return variables;
+  googleMapCallbacks.push(onAPILoaded);
 }
 
 function showSubmission(url, div_id, details_id) {

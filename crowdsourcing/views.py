@@ -315,6 +315,18 @@ def _default_report(survey):
 
 
 def survey_report(request, slug, report='', page=None):
+    templates = ['crowdsourcing/survey_report_%s.html' % slug,
+                 'crowdsourcing/survey_report.html']
+    return _survey_report(request, slug, report, page, templates)
+
+
+def embeded_survey_report(request, slug, report=''):
+    templates = ['crowdsourcing/embeded_survey_report_%s.html' % slug,
+                 'crowdsourcing/embeded_survey_report.html']
+    return _survey_report(request, slug, report, None, templates)
+
+
+def _survey_report(request, slug, report, page, templates):
     """ Show a report for the survey. As rating is done in a separate
     application we don't directly check request.GET["sort"] here.
     local_settings.PRE_REPORT is the place for that. """
@@ -372,23 +384,22 @@ def survey_report(request, slug, report='', page=None):
         pages_to_link = [1, False] + pages_to_link
     if pages_to_link[-1] < paginator.num_pages:
         pages_to_link = pages_to_link + [False, paginator.num_pages]
-    templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
-                 'crowdsourcing/survey_report.html']
 
-    return render_to_response(templates,
-                              dict(survey=survey,
-                                   submissions=submissions,
-                                   paginator=paginator,
-                                   page_obj=page_obj,
-                                   ids=ids,
-                                   pages_to_link=pages_to_link,
-                                   fields=fields,
-                                   archive_fields=archive_fields,
-                                   filters=filters,
-                                   report=report_obj,
-                                   page_answers=page_answers,
-                                   request=request),
-                              _rc(request))
+    context = dict(
+        survey=survey,
+        submissions=submissions,
+        paginator=paginator,
+        page_obj=page_obj,
+        ids=ids,
+        pages_to_link=pages_to_link,
+        fields=fields,
+        archive_fields=archive_fields,
+        filters=filters,
+        report=report_obj,
+        page_answers=page_answers,
+        request=request)
+    
+    return render_to_response(templates, context, _rc(request))
 
 
 def paginate_or_404(queryset, page, num_per_page=20):

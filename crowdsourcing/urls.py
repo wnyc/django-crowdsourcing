@@ -3,6 +3,7 @@ from __future__ import absolute_import
 from django.conf.urls.defaults import patterns, url
 
 from .views import (allowed_actions,
+                    embeded_survey_report,
                     location_question_results,
                     questions,
                     submissions,
@@ -49,7 +50,16 @@ urlpatterns = patterns(
     url(r'^(?P<slug>[-a-z0-9_]+)/api/questions/$',
         questions,
         name="questions"),
-    
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/report/$',
+        embeded_survey_report,
+        {"report": ""},
+        name="embeded_survey_report_default"),
+
+    url(r'^(?P<slug>[-a-z0-9_]+)/api/report/(?P<report>[-a-z0-9_]+)/$',
+        embeded_survey_report,
+        name="embeded_survey_report"),
+
     url(r'^(?P<slug>[-a-z0-9_]+)/report/$',
         survey_report,
         name="survey_default_report_page_1"),

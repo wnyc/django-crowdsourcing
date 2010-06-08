@@ -1,3 +1,41 @@
+var googleMapCallbacks = [];
+var yahooChartCallbacks = [];
+var mapAPILoaded = false;
+var chartAPILoaded = false;
+function loadMapsAndCharts() {
+  if (googleMapCallbacks.length) {
+    var onAPILoaded = function() {
+      while (googleMapCallbacks.length) {
+        googleMapCallbacks.pop()();
+      }
+      $(window).unload(GUnload);
+    };
+    if (!mapAPILoaded) {
+      google.load("maps", "2", {callback: onAPILoaded});
+      mapAPILoaded = true;
+    } else {
+      onAPILoaded();
+    }
+  }
+  if (yahooChartCallbacks.length) {
+    var onAPILoaded = function() {
+      while (yahooChartCallbacks.length) {
+        yahooChartCallbacks.pop()();
+      }
+    };
+    if (!chartAPILoaded) {
+      var loader = new YAHOO.util.YUILoader({
+        require: ["charts"],
+        onSuccess: onAPILoaded,
+        combine: true
+      });
+      loader.insert();
+    } else {
+      onAPILoaded();
+    }
+  }
+}
+
 var commentToggles = {};
 function toggleComments(id) {
   if (commentToggles[id]) {
@@ -109,6 +147,23 @@ function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
     }});
     if (canView) {
       appendSeeResults(form, survey);
+    }
+  });
+}
+
+function loadSurveyResults(surveySlug, reportSlug, elementId) {
+  var url = "/crowdsourcing/" + surveySlug + "/api/report/";
+  if (reportSlug) {
+    url += reportSlug + "/";
+  }
+  $.get(url, queryParametersAsLookup(), function(results, textStatus) {
+    var wrapper = $("#" + elementId);
+    if ("success" == textStatus) {
+      wrapper.html(results);
+      initEnlargeable(wrapper);
+    } else {
+      wrapper.html("The reports appear to be broken. Sorry about that! " +
+                   "<input type='hidden' value='" + textStatus + "' />");
     }
   });
 }
@@ -262,3 +317,18 @@ function initEnlargeable(parent) {
 $(function() {
   initEnlargeable($("body"));
 });
+
+/* Almost identical to parametersFromQuery in main.js, but used by
+ * the crowdsourcing sample app, so we need 2 copies. */
+function queryParametersAsLookup() {
+  query = window.location.search.replace("?", "");
+  var hashParts = query.split("&");
+  var variables = {};
+  for (var i in hashParts) {
+    var subParts = hashParts[i].split("=");
+    if (subParts.length > 1 && subParts[1].length) {
+      variables[unescape(subParts[0])] = unescape(subParts[1]);
+    }
+  }
+  return variables;
+}
