@@ -1,7 +1,7 @@
 var googleMapCallbacks = [];
 var yahooChartCallbacks = [];
-var mapAPILoaded = false;
-var chartAPILoaded = false;
+var googleMapAPILoaded = false;
+var yahooChartAPILoaded = false;
 function loadMapsAndCharts() {
   if (googleMapCallbacks.length) {
     var onAPILoaded = function() {
@@ -10,9 +10,9 @@ function loadMapsAndCharts() {
       }
       $(window).unload(GUnload);
     };
-    if (!mapAPILoaded) {
+    if (!googleMapAPILoaded) {
       google.load("maps", "2", {callback: onAPILoaded});
-      mapAPILoaded = true;
+      googleMapAPILoaded = true;
     } else {
       onAPILoaded();
     }
@@ -23,7 +23,7 @@ function loadMapsAndCharts() {
         yahooChartCallbacks.pop()();
       }
     };
-    if (!chartAPILoaded) {
+    if (!yahooChartAPILoaded) {
       var loader = new YAHOO.util.YUILoader({
         require: ["charts"],
         onSuccess: onAPILoaded,
