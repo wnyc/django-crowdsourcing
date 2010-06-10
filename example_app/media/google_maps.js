@@ -1,5 +1,4 @@
 var latestMap = null;
-var messages = [];
 function setupMap(
     div_id,
     details_id,
@@ -35,7 +34,6 @@ function setupMap(
             if (entry.icon) {
               icon = new GIcon(G_DEFAULT_ICON, entry.icon);
             }
-            messages.push(icon.image);
             var marker = new GMarker(new GLatLng(entry.lat, entry.lng), icon);
             map.addOverlay(marker);
             createClickClosure(marker, entry.url);

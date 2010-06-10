@@ -38,10 +38,11 @@ function loadMapsAndCharts() {
 
 var commentToggles = {};
 function toggleComments(id) {
+  var div = $("#" + id);
   if (commentToggles[id]) {
-    $("#" + id).hide("slow");
+    div.hide("slow");
   } else {
-    $("#" + id).show("slow");
+    div.show("slow");
   }
   commentToggles[id] = !commentToggles[id];
   return false;
