@@ -200,21 +200,23 @@ class OptionCheckbox(BaseOptionAnswer):
     answer = MultipleChoiceField(widget=CheckboxSelectMultiple)
 
 
-## each question gets a form with one element, determined by the type
-## for the answer.
+# Each question gets a form with one element determined by the type for the
+# answer.
 QTYPE_FORM = {
-    OPTION_TYPE_CHOICES.TEXT_FIELD:        TextInputAnswer,
-    OPTION_TYPE_CHOICES.INTEGER:           IntegerInputAnswer,
-    OPTION_TYPE_CHOICES.FLOAT:             FloatInputAnswer,
-    OPTION_TYPE_CHOICES.BOOLEAN:           BooleanInputAnswer,
-    OPTION_TYPE_CHOICES.TEXT_AREA:         TextAreaAnswer,
-    OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE: OptionAnswer,
-    OPTION_TYPE_CHOICES.RADIO_LIST:        OptionRadio,
-    OPTION_TYPE_CHOICES.CHECKBOX_LIST:     OptionCheckbox,
-    OPTION_TYPE_CHOICES.EMAIL_FIELD:       EmailAnswer, 
-    OPTION_TYPE_CHOICES.PHOTO_UPLOAD:      PhotoUpload,
-    OPTION_TYPE_CHOICES.VIDEO_LINK:        VideoAnswer,
-    OPTION_TYPE_CHOICES.LOCATION_FIELD:    LocationAnswer,
+    OPTION_TYPE_CHOICES.CHAR: TextInputAnswer,
+    OPTION_TYPE_CHOICES.INTEGER: IntegerInputAnswer,
+    OPTION_TYPE_CHOICES.FLOAT: FloatInputAnswer,
+    OPTION_TYPE_CHOICES.BOOL: BooleanInputAnswer,
+    OPTION_TYPE_CHOICES.TEXT: TextAreaAnswer,
+    OPTION_TYPE_CHOICES.SELECT: OptionAnswer,
+    OPTION_TYPE_CHOICES.CHOICE: OptionRadio,
+    OPTION_TYPE_CHOICES.NUMERIC_SELECT: OptionAnswer,
+    OPTION_TYPE_CHOICES.NUMERIC_CHOICE: OptionRadio,
+    OPTION_TYPE_CHOICES.BOOL_LIST: OptionCheckbox,
+    OPTION_TYPE_CHOICES.EMAIL: EmailAnswer,
+    OPTION_TYPE_CHOICES.PHOTO: PhotoUpload,
+    OPTION_TYPE_CHOICES.VIDEO: VideoAnswer,
+    OPTION_TYPE_CHOICES.LOCATION: LocationAnswer,
 }
 
 

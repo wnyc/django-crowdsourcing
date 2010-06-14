@@ -13,15 +13,21 @@ def get_function(path):
 class ChoiceEnum(object):
     def __init__(self, choices):
         if isinstance(choices, basestring):
-            choices=choices.split()
-        if isinstance(choices, (list,tuple)) and all(isinstance(x, tuple) and len(x)==2 for x in choices):
-            values=choices
+            choices = choices.split()
+        if all([isinstance(choices, (list,tuple)),
+                all(isinstance(x, tuple) and len(x) == 2 for x in choices)]):
+            values = choices
         else:
-            values=zip(itertools.count(1), choices)
+            values = zip(itertools.count(1), choices)
         for v, n in values:
-            name=re.sub('[- ]', '_', n.upper())
+            name = re.sub('[- ]', '_', n.upper())
             setattr(self, name, v)
-        self._choices=values
+            if isinstance(v, str):
+                setattr(self, v.upper(), v)
+        self._choices = values
 
     def __getitem__(self, idx):
         return self._choices[idx]
+
+    def getdisplay(self, key):
+        return [v[1] for v in self._choices if v[0] == key][0]

@@ -16,6 +16,7 @@ from django.core.urlresolvers import reverse
 from django.db import models, connection
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
+from decimal import Decimal
 from django.utils.translation import ugettext_lazy as _
 from django.utils.safestring import mark_safe
 
@@ -152,17 +153,20 @@ class Survey(models.Model):
 
     def get_public_archive_fields(self):
         types = (
-            OPTION_TYPE_CHOICES.TEXT_FIELD,
-            OPTION_TYPE_CHOICES.PHOTO_UPLOAD,
-            OPTION_TYPE_CHOICES.VIDEO_LINK,
-            OPTION_TYPE_CHOICES.TEXT_AREA)
+            OPTION_TYPE_CHOICES.CHAR,
+            OPTION_TYPE_CHOICES.PHOTO,
+            OPTION_TYPE_CHOICES.VIDEO,
+            OPTION_TYPE_CHOICES.TEXT)
         return [f for f in self.get_public_fields() if f.option_type in types]
 
     def icon_questions(self):
         OTC = OPTION_TYPE_CHOICES
         return self.questions.filter(
             ~models.Q(map_icons=""),
-            option_type__in=[OTC.SELECT_ONE_CHOICE, OTC.RADIO_LIST])
+            option_type__in=[OTC.SELECT,
+                             OTC.CHOICE,
+                             OTC.NUMERIC_SELECT,
+                             OTC.NUMERIC_CHOICE])
 
     def parsed_option_icon_pairs(self):
         icon_questions = self.icon_questions()
@@ -210,27 +214,33 @@ class Survey(models.Model):
     live = LiveSurveyManager()
 
 
-OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Field'),
-                                         ('email', 'Email Field'),
+OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Box'),
+                                         ('email', 'Email Text Box'),
                                          ('photo', 'Photo Upload'),
-                                         ('video', 'Video Link'),
-                                         ('location', 'Location Field'),
-                                         ('integer', 'Integer'),
-                                         ('float', 'Float'),
-                                         ('bool', 'Boolean'),
+                                         ('video', 'Video Link Text Box'),
+                                         ('location', 'Location Text Box'),
+                                         ('integer', 'Integer Text Box'),
+                                         ('float', 'Decimal Text Box'),
+                                         ('bool', 'Checkbox'),
                                          ('text', 'Text Area'),
-                                         ('select', 'Select One Choice'),
-                                         ('radio', 'Radio List'),
-                                         ('checkbox', 'Checkbox List')],
+                                         ('select', 'Drop Down List'),
+                                         ('choice', 'Radio Button List'),
+                                         ('bool_list', 'Checkbox List'),
+                                         ('numeric_select',
+                                          'Numeric Drop Down List'),
+                                         ('numeric_choice',
+                                          'Numeric Radio Button List')],
                                         key=itemgetter(1)))
 
 
-FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.BOOLEAN,
-                           OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-                           OPTION_TYPE_CHOICES.RADIO_LIST,
+FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.LOCATION,
                            OPTION_TYPE_CHOICES.INTEGER,
                            OPTION_TYPE_CHOICES.FLOAT,
-                           OPTION_TYPE_CHOICES.LOCATION_FIELD)
+                           OPTION_TYPE_CHOICES.BOOL,
+                           OPTION_TYPE_CHOICES.SELECT,
+                           OPTION_TYPE_CHOICES.CHOICE,
+                           OPTION_TYPE_CHOICES.NUMERIC_SELECT,
+                           OPTION_TYPE_CHOICES.NUMERIC_CHOICE)
 
 
 class Question(models.Model):
@@ -255,16 +265,18 @@ class Question(models.Model):
     else:
         order = models.IntegerField()
     option_type = models.CharField(
-        max_length=12,
+        max_length=max([len(key) for key, v in OPTION_TYPE_CHOICES._choices]),
         choices=OPTION_TYPE_CHOICES,
         help_text=_('You must not change this field on a live survey.'))
+    # For NUMERIC_(SELECT|CHOICE) use it as an int unless they use a decimal. 
+    numeric_is_int = models.BooleanField(default=True, editable=False)
     options = models.TextField(
         blank=True,
         default='',
         help_text=_(
-            'You can not safely modify this field once a survey has gone '
-            'live. You can, at your own risk, add new options, but you '
-            'must not change or remove options.'))
+            'On a live survey you can modify the order of these options. You '
+            'can, at your own risk, add new options, but you must not change '
+            'or remove options.'))
     map_icons = models.TextField(
         blank=True,
         default='',
@@ -303,9 +315,23 @@ class Question(models.Model):
     def __unicode__(self):
         return self.question
 
+    def save(self, *args, **kwargs):
+        self.numeric_is_int = True
+        OTC = OPTION_TYPE_CHOICES
+        if self.option_type in (OTC.NUMERIC_SELECT, OTC.NUMERIC_CHOICE):
+            for option in self.parsed_options:
+                try:
+                    int(option)
+                except ValueError:
+                    float(option)
+                    self.numeric_is_int = False
+        elif self.option_type == OTC.FLOAT:
+            self.numeric_is_int = False
+        super(Question, self).save(*args, **kwargs)
+
     @property
     def parsed_options(self):
-        if OPTION_TYPE_CHOICES.BOOLEAN == self.option_type:
+        if OPTION_TYPE_CHOICES.BOOL == self.option_type:
             return [True, False]
         return filter(None, (s.strip() for s in self.options.splitlines()))
 
@@ -327,20 +353,33 @@ class Question(models.Model):
     @property
     def value_column(self):
         ot = self.option_type
-        if ot == OPTION_TYPE_CHOICES.BOOLEAN:
+        OTC = OPTION_TYPE_CHOICES
+        if ot == OTC.BOOL:
             return "boolean_answer"
-        elif ot == OPTION_TYPE_CHOICES.FLOAT:
+        elif self.is_float:
             return "float_answer"
-        elif ot == OPTION_TYPE_CHOICES.INTEGER:
+        elif self.is_integer:
             return "integer_answer"
-        elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+        elif ot == OTC.PHOTO:
             return "image_answer"
         return "text_answer"
 
     @property
     def is_numeric(self):
         OTC = OPTION_TYPE_CHOICES
-        return self.option_type in [OTC.FLOAT, OTC.INTEGER, OTC.BOOLEAN]
+        return self.option_type in [OTC.FLOAT,
+                                    OTC.INTEGER,
+                                    OTC.BOOL,
+                                    OTC.NUMERIC_SELECT,
+                                    OTC.NUMERIC_CHOICE]
+
+    @property
+    def is_float(self):
+        return self.is_numeric and not self.numeric_is_int
+
+    @property
+    def is_integer(self):
+        return self.is_numeric and self.numeric_is_int
 
 
 FILTER_TYPE = ChoiceEnum("choice range distance")
@@ -356,9 +395,11 @@ class Filter:
         self.within_value = self.location_value = ""
         def get_val(suffix):
             return request_data.get(self.key + suffix, "").replace("+", " ")
-        if field.option_type in (OPTION_TYPE_CHOICES.BOOLEAN,
-                                 OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-                                 OPTION_TYPE_CHOICES.RADIO_LIST):
+        if field.option_type in (OPTION_TYPE_CHOICES.BOOL,
+                                 OPTION_TYPE_CHOICES.CHOICE,
+                                 OPTION_TYPE_CHOICES.SELECT,
+                                 OPTION_TYPE_CHOICES.NUMERIC_CHOICE,
+                                 OPTION_TYPE_CHOICES.NUMERIC_SELECT):
             self.type = FILTER_TYPE.CHOICE
             self.value = get_val("")
         elif field.option_type in (OPTION_TYPE_CHOICES.INTEGER,
@@ -366,7 +407,7 @@ class Filter:
             self.type = FILTER_TYPE.RANGE
             self.from_value = get_val("_from")
             self.to_value = get_val("_to")
-        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION:
             self.type = FILTER_TYPE.DISTANCE
             self.within_value = get_val("_within")
             self.location_value = get_val("_location")
@@ -390,23 +431,20 @@ def extra_clauses_from_filters(submission_id_column, survey, request_data):
         loc = filter.location_value and filter.within_value
         if filter.value or filter.from_value or filter.to_value or loc:
             try:
-                type = filter.field.option_type
-                is_float = OPTION_TYPE_CHOICES.FLOAT == type
-                is_integer = OPTION_TYPE_CHOICES.INTEGER == type
-                is_distance = OPTION_TYPE_CHOICES.LOCATION_FIELD == type
+                OTC = OPTION_TYPE_CHOICES
                 where = "".join((
                     submission_id_column,
                     " IN (SELECT submission_id FROM ",
                     "crowdsourcing_answer WHERE question_id = %d ",
                     "AND ")) % filter.field.id
-                if OPTION_TYPE_CHOICES.BOOLEAN == filter.field.option_type:
+                if OTC.BOOL == filter.field.option_type:
                     f = ("0", "f",)
                     length = len(filter.value)
                     params = [length and not filter.value[0].lower() in f]
                     where += "boolean_answer = %s"
-                elif is_float or is_integer:
-                    convert = float if is_float else int
-                    column = "float_answer" if is_float else "integer_answer"
+                elif filter.field.is_numeric:
+                    column = filter.field.value_column
+                    convert = float if filter.field.is_float else int
                     params = []
                     wheres = []
                     if filter.from_value:
@@ -415,8 +453,11 @@ def extra_clauses_from_filters(submission_id_column, survey, request_data):
                     if filter.to_value:
                         params.append(convert(filter.to_value))
                         wheres.append(column + " <= %s")
+                    if filter.value:
+                        params.append(convert(filter.value))
+                        wheres.append(column + " = %s")
                     where += " AND ".join(wheres)
-                elif is_distance:
+                elif OTC.LOCATION == filter.field.option_type:
                     e = _extra_from_distance(filter, submission_id_column)
                     if e:
                         d_where, params = e
@@ -491,36 +532,46 @@ class AggregateResultCount:
                                              "submission_id",
                                              survey,
                                              request_data)
-        self.answer_counts = []
+        self.answer_value_lookup = {}
         for answer in self.answer_set:
-            if field.option_type == OPTION_TYPE_CHOICES.BOOLEAN:
+            if field.option_type == OPTION_TYPE_CHOICES.BOOL:
                 text = str(answer["boolean_answer"])
             else:
                 text = fill(answer["text_answer"], 30)
             if answer["count"]:
-                self.answer_counts.append({
-                    "response": text,
-                    "count": answer["count"]})
-        self.yahoo_answer_string = simplejson.dumps(self.answer_counts)
+                self.answer_value_lookup[text] = {
+                    field.fieldname: text,
+                    "count": answer["count"]}
+        # 2-axis aggregate results put the results in the same order as the
+        # options, so we do that here as well to make 1-axis graphs like pie
+        # charts and simple count bar charts match.
+        self.answer_values = []
+        for answer in field.parsed_options:
+            value = self.answer_value_lookup.pop(answer, None)
+            if value:
+                self.answer_values.append(value)
+        for value in self.answer_value_lookup.values():
+            self.answer_values.append(value)
+        self.yahoo_answer_string = simplejson.dumps(self.answer_values)
 
 
-class AggregateResultSum:
-    def __init__(self, y_axes, x_axis, request_data):
-        self.answer_sums = []
-        answer_sum_lookup = {}
+class AggregateResult2Axis(object):
+    def __init__(self, y_axes, x_axis, request_data, aggregate_function):
+        self.answer_values = []
+        answer_value_lookup = {}
 
-        def new_answer_sum(x_value):
-            answer_sum = {x_axis.fieldname: x_value}
+        def new_answer_value(x_value):
+            answer_value = {x_axis.fieldname: x_value}
             for y_axis in y_axes:
-                answer_sum[y_axis.fieldname] = 0
-            answer_sum_lookup[x_value] = answer_sum
-            self.answer_sums.append(answer_sum)
-            return answer_sum
+                answer_value[y_axis.fieldname] = 0
+            answer_value_lookup[x_value] = answer_value
+            self.answer_values.append(answer_value)
+            return answer_value
 
         # We could just add new x-axis values as we encounter them. However,
         # say someone has parsed_options ["January", ... , "December"].
         # Then doing it this way puts them in order.
-        [new_answer_sum(x_value) for x_value in x_axis.parsed_options]
+        [new_answer_value(x_value) for x_value in x_axis.parsed_options]
 
         x_value_column = "x_axis." + x_axis.value_column
         for y_axis in y_axes:
@@ -533,13 +584,16 @@ class AggregateResultSum:
             query = [
                 "SELECT ",
                 x_value_column,
-                " AS x_value, SUM(",
+                " AS x_value, ",
+                aggregate_function,
+                "(",
                 y_axis_column,
                 ") AS y_value FROM crowdsourcing_answer AS y_axis ",
                 "JOIN crowdsourcing_answer AS x_axis "
                 "ON y_axis.submission_id = x_axis.submission_id ",
-                "WHERE y_axis.question_id = %s ",
-                "AND x_axis.question_id = %s"]
+                "WHERE y_axis.question_id = %s AND ",
+                y_axis_column,
+                " IS NOT NULL AND x_axis.question_id = %s"]
             y = "y_axis.submission_id"
             extras = extra_clauses_from_filters(y, x_axis.survey, request_data)
             for where, next_params in extras:
@@ -551,14 +605,34 @@ class AggregateResultSum:
             cursor = connection.cursor()
             cursor.execute("".join(query), params)
             for x_value, y_value in cursor.fetchall():
-                answer_sum = answer_sum_lookup.get(x_value)
-                if not answer_sum:
-                    answer_sum = new_answer_sum(x_value)
-                answer_sum[y_axis.fieldname] += y_value
+                if isinstance(y_value, Decimal):
+                    y_value = round(y_value, 2)
+                answer_value = answer_value_lookup.get(x_value)
+                if not answer_value:
+                    answer_value = new_answer_value(x_value)
+                answer_value[y_axis.fieldname] += y_value
         if x_axis.is_numeric:
             key = x_axis.fieldname
-            self.answer_sums.sort(lambda x, y: x[key] - y[key])
-        self.yahoo_answer_string = simplejson.dumps(self.answer_sums)
+            self.answer_values.sort(lambda x, y: x[key] - y[key])
+        self.yahoo_answer_string = simplejson.dumps(self.answer_values)
+
+
+class AggregateResultSum(AggregateResult2Axis):
+    def __init__(self, y_axes, x_axis, request_data):
+        sup = super(AggregateResultSum, self)
+        sup.__init__(y_axes, x_axis, request_data, "SUM")
+
+
+class AggregateResultAverage(AggregateResult2Axis):
+    def __init__(self, y_axes, x_axis, request_data):
+        sup = super(AggregateResultAverage, self)
+        sup.__init__(y_axes, x_axis, request_data, "AVG")
+
+
+class AggregateResult2AxisCount(AggregateResult2Axis):
+    def __init__(self, y_axes, x_axis, request_data):
+        sup = super(AggregateResult2AxisCount, self)
+        sup.__init__(y_axes, x_axis, request_data, "COUNT")
 
 
 class Submission(models.Model):
@@ -639,14 +713,19 @@ class Answer(models.Model):
 
         def set(self, v):
             ot = self.question.option_type
-            if ot == OPTION_TYPE_CHOICES.BOOLEAN:
+            OTC = OPTION_TYPE_CHOICES
+            if ot == OTC.BOOL:
                 self.boolean_answer = bool(v)
-            elif ot == OPTION_TYPE_CHOICES.FLOAT:
-                self.float_answer = float(v)
-            elif ot == OPTION_TYPE_CHOICES.INTEGER:
-                self.integer_answer = int(v)
-            elif ot == OPTION_TYPE_CHOICES.PHOTO_UPLOAD:
+            elif ot == OTC.PHOTO:
                 self.image_answer = v
+            elif ot in (OTC.FLOAT,
+                        OTC.INTEGER,
+                        OTC.NUMERIC_SELECT,
+                        OTC.NUMERIC_CHOICE):
+                # Keep values in both the integer and float columns just in
+                # case the question switches between integer and float types.
+                self.float_answer = float(v)
+                self.integer_answer = int(round(self.float_answer))
             else:
                 self.text_answer = v
 
@@ -742,11 +821,19 @@ class SurveyReport(models.Model):
 SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line')
 
 
+SURVEY_AGGREGATE_TYPE_CHOICES = ChoiceEnum('default sum count average')
+
+
 class SurveyReportDisplay(models.Model):
     """ Think of this as a line item of SurveyReport. """
     report = models.ForeignKey(SurveyReport)
     display_type = models.PositiveIntegerField(
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
+    aggregate_type = models.PositiveIntegerField(
+        choices=SURVEY_AGGREGATE_TYPE_CHOICES,
+        help_text=_("We only use this field if you chose a Pie, Bar, or Line "
+                    "Chart."),
+        default=SURVEY_AGGREGATE_TYPE_CHOICES.DEFAULT)
     fieldnames = models.TextField(
         blank=True,
         help_text=_("Pull these values from Survey -> Questions -> Fieldname. "
@@ -782,9 +869,18 @@ class SurveyReportDisplay(models.Model):
         order = models.IntegerField()
 
     def __unicode__(self):
-        SDTC = SURVEY_DISPLAY_TYPE_CHOICES
-        type = [v[1] for v in SDTC._choices if v[0] == self.display_type][0]
-        return "%s: %s" % (type, self.fieldnames)
+        type = SURVEY_DISPLAY_TYPE_CHOICES.getdisplay(self.display_type)
+        return_value = [type]
+        SATC = SURVEY_AGGREGATE_TYPE_CHOICES
+        if self.aggregate_type != SATC.DEFAULT:
+            return_value.append(SATC.getdisplay(self.aggregate_type))
+        if self.x_axis_fieldname:
+            if self.fieldnames:
+                return_value.append("y-axes: %s" % self.fieldnames)
+            return_value.append("x-axis: %s" % self.x_axis_fieldname)
+        elif self.fieldnames:
+            return_value.append(self.fieldnames)
+        return " ".join(return_value)
 
     def questions(self, fields=None):
         return self._get_questions(self.fieldnames, fields)
@@ -817,11 +913,10 @@ class SurveyReportDisplay(models.Model):
     class Meta:
         ordering = ('order',)
 
-
     def __getattribute__(self, key):
         """ We provide is_text, is_pie, etc... as attirbutes to make it easier
         to write conditional logic in Django templates based on
-        display_type."""
+        display_type. """
         if "is_" == key[:3]:
             for value, name in SURVEY_DISPLAY_TYPE_CHOICES._choices:
                 if name == key[3:]:

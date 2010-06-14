@@ -288,10 +288,12 @@ def submission(request, id):
 def _default_report(survey):
     field_count = count(1)
     pie_choices = (
-        OPTION_TYPE_CHOICES.BOOLEAN,
-        OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-        OPTION_TYPE_CHOICES.RADIO_LIST)
-    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION_FIELD,)
+        OPTION_TYPE_CHOICES.BOOL,
+        OPTION_TYPE_CHOICES.SELECT,
+        OPTION_TYPE_CHOICES.CHOICE,
+        OPTION_TYPE_CHOICES.NUMERIC_SELECT,
+        OPTION_TYPE_CHOICES.NUMERIC_CHOICE)
+    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION,)
     public_fields = survey.get_public_fields()
     fields = [f for f in public_fields if f.option_type in all_choices]
     report = SurveyReport(
@@ -302,7 +304,7 @@ def _default_report(survey):
     for field in fields:
         if field.option_type in pie_choices:
             type = SURVEY_DISPLAY_TYPE_CHOICES.PIE
-        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION:
             type = SURVEY_DISPLAY_TYPE_CHOICES.MAP
         displays.append(SurveyReportDisplay(
             report=report,
