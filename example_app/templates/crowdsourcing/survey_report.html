@@ -3,47 +3,6 @@
 
 {% block title %}{{ survey.title }}{% endblock %}
 
-{% block extra_header %}
-  {% yahoo_chart_header %}
-  {% google_maps_header %}
-{% endblock %}
-
 {% block content %}
-  <h1>{{ survey.title }}</h1>
-
-  {% if thanks %}
-    <p>Thanks for your submission.</p>
-  {% endif %}
-
-  {% if filters %}
-    <h2>Filters</h2>
-    {% filters_as_ul filters %}
-  {% endif %}
-
-  {% if not fields %}
-    All questions in this survey have private answers.
-  {% endif %}
-
-  {% for display in report.get_survey_report_displays %}
-    {% if display.is_text %}
-      {{ display.annotation|safe }}
-    {% else %}{% if display.is_pie %}
-      {% for question in display.questions %}
-        {% yahoo_pie_chart display question request.GET %}
-      {% endfor %}
-    {% else %}{% if display.is_map %}
-      {% for question in display.questions %}
-        {% google_map display question request.GET ids %}
-      {% endfor %}
-    {% else %}{% if display.is_bar %}
-      {% yahoo_bar_chart display request.GET %}
-    {% else %}{% if display.is_line %}
-      {% yahoo_line_chart display request.GET %}
-    {% endif %}{% endif %}{% endif %}{% endif %}{% endif %}
-  {% endfor %}
-
-  {% if archive_fields %}
-    {% submissions page_obj.object_list fields %}
-    {% paginator survey report pages_to_link page_obj %}
-  {% endif %}
+  {% include "crowdsourcing/embeded_survey_report.html" %}
 {% endblock %}

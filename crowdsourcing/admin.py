@@ -7,7 +7,9 @@ from django.forms import ModelForm, ValidationError
 from django.utils.translation import ugettext_lazy as _
 
 from .models import (Question, Survey, Answer, Submission,
-                     SurveyReport, SurveyReportDisplay)
+                     SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
+                     SURVEY_DISPLAY_TYPE_CHOICES,
+                     SURVEY_AGGREGATE_TYPE_CHOICES)
 
 try:
     from .flickrsupport import get_group_names, get_group_id
@@ -17,6 +19,21 @@ except ImportError:
 class QuestionForm(ModelForm):
     class Meta:
         model = Question
+
+    def clean(self):
+        OTC = OPTION_TYPE_CHOICES
+        opts = self.cleaned_data['options']
+        if self.cleaned_data['option_type'] in (OTC.NUMERIC_SELECT,
+                                                OTC.NUMERIC_CHOICE,):
+            for option in filter(None, (s.strip() for s in opts.splitlines())):
+                try:
+                    float(option)
+                except ValueError:
+                    raise ValidationError(_(
+                        "For numeric select or numeric choice, all your "
+                        "options must be a number. This is not a number: ") +
+                        option)
+        return self.cleaned_data
 
     def clean_fieldname(self):
         fieldname = self.cleaned_data['fieldname'].strip()
@@ -104,7 +121,72 @@ class SubmissionAdmin(admin.ModelAdmin):
 admin.site.register(Submission, SubmissionAdmin)
 
 
+TEXT = SURVEY_DISPLAY_TYPE_CHOICES.TEXT
+PIE = SURVEY_DISPLAY_TYPE_CHOICES.PIE
+MAP = SURVEY_DISPLAY_TYPE_CHOICES.MAP
+BAR = SURVEY_DISPLAY_TYPE_CHOICES.BAR
+LINE = SURVEY_DISPLAY_TYPE_CHOICES.LINE
+
+
+class SurveyReportDisplayInlineForm(ModelForm):
+    def clean(self):
+        display_type = self.cleaned_data["display_type"]
+        aggregate_type = self.cleaned_data["aggregate_type"]
+        fieldnames = self.cleaned_data["fieldnames"]
+        x_axis_fieldname = self.cleaned_data["x_axis_fieldname"]
+        annotation = self.cleaned_data["annotation"]
+        is_chart = display_type in (BAR, LINE,)
+        is_count = aggregate_type == SURVEY_AGGREGATE_TYPE_CHOICES.COUNT
+        one_axis_count = is_chart and is_count
+        if display_type == TEXT:
+            if not annotation:
+                raise ValidationError(_(
+                    "Use the 'annotation' of Text Survey Report Displays to "
+                    "insert arbitrary text."))
+        elif not one_axis_count and not fieldnames:
+            raise ValidationError(_(
+                "Given the options you picked, you need to specify some "
+                "fieldnames or this Survey Report Display won't do "
+                "anything."))
+        if not is_chart and x_axis_fieldname:
+            raise ValidationError(_(
+                "An x axis only makes sense for Bar and Line graphs."))
+        elif is_chart and not x_axis_fieldname:
+            raise ValidationError(_(
+                "You have to specify an x-axis for bar and line graphs."))
+        if aggregate_type != SURVEY_AGGREGATE_TYPE_CHOICES.DEFAULT:
+            if display_type == TEXT:
+                raise ValidationError(_("Use 'Default' for Text."))
+            elif display_type == PIE and not is_count:
+                raise ValidationError(_(
+                    "Use 'Default' or 'Count' for Pie charts."))
+        return self.cleaned_data
+
+    class Meta:
+        model = SurveyReportDisplay
+
+
 class SurveyReportDisplayInline(admin.StackedInline):
+    form = SurveyReportDisplayInlineForm
+
+    fieldsets = (
+        (None,
+            {'fields': (
+                'display_type',
+                'fieldnames',
+                'annotation',
+                'order',)}),
+        ('Pie, Line, and Bar Charts',
+            {'fields': (
+                'aggregate_type',
+                'x_axis_fieldname',)}),
+        ('Maps',
+            {'fields': (
+                'limit_map_answers',
+                'map_center_latitude',
+                'map_center_longitude',
+                'map_zoom',)}))
+
     model = SurveyReportDisplay
     extra = 3
 

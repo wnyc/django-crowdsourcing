@@ -8,9 +8,10 @@ from django.utils.safestring import mark_safe
 from django.utils.html import escape
 from sorl.thumbnail.base import ThumbnailException
 
-from ..crowdsourcing.models import (AggregateResultCount, AggregateResultSum,
-                                    FILTER_TYPE, OPTION_TYPE_CHOICES,
-                                    get_all_answers)
+from ..crowdsourcing.models import (
+    AggregateResultCount, AggregateResultSum, AggregateResultAverage,
+    AggregateResult2AxisCount, FILTER_TYPE, OPTION_TYPE_CHOICES,
+    SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -42,19 +43,13 @@ returning safe strings. """
 register = template.Library()
 
 
-def yahoo_chart_header():
-    return "\n".join([
-        '<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/2.8.0r4/build/fonts/fonts-min.css" />',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/yahoo-dom-event/yahoo-dom-event.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/json/json-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/element/element-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/datasource/datasource-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/swf/swf-min.js"></script>',
-        '<script type="text/javascript" src="http://yui.yahooapis.com/2.8.0r4/build/charts/charts-min.js"></script>',
+def yahoo_api():
+    return mark_safe("\n".join([
+        '<script src="http://yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js"></script>',
         '<style>',
         '  .chart_div { width: 600px; height: 300px; }',
-        '</style>'])
-register.simple_tag(yahoo_chart_header)
+        '</style>']))
+register.simple_tag(yahoo_api)
 
 
 def filter(wrapper_format, key, label, html):
@@ -146,14 +141,15 @@ register.simple_tag(filters_as_ul)
 def yahoo_pie_chart(display, question, request_get):
     survey = display.get_report().survey
     aggregate = AggregateResultCount(survey, question, request_get)
-    if not aggregate.answer_counts:
+    if not aggregate.answer_values:
         return ""
+    fieldname = question.fieldname
     args = {
         "answer_string": aggregate.yahoo_answer_string,
         "option_setup": "",
         "chart_type": "PieChart",
-        "response_schema": '{fields: [ "response", "count" ]}',
-        "options": "dataField: 'count', categoryField: 'response'",
+        "response_schema": '{fields: ["%s", "count"]}' % fieldname,
+        "options": "dataField: 'count', categoryField: '%s'" % fieldname,
         "style": """
             {padding: 20,
              legend: {display: "right",
@@ -181,28 +177,52 @@ register.simple_tag(yahoo_line_chart)
 
 def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
     y_axes = display.questions()
-    if not y_axes:
-        return ("This chart uses y axes '%s', none of which are questions "
-                "in this survey.") % display.fieldnames
+    SATC = SURVEY_AGGREGATE_TYPE_CHOICES
+    return_value = []
+    if display.aggregate_type != SATC.COUNT and not y_axes:
+        message = ("This chart uses y axes '%s', none of which are questions "
+                   "in this survey.") % display.fieldnames
+        return issue(message)
     x_axis = display.x_axis_question()
     if not x_axis:
-        return ("This chart uses x axis '%s' which isn't a question in "
-                "this survey.") % display.x_axis_fieldname
-    aggregate = AggregateResultSum(y_axes, x_axis, request_get)
-    if not aggregate.answer_sums:
+        message = ("This chart uses x axis '%s' which isn't a question in "
+                   "this survey.") % display.x_axis_fieldname
+        return issue(message)
+    single_count = False
+    if display.aggregate_type in [SATC.DEFAULT, SATC.SUM]:
+        aggregate_function = "Sum"
+        aggregate = AggregateResultSum(y_axes, x_axis, request_get)
+    elif display.aggregate_type == SATC.AVERAGE:
+        aggregate_function = "Average"
+        aggregate = AggregateResultAverage(y_axes, x_axis, request_get)
+    elif display.aggregate_type == SATC.COUNT:
+        aggregate_function = "Count"
+        if y_axes:
+            aggregate = AggregateResult2AxisCount(y_axes, x_axis, request_get)
+        else:
+            single_count = True
+            survey = x_axis.survey
+            aggregate = AggregateResultCount(survey, x_axis, request_get)
+    if not aggregate.answer_values:
         return ""
     answer_string = aggregate.yahoo_answer_string
     series = []
-    for question in y_axes:
-        series.append("""{
-              displayName: "%s",
-              yField: "%s",
-              style: {size: 10}
-            }""" % (question.label, question.fieldname))
+    series_format = '{displayName: "%s", yField: "%s", style: {size: 10}}'
+    if single_count:
+        y_axis_label = "Count"
+        fieldnames = ["count", x_axis.fieldname]
+        series.append(series_format % ("Count", "count"))
+    else:
+        y_labels = ", ".join([y.label for y in y_axes])
+        y_axis_label = "%s %s" % (aggregate_function, y_labels)
+        axes = list(y_axes) + [x_axis]
+        fieldnames = [f.fieldname for f in axes]
+        for question in y_axes:
+            series.append(series_format % (question.label, question.fieldname))
     option_setup_args = (
         "NumericAxis" if x_axis.is_numeric else "CategoryAxis",
         x_axis.label,
-        ", ".join([y.label for y in y_axes]),)
+        y_axis_label,)
     option_setup_args = tuple(l.replace('"', r'\"') for l in option_setup_args)
     index = display.index_in_report()
     option_setup = """
@@ -217,16 +237,22 @@ def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
         "xAxis": "xAxis",
         "yAxis": "yAxis"}
     options = ",\n".join(["%s: %s" % item for item in options.items()])
-    axes = list(y_axes) + [x_axis]
-    field_names = "[%s]" % ", ".join(['"%s"' % f.fieldname for f in axes])
+    fieldnames_str = ", ".join(['"%s"' % f for f in fieldnames])
     args = {
         "answer_string": answer_string,
         "option_setup": option_setup,
         "chart_type": chart_type,
-        "response_schema": '{fields: %s}' % field_names,
+        "response_schema": '{fields: [%s]}' % fieldnames_str,
         "style": '{xAxis: {labelRotation: -45}, yAxis: {titleRotation: -90}}',
         "options": options}
-    return _yahoo_chart(display, str(index), args)
+    return_value.append(_yahoo_chart(display, str(index), args))
+    for question in y_axes:
+        if not question.is_numeric:
+            message = ("%s isn't numeric so it doesn't work as a y axis. "
+                       "Update the fieldnames of this Survey Report Display.")
+            message = message % question.fieldname
+            return_value.append(issue(message))
+    return mark_safe("\n".join(return_value))
 
 
 def _yahoo_chart(display, unique_id, args):
@@ -244,22 +270,22 @@ def _yahoo_chart(display, unique_id, args):
         div_id="chart%s" % unique_id)
     script = """
         <script type="text/javascript">
-          YAHOO.widget.Chart.SWFURL =
-            "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
-          var answerData = %(answer_string)s;
-          var %(data_var)s = new YAHOO.util.DataSource(answerData);
-          %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
-          %(data_var)s.responseSchema = %(response_schema)s;
-          %(option_setup)s
-          var %(div_id)s = new YAHOO.widget.%(chart_type)s(
-            "%(div_id)s",
-            %(data_var)s,
-            {
-             %(options)s,
-
-             style: %(style)s,
-             expressInstall: "assets/expressinstall.swf"
-            });
+          yahooChartCallbacks.push(function() {
+            YAHOO.widget.Chart.SWFURL =
+              "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
+            var answerData = %(answer_string)s;
+            var %(data_var)s = new YAHOO.util.DataSource(answerData);
+            %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
+            %(data_var)s.responseSchema = %(response_schema)s;
+            %(option_setup)s
+            var %(div_id)s = new YAHOO.widget.%(chart_type)s(
+              "%(div_id)s",
+              %(data_var)s,
+              {%(options)s,
+  
+               style: %(style)s,
+               expressInstall: "assets/expressinstall.swf"});
+          });
         </script>""" % args
     out.append(script)
     return mark_safe("\n".join(out))
@@ -399,18 +425,6 @@ def paginator(survey, report, pages_to_link, page_obj):
 register.simple_tag(paginator)
 
 
-def google_maps_header():
-    format = "\n".join([
-        '<script',
-        'src="http://maps.google.com/maps?file=api&amp;v=2&amp;sensor=false&amp;key=%s"',
-        'type="text/javascript"></script>',
-        '<script type="text/javascript">',
-        '  $(window).unload(GUnload);',
-        '</script>'])
-    return format % local_settings.GOOGLE_MAPS_API_KEY
-register.simple_tag(google_maps_header)
-
-
 def google_map(display, question, request_GET, ids):
     map_id = "map_%d" % question.id
     detail_id = "map_detail_%d" % question.id
@@ -438,7 +452,7 @@ def google_map(display, question, request_GET, ids):
         '  </div>',
         '  <div id="%s" class="map_story"></div>' % detail_id,
         '  <script type="text/javascript">',
-        '    loadMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
+        '    setupMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
         '  </script>',
         '</div>']
     out.append(map_key(question.survey))
@@ -450,6 +464,7 @@ def number_to_javascript(number):
     if isinstance(number, (int, float,)):
         return str(number)
     return "null"
+
 
 def map_key(survey):
     option_icon_pairs = survey.parsed_option_icon_pairs()
@@ -463,3 +478,32 @@ def map_key(survey):
         out.append('</ul>')
     return mark_safe("\n".join(out))
 register.simple_tag(map_key)
+
+
+def jquery_and_google_api():
+    key = ""
+    if local_settings.GOOGLE_MAPS_API_KEY:
+        key = '?key=%s' % local_settings.GOOGLE_MAPS_API_KEY
+    jsapi = "".join([
+        '<script type="text/javascript" src="http://www.google.com/jsapi',
+        key,
+        '"></script>'])
+    return mark_safe("\n".join([
+        jsapi,
+        '<script type="text/javascript">',
+        '  google.load("jquery", "1.4");',
+        '</script>']))
+register.simple_tag(jquery_and_google_api)
+
+
+def load_maps_and_charts():
+    return mark_safe("\n".join([
+        '<script type="text/javascript">',
+        '  loadMapsAndCharts();',
+        '</script>']))
+register.simple_tag(load_maps_and_charts)
+
+
+def issue(message):
+    return mark_safe("<div class=\"issue\">%s</div>" % message)
+register.simple_tag(issue)

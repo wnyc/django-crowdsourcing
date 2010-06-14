@@ -288,10 +288,12 @@ def submission(request, id):
 def _default_report(survey):
     field_count = count(1)
     pie_choices = (
-        OPTION_TYPE_CHOICES.BOOLEAN,
-        OPTION_TYPE_CHOICES.SELECT_ONE_CHOICE,
-        OPTION_TYPE_CHOICES.RADIO_LIST)
-    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION_FIELD,)
+        OPTION_TYPE_CHOICES.BOOL,
+        OPTION_TYPE_CHOICES.SELECT,
+        OPTION_TYPE_CHOICES.CHOICE,
+        OPTION_TYPE_CHOICES.NUMERIC_SELECT,
+        OPTION_TYPE_CHOICES.NUMERIC_CHOICE)
+    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION,)
     public_fields = survey.get_public_fields()
     fields = [f for f in public_fields if f.option_type in all_choices]
     report = SurveyReport(
@@ -302,7 +304,7 @@ def _default_report(survey):
     for field in fields:
         if field.option_type in pie_choices:
             type = SURVEY_DISPLAY_TYPE_CHOICES.PIE
-        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION_FIELD:
+        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION:
             type = SURVEY_DISPLAY_TYPE_CHOICES.MAP
         displays.append(SurveyReportDisplay(
             report=report,
@@ -315,6 +317,18 @@ def _default_report(survey):
 
 
 def survey_report(request, slug, report='', page=None):
+    templates = ['crowdsourcing/survey_report_%s.html' % slug,
+                 'crowdsourcing/survey_report.html']
+    return _survey_report(request, slug, report, page, templates)
+
+
+def embeded_survey_report(request, slug, report=''):
+    templates = ['crowdsourcing/embeded_survey_report_%s.html' % slug,
+                 'crowdsourcing/embeded_survey_report.html']
+    return _survey_report(request, slug, report, None, templates)
+
+
+def _survey_report(request, slug, report, page, templates):
     """ Show a report for the survey. As rating is done in a separate
     application we don't directly check request.GET["sort"] here.
     local_settings.PRE_REPORT is the place for that. """
@@ -372,23 +386,22 @@ def survey_report(request, slug, report='', page=None):
         pages_to_link = [1, False] + pages_to_link
     if pages_to_link[-1] < paginator.num_pages:
         pages_to_link = pages_to_link + [False, paginator.num_pages]
-    templates = ['crowdsourcing/%s_survey_report.html' % survey.slug,
-                 'crowdsourcing/survey_report.html']
 
-    return render_to_response(templates,
-                              dict(survey=survey,
-                                   submissions=submissions,
-                                   paginator=paginator,
-                                   page_obj=page_obj,
-                                   ids=ids,
-                                   pages_to_link=pages_to_link,
-                                   fields=fields,
-                                   archive_fields=archive_fields,
-                                   filters=filters,
-                                   report=report_obj,
-                                   page_answers=page_answers,
-                                   request=request),
-                              _rc(request))
+    context = dict(
+        survey=survey,
+        submissions=submissions,
+        paginator=paginator,
+        page_obj=page_obj,
+        ids=ids,
+        pages_to_link=pages_to_link,
+        fields=fields,
+        archive_fields=archive_fields,
+        filters=filters,
+        report=report_obj,
+        page_answers=page_answers,
+        request=request)
+    
+    return render_to_response(templates, context, _rc(request))
 
 
 def paginate_or_404(queryset, page, num_per_page=20):
