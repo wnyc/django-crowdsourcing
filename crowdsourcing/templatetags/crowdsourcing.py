@@ -344,7 +344,7 @@ def submission_fields(submission,
                         out.append(format % args)
                 except ThumbnailException as ex:
                     out.append('<div class="error">%s</div>' % str(ex))
-            elif question.option_type == OPTION_TYPE_CHOICES.VIDEO_LINK:
+            elif question.option_type == OPTION_TYPE_CHOICES.VIDEO:
                 if oembed_expand:
                     html = video_html(answer.value, video_height, video_width)
                     out.append(html)
