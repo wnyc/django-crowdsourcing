@@ -180,6 +180,8 @@ class SurveyReportDisplayInline(admin.StackedInline):
             {'fields': (
                 'aggregate_type',
                 'x_axis_fieldname',)}),
+        ('Slideshow',
+            {'fields': ('caption_fields',)}),
         ('Maps',
             {'fields': (
                 'limit_map_answers',

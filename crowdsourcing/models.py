@@ -697,6 +697,7 @@ class Answer(models.Model):
         max_length=500,
         blank=True,
         thumbnail=dict(size=(250, 250)),
+        extra_thumbnails=local_settings.EXTRA_THUMBNAILS,
         upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
@@ -818,7 +819,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')
 
 
 SURVEY_AGGREGATE_TYPE_CHOICES = ChoiceEnum('default sum count average')
@@ -863,6 +864,10 @@ class SurveyReportDisplay(models.Model):
         null=True,
         help_text=_('13 is about the right level for Manhattan. 0 shows the '
                     'entire world.'))
+    caption_fields = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_('Separate by spaces.'))
     if PositionField:
         order = PositionField(collection=('report',))
     else:
@@ -890,6 +895,9 @@ class SurveyReportDisplay(models.Model):
         if return_value:
             return return_value[0]
         return None
+
+    def get_caption_fieldnames(self):
+        return self.caption_fields.split(" ")
 
     def _get_questions(self, fieldnames, fields):
         names = fieldnames.split(" ")
