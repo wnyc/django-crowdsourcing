@@ -761,8 +761,8 @@ class SurveyReport(models.Model):
     and an annotation.  It also has article-like fields of its own.
     """
     survey = models.ForeignKey(Survey)
-    title = models.CharField(max_length=50, blank=True)
-    slug = models.CharField(max_length=50, blank=True)
+    title = models.CharField(max_length=50)
+    slug = models.CharField(max_length=50)
     # some text at the beginning
     summary = models.TextField(blank=True)
     # As crowdsourcing doesn't implement rating because we want to let you use
