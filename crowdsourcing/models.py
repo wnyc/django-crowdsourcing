@@ -70,7 +70,11 @@ class Survey(models.Model):
     require_login = models.BooleanField(default=False)
     allow_multiple_submissions = models.BooleanField(default=False)
     moderate_submissions = models.BooleanField(
-        default=local_settings.MODERATE_SUBMISSIONS)
+        default=local_settings.MODERATE_SUBMISSIONS,
+        help_text=_("If checked, all submissions will start as NOT public and "
+                    "you will have to manually make them public. If your "
+                    "survey doesn't show any results, it may be because this "
+                    "option is checked."))
     allow_comments = models.BooleanField(
         default=False,
         help_text="Allow comments on user submissions.")
@@ -523,10 +527,9 @@ def _radians(degrees):
 
 class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
-    aggregate results. """
+    pie charts. """
     def __init__(self, survey, field, request_data):
-        self.answer_set = field.answer_set.values('text_answer',
-                                                  'boolean_answer')
+        self.answer_set = field.answer_set.values(field.value_column)
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
@@ -534,10 +537,7 @@ class AggregateResultCount:
                                              request_data)
         self.answer_value_lookup = {}
         for answer in self.answer_set:
-            if field.option_type == OPTION_TYPE_CHOICES.BOOL:
-                text = str(answer["boolean_answer"])
-            else:
-                text = fill(answer["text_answer"], 30)
+            text = fill(str(answer[field.value_column]), 30)
             if answer["count"]:
                 self.answer_value_lookup[text] = {
                     field.fieldname: text,
