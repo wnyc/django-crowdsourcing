@@ -5,5 +5,6 @@ Content Producers
    :maxdepth: 2
 
    options
+   filters
    examples/index
    live

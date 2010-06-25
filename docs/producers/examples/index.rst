@@ -1,4 +1,10 @@
 Examples
 ========
 
-I got a lot of examples here.
+.. toctree::
+   :maxdepth: 1
+
+   simple_survey
+   top_10
+   categories
+   favorite_composer

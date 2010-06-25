@@ -153,6 +153,8 @@ Use the exact group name from flickr.com. If you use this field, then all images
 
 Survey reports describe how you should display the results of a survey. If you specify a default report then Crowdsourcing will use that report to display the results of a survey unless they request a specific different report. If you don't specify a default report then Crowdsourcing will use its default behavior which gets documented thoroughly under Survey Report. 
 
+The default report behavior is to display the filters and individual results. It creates one pie chart for every choice type question, and one map for every location text box question.
+
 Question
 ========
 
