@@ -23,8 +23,9 @@ class QuestionForm(ModelForm):
     def clean(self):
         OTC = OPTION_TYPE_CHOICES
         opts = self.cleaned_data.get('options', "")
-        if self.cleaned_data.get('option_type', "") in (OTC.NUMERIC_SELECT,
-                                                OTC.NUMERIC_CHOICE,):
+        if self.cleaned_data.get('option_type', "") in (
+            OTC.NUMERIC_SELECT,
+            OTC.NUMERIC_CHOICE,):
             for option in filter(None, (s.strip() for s in opts.splitlines())):
                 try:
                     float(option)
@@ -109,6 +110,7 @@ class AnswerInline(admin.TabularInline):
 
 
 class SubmissionAdmin(admin.ModelAdmin):
+    raw_id_fields = ('user',)
     search_fields = ('answer__text_answer',)
     list_display = ('survey', 'submitted_at', 'user',
                     'ip_address', 'email', 'is_public',)
