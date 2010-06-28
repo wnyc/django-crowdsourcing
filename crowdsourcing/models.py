@@ -5,9 +5,12 @@ import datetime
 import logging
 from math import sin, cos
 from operator import itemgetter
-import simplejson
 from textwrap import fill
 
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
@@ -551,7 +554,7 @@ class AggregateResultCount:
                 self.answer_values.append(value)
         for value in self.answer_value_lookup.values():
             self.answer_values.append(value)
-        self.yahoo_answer_string = simplejson.dumps(self.answer_values)
+        self.yahoo_answer_string = json.dumps(self.answer_values)
 
 
 class AggregateResult2Axis(object):
@@ -613,7 +616,7 @@ class AggregateResult2Axis(object):
         if x_axis.is_numeric:
             key = x_axis.fieldname
             self.answer_values.sort(lambda x, y: x[key] - y[key])
-        self.yahoo_answer_string = simplejson.dumps(self.answer_values)
+        self.yahoo_answer_string = json.dumps(self.answer_values)
 
 
 class AggregateResultSum(AggregateResult2Axis):
