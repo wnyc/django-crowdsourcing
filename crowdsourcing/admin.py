@@ -22,8 +22,8 @@ class QuestionForm(ModelForm):
 
     def clean(self):
         OTC = OPTION_TYPE_CHOICES
-        opts = self.cleaned_data['options']
-        if self.cleaned_data['option_type'] in (OTC.NUMERIC_SELECT,
+        opts = self.cleaned_data.get('options', "")
+        if self.cleaned_data.get('option_type', "") in (OTC.NUMERIC_SELECT,
                                                 OTC.NUMERIC_CHOICE,):
             for option in filter(None, (s.strip() for s in opts.splitlines())):
                 try:
@@ -36,7 +36,7 @@ class QuestionForm(ModelForm):
         return self.cleaned_data
 
     def clean_fieldname(self):
-        fieldname = self.cleaned_data['fieldname'].strip()
+        fieldname = self.cleaned_data.get('fieldname', "").strip()
         if not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', fieldname):
             raise ValidationError(_('The field name must start with a letter '
                                     'and contain nothing but alphanumerics '
@@ -60,7 +60,7 @@ class SurveyAdminForm(ModelForm):
         model = Survey
 
     def clean_flickr_group_name(self):
-        group = self.cleaned_data['flickr_group_name']
+        group = self.cleaned_data.get('flickr_group_name', "")
         if group:
             if not get_group_names:
                 raise ValidationError(
@@ -130,11 +130,11 @@ LINE = SURVEY_DISPLAY_TYPE_CHOICES.LINE
 
 class SurveyReportDisplayInlineForm(ModelForm):
     def clean(self):
-        display_type = self.cleaned_data["display_type"]
-        aggregate_type = self.cleaned_data["aggregate_type"]
-        fieldnames = self.cleaned_data["fieldnames"]
-        x_axis_fieldname = self.cleaned_data["x_axis_fieldname"]
-        annotation = self.cleaned_data["annotation"]
+        display_type = self.cleaned_data("display_type", "")
+        aggregate_type = self.cleaned_data("aggregate_type", "")
+        fieldnames = self.cleaned_data("fieldnames", "")
+        x_axis_fieldname = self.cleaned_data("x_axis_fieldname", "")
+        annotation = self.cleaned_data("annotation", "")
         is_chart = display_type in (BAR, LINE,)
         is_count = aggregate_type == SURVEY_AGGREGATE_TYPE_CHOICES.COUNT
         one_axis_count = is_chart and is_count
@@ -180,6 +180,8 @@ class SurveyReportDisplayInline(admin.StackedInline):
             {'fields': (
                 'aggregate_type',
                 'x_axis_fieldname',)}),
+        ('Slideshow',
+            {'fields': ('caption_fields',)}),
         ('Maps',
             {'fields': (
                 'limit_map_answers',

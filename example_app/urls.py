@@ -13,4 +13,9 @@ urlpatterns = patterns('',
     (r'^media/(?P<path>.*)$',
      'django.views.static.serve',
      {'document_root': settings.MEDIA_ROOT}),
+    # See settings.py for detailed instructions on how to build the
+    # documentation.
+    (r'^docs/(?P<path>.*)$',
+     'django.views.static.serve',
+     {'document_root': settings.DOCUMENTATION_ROOT})
 )

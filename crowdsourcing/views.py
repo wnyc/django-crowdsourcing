@@ -234,7 +234,7 @@ def submissions(request):
         a logged in user.
     submitted_from and submitted_to - strings in the format YYYY-mm-ddThh:mm:ss
         For example, 2010-04-05T13:02:03
-    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean ignore 
+    featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean ignore
         the featured flag. Everything else means display only featured. """
     response = HttpResponse(mimetype='application/json')
     results = Submission.objects.filter(is_public=True)
@@ -283,17 +283,18 @@ def submission(request, id):
     template = 'crowdsourcing/submission.html'
     sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
     return render_to_response(template, dict(submission=sub), _rc(request))
-    
+
 
 def _default_report(survey):
     field_count = count(1)
+    OTC = OPTION_TYPE_CHOICES
     pie_choices = (
-        OPTION_TYPE_CHOICES.BOOL,
-        OPTION_TYPE_CHOICES.SELECT,
-        OPTION_TYPE_CHOICES.CHOICE,
-        OPTION_TYPE_CHOICES.NUMERIC_SELECT,
-        OPTION_TYPE_CHOICES.NUMERIC_CHOICE)
-    all_choices = pie_choices + (OPTION_TYPE_CHOICES.LOCATION,)
+        OTC.BOOL,
+        OTC.SELECT,
+        OTC.CHOICE,
+        OTC.NUMERIC_SELECT,
+        OTC.NUMERIC_CHOICE)
+    all_choices = pie_choices + (OTC.LOCATION, OTC.PHOTO)
     public_fields = survey.get_public_fields()
     fields = [f for f in public_fields if f.option_type in all_choices]
     report = SurveyReport(
@@ -304,8 +305,10 @@ def _default_report(survey):
     for field in fields:
         if field.option_type in pie_choices:
             type = SURVEY_DISPLAY_TYPE_CHOICES.PIE
-        elif field.option_type == OPTION_TYPE_CHOICES.LOCATION:
+        elif field.option_type == OTC.LOCATION:
             type = SURVEY_DISPLAY_TYPE_CHOICES.MAP
+        elif field.option_type == OTC.PHOTO:
+            type = SURVEY_DISPLAY_TYPE_CHOICES.SLIDESHOW
         displays.append(SurveyReportDisplay(
             report=report,
             display_type=type,
@@ -400,7 +403,7 @@ def _survey_report(request, slug, report, page, templates):
         report=report_obj,
         page_answers=page_answers,
         request=request)
-    
+
     return render_to_response(templates, context, _rc(request))
 
 

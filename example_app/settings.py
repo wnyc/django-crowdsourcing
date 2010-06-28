@@ -38,6 +38,18 @@ USE_I18N = True
 # Example: "/home/media/media.lawrence.com/"
 MEDIA_ROOT = os.path.join(PROJECT_ROOT, 'media')
 
+"""
+Follow these directions to build the documentation using Sphinx. Then the
+example app will serve the documentation.
+
+1. Install Sphinx. For example,
+   $ pip install sphinx
+2. Build the documentation using Sphinx.
+   $ cd django-crowdsourcing/docs
+   $ sphinx-build -b html . _build
+"""
+DOCUMENTATION_ROOT = os.path.join(PROJECT_ROOT, '../docs/_build')
+
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash if there is a path component (optional in other cases).
 # Examples: "http://media.lawrence.com", "http://example.com/media/"

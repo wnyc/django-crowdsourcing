@@ -3,6 +3,7 @@ import re
 from django.conf import settings as _gs
 
 
+""" This sets the default "Moderate submissions" value of surveys. """
 MODERATE_SUBMISSIONS = getattr(_gs,
                                'CROWDSOURCING_MODERATE_SUBMISSIONS',
                                False)
@@ -51,6 +52,7 @@ FLICKR_TOKEN = getattr(_gs, 'CROWDSOURCING_FLICKR_TOKEN', '')
 FLICKR_FROB = getattr(_gs, 'CROWDSOURCING_FLICKR_FROB', '')
 
 
+""" Are Flickr photos live by default? """
 FLICKR_LIVE = getattr(_gs, 'CROWDSOURCING_FLICKR_LIVE', False)
 
 
@@ -73,30 +75,39 @@ SURVEY_EMAIL_FROM = getattr(_gs,
                             'donotreply@donotreply.com')
 
 
+# This site is for the notification emails that crowdsourcing sends when
+# a user enters a survey. The default is the site the user entered the survey
+# on.
 SURVEY_ADMIN_SITE = getattr(_gs, 'CROWDSOURCING_SURVEY_ADMIN_SITE', '')
 
 
 # You can set a custom def oembed_expand(url, **opts) which takes the url to
-# a video and returns html embed code.
+# a video and returns html embed code. Use the form path.to.my_function
 OEMBED_EXPAND = getattr(_gs, 'CROWDSOURCING_OEMBED_EXPAND', '')
 
 
-# What URL should we redirect users to if they try to enter a survey that
-# requires a login?
+# What URL should crowdsourcing redirect users to if they try to enter a survey
+# that requires a login?
 LOGIN_VIEW = getattr(_gs, 'CROWDSOURCING_LOGIN_VIEW', '')
 
 
 # youtube has a lot of characters in their ids now so use [^&]
 # youtube also likes to add additional query arguments, so no trailing $
-# If you have oembed installed, we use the oembed configuration and ignore
-# this.
+# If you have oembed installed, crowdsourcing uses the oembed configuration and
+# ignores this.
 VIDEO_URL_PATTERNS = getattr(
     _gs,
     'CROWDSOURCING_VIDEO_URL_PATTERNS',
     (r'^http://www\.youtube\.com/watch\?v=[^&]+',))
 
 
+# crowdsourcing.templatetags.crowdsourcing.google_map uses this setting.
 GOOGLE_MAPS_API_KEY = getattr(
     _gs,
     'CROWDSOURCING_GOOGLE_MAPS_API_KEY',
     '')
+
+
+# A dictionary of extra thumbnails for Submission.image_answer, which is a sorl
+# ImageWithThumbnailsField. For example, {'slideshow': {'size': (620, 350)}}
+EXTRA_THUMBNAILS = getattr(_gs, 'CROWDSOURCING_EXTRA_THUMBNAILS', {})

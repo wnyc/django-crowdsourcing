@@ -1,2 +1,17 @@
 .enlarge_link { background-image: url('/media/enlarge-icon.png'); }
+
 h2 { color: #055; }
+
+.jcarousel-skin-tango .jcarousel-clip-horizontal {
+  height: 275px;
+  width: 500px;
+}
+
+.jcarousel-skin-tango .jcarousel-container-horizontal {
+  width: 510px;
+}
+
+.jcarousel-skin-tango .jcarousel-item {
+    height: 275px;
+    width: 250px;
+}

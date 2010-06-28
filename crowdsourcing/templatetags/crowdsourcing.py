@@ -9,9 +9,9 @@ from django.utils.html import escape
 from sorl.thumbnail.base import ThumbnailException
 
 from ..crowdsourcing.models import (
-    AggregateResultCount, AggregateResultSum, AggregateResultAverage,
-    AggregateResult2AxisCount, FILTER_TYPE, OPTION_TYPE_CHOICES,
-    SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
+    extra_from_filters, AggregateResultCount, AggregateResultSum,
+    AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
+    OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -367,13 +367,15 @@ def submissions(object_list, fields):
     for submission in object_list:
         out.append('<div class="submission">')
         out.append(submission_fields(submission, fields, page_answers))
-        out.append(submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL))
+        D = link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL
+        out.append(submission_link(submission, D))
         out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submissions)
 
 
-def submission_link(submission, link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
+def submission_link(submission,
+                    link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
     out = ['<div class="permalink">']
     if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
         return ""
@@ -425,7 +427,7 @@ def paginator(survey, report, pages_to_link, page_obj):
 register.simple_tag(paginator)
 
 
-def google_map(display, question, request_GET, ids):
+def google_map(display, question, ids):
     map_id = "map_%d" % question.id
     detail_id = "map_detail_%d" % question.id
     view = "location_question_results"
@@ -458,6 +460,46 @@ def google_map(display, question, request_GET, ids):
     out.append(map_key(question.survey))
     return mark_safe("\n".join(out))
 register.simple_tag(google_map)
+
+
+def simple_slideshow(display, question, request_GET, css):
+    id = "slideshow_%d_%d" % (display.order, question.id)
+    out = [
+        '<script type="text/javascript">',
+        '$(function() {',
+        "  $('#%s').jcarousel();" % id,
+        '});',
+        '</script>',
+        '<ul class="%s" id="%s">' % (css, id)]
+    caption_fieldnames = display.get_caption_fieldnames()
+    caption_lookup = {}
+    if caption_fieldnames:
+        captions = Answer.objects.filter(
+            question__fieldname__in=caption_fieldnames,
+            question__survey=display.report.survey)
+        for caption in captions:
+            if not caption.submission_id in caption_lookup:
+                caption_lookup[caption.submission_id] = []
+            append = "<div class='caption'>%s</div>" % str(caption.value)
+            caption_lookup[caption.submission_id].append(append)
+    answers = extra_from_filters(
+        question.answer_set.all(),
+        "submission_id",
+        display.report.survey,
+        request_GET)
+    for answer in answers:
+        try:
+            image = answer.image_answer.thumbnail_tag
+        except ThumbnailException:
+            image = "Can't find %s" % answer.image_answer.url
+        out.extend([
+            '<li>',
+            image,
+            "\n".join(caption_lookup.get(answer.submission_id, [])),
+            '</li>'])
+    out.append("</ul>")
+    return mark_safe("\n".join(out))
+register.simple_tag(simple_slideshow)
 
 
 def number_to_javascript(number):

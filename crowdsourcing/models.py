@@ -70,7 +70,11 @@ class Survey(models.Model):
     require_login = models.BooleanField(default=False)
     allow_multiple_submissions = models.BooleanField(default=False)
     moderate_submissions = models.BooleanField(
-        default=local_settings.MODERATE_SUBMISSIONS)
+        default=local_settings.MODERATE_SUBMISSIONS,
+        help_text=_("If checked, all submissions will start as NOT public and "
+                    "you will have to manually make them public. If your "
+                    "survey doesn't show any results, it may be because this "
+                    "option is checked."))
     allow_comments = models.BooleanField(
         default=False,
         help_text="Allow comments on user submissions.")
@@ -249,8 +253,7 @@ class Question(models.Model):
         max_length=32,
         help_text=_('a single-word identifier used to track this value; '
                     'it must begin with a letter and may contain '
-                    'alphanumerics and underscores (no spaces). You must not '
-                    'change this field on a live survey.'))
+                    'alphanumerics and underscores (no spaces).'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
     label = models.CharField(max_length=32, help_text=_(
@@ -523,10 +526,9 @@ def _radians(degrees):
 
 class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
-    aggregate results. """
+    pie charts. """
     def __init__(self, survey, field, request_data):
-        self.answer_set = field.answer_set.values('text_answer',
-                                                  'boolean_answer')
+        self.answer_set = field.answer_set.values(field.value_column)
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
@@ -534,10 +536,7 @@ class AggregateResultCount:
                                              request_data)
         self.answer_value_lookup = {}
         for answer in self.answer_set:
-            if field.option_type == OPTION_TYPE_CHOICES.BOOL:
-                text = str(answer["boolean_answer"])
-            else:
-                text = fill(answer["text_answer"], 30)
+            text = fill(str(answer[field.value_column]), 30)
             if answer["count"]:
                 self.answer_value_lookup[text] = {
                     field.fieldname: text,
@@ -697,6 +696,7 @@ class Answer(models.Model):
         max_length=500,
         blank=True,
         thumbnail=dict(size=(250, 250)),
+        extra_thumbnails=local_settings.EXTRA_THUMBNAILS,
         upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
@@ -760,8 +760,8 @@ class SurveyReport(models.Model):
     and an annotation.  It also has article-like fields of its own.
     """
     survey = models.ForeignKey(Survey)
-    title = models.CharField(max_length=50, blank=True)
-    slug = models.CharField(max_length=50, blank=True)
+    title = models.CharField(max_length=50)
+    slug = models.CharField(max_length=50)
     # some text at the beginning
     summary = models.TextField(blank=True)
     # As crowdsourcing doesn't implement rating because we want to let you use
@@ -818,7 +818,7 @@ class SurveyReport(models.Model):
         return self.title
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')
 
 
 SURVEY_AGGREGATE_TYPE_CHOICES = ChoiceEnum('default sum count average')
@@ -863,6 +863,13 @@ class SurveyReportDisplay(models.Model):
         null=True,
         help_text=_('13 is about the right level for Manhattan. 0 shows the '
                     'entire world.'))
+    caption_fields = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text=_('The answers to these questions will appear as '
+                    'captions below their corresponding slides. Separate by '
+                    'spaces.'))
+
     if PositionField:
         order = PositionField(collection=('report',))
     else:
@@ -890,6 +897,9 @@ class SurveyReportDisplay(models.Model):
         if return_value:
             return return_value[0]
         return None
+
+    def get_caption_fieldnames(self):
+        return self.caption_fields.split(" ")
 
     def _get_questions(self, fieldnames, fields):
         names = fieldnames.split(" ")
