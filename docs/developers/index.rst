@@ -2,10 +2,16 @@
 Developers
 **********
 
-Intro
-=====
+This documentation is meant for the technical people who will install crowdsourcing, tailor it for your website, and keep it running.
 
-The example application is a great place to start. You can also review the producer's documentation as that explains what all the fields are for and how to use them. Finally, the source itself is a good place to look.
+The example application is a great place to start. You can also review the producer's documentation as that explains what all the fields are for and how to use them.
+
+Finally, the source itself is a good place to look. These files are particularly important.
+
+* crowdsourcing/models.py
+* crowdsourcing/urls.py
+* crowdsourcing/views.py
+* crowdsourcing/templatetags/crowdsourcing.py
 
 Setting Up the Example Application
 ==================================
