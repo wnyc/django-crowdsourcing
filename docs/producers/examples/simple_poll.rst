@@ -1,8 +1,8 @@
-*************
-Simple Survey
-*************
+***********
+Simple Poll
+***********
 
-This simple survey has a single question and a pie chart display. Since the pie chart is the default display for a choice type question, we don't have to set up any survey reports.
+This simple poll has a single question and a pie chart display. Since the pie chart is the default display for a choice type question, we don't have to set up any survey reports.
 
 /admin/crowdsourcing/survey/add/
 ================================

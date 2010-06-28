@@ -253,8 +253,7 @@ class Question(models.Model):
         max_length=32,
         help_text=_('a single-word identifier used to track this value; '
                     'it must begin with a letter and may contain '
-                    'alphanumerics and underscores (no spaces). You must not '
-                    'change this field on a live survey.'))
+                    'alphanumerics and underscores (no spaces).'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
     label = models.CharField(max_length=32, help_text=_(

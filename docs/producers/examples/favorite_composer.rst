@@ -14,7 +14,7 @@ Let's simply allow users to pick their favorite composer from a list. In other w
 Yes or No For Each Composer
 ===========================
 
-For this tact, we'll let each user enter the survey only once. Every composer gets a separate check box. We'll use the default survey report to display a pie chart for every composer showing checks vs. empty checks.
+For this approach, we'll let each user enter the survey only once. Every composer gets a separate check box. We'll use the default survey report to display a pie chart for every composer showing checks vs. empty checks.
 
 .. image:: images/FavoriteComposerEach.png
 

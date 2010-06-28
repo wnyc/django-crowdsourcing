@@ -5,7 +5,7 @@ Filters
 Introduction
 ============
 
-Filters allow you to control which submissions appear in a survey report. They appear at the top of a survey report. There is at most one filter per question. We currently only support filters for checkbox, choice type, number, and location questions.
+Filters allow you to control which submissions appear in a survey report. They appear at the top of a survey report. There is at most one filter per question. We currently only support filters for checkbox, choice type, numberic, and location questions.
 
 Types
 =====

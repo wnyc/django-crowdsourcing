@@ -11,8 +11,8 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   developers/index
    producers/index
+   developers/index
 
 Indices and tables
 ==================

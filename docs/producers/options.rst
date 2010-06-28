@@ -5,7 +5,7 @@ Objects and Options
 Submission
 ==========
 
-Crowdsourcing creates a Submission when a user correctly fills out a Survey and submits the form. A Submission is comprised of 0 or more Answers.
+Crowdsourcing creates a submission when a user correctly fills out a survey and submits the form. A submission is comprised of 0 or more answers.
 
 **Survey**
 
@@ -13,11 +13,11 @@ Each submission is associated with exactly one survey.
 
 **User**
 
-The user who submitted the submission is not necessarily required.
+If the person filling out the survey is logged in, crowdsourcing will set this field regardless of whether or not log in is required for the survey.
 
 **Ip address**
 
-Crowdsourcing pulls the IP Address from the http requrest which means that multiple users could have the same IP Address if they are behind a router.
+If the survey does not require logged in users and does not allow multiple submissions, crowdsourcing uses the ip address to stop multiple submissions. Crowdsourcing pulls the ip address from the http requrest which means that multiple users could have the same ip address if they are behind a router.
 
 **Submitted at**
 
@@ -25,11 +25,11 @@ This time reflects the time zone of the server that received the request, not th
 
 **Featured**
 
-This flag is useful for featuring specific submissions to a survey. How featured submissions are displayed exactly is particular to your site. 
+This flag is useful for featuring specific submissions. How featured submissions are displayed exactly is particular to your site.
 
 **Is public**
 
-This flag is set manually in the admin. Only public submissions are visible on the site. This includes aggregate results like pie charts.
+You set this flag manually in the admin. Only public submissions appear on the site. This includes charts and graphs like maps and pie charts. Surveys have a "moderate submissions" field which determines the default "is public" value. Moderated surveys have not public submissions which may be switched to public. Not moderated surveys have public submissions which may be switched to not public.
 
 Answer
 ======
@@ -42,7 +42,7 @@ An answer is a single answer to a specific question. A submission is made up of 
 
 **Text answer**
 
-This field is used for any question that is best recorded as a string of characters such as location questions.
+This field is used for any question that is best recorded as text, e.g. "What's your address?"
 
 **Integer answer**
 
@@ -50,7 +50,7 @@ This column is used for whole numbers.
 
 **Float answer**
 
-This column is used for decimals. Any Integer answer will also be recorded as a Float answer and visa versa. This is in case someone changes the type of question between Integer and Float.
+This column is used for decimals. Any integer answer will also be recorded as a float answer and visa versa. This is in case someone changes the type of question between integer and float.
 
 **Boolean answer**
 
@@ -70,7 +70,7 @@ In degrees between -90 and 90.
 
 **Flickr id**
 
-If you set your Crowdsourcing instance up to interface with Flickr, you associate a survey with a Flickr group, and a user uploads a photo, this field will contain the id that Flickr uses to identify the photo. This is an advanced field that you should never need to fix manually.
+If you set up crowdsourcing to work with Flickr, you associate a survey with a Flickr group, and a user uploads a photo, this field will contain the id that Flickr uses to identify the photo. This is an advanced field that you should never need to fix manually.
 
 Survey
 ======
@@ -79,7 +79,7 @@ A survey is a set of options and a list of questions.
 
 **Title**
 
-The title appears at the top whenever Crowdsourcing displays surveys or their results.
+The title appears at the top whenever crowdsourcing displays surveys or their results.
 
 **Slug**
 
@@ -91,7 +91,7 @@ The tease may be used to briefly describe the survey.
 
 **Description**
 
-The description appears after the title.
+The description appears after the title on detail pages.
 
 **Thanks**
 
@@ -99,11 +99,11 @@ When a user submits an entry they will either be redirected to the results, or w
 
 **Require login**
 
-When set, only users who are logged into the site can enter this survey.
+When set, only logged in users can enter this survey.
 
 **Allow multiple submissions**
 
-If you don't allow multiple submissions and don't require login, then Crowdsourcing will use the IP address of users who are not logged in to block multiple submissions.
+If you don't allow multiple submissions and don't require login, then Crowdsourcing will use the ip address of users who are not logged in to block multiple submissions.
 
 **Moderate submissions**
 
@@ -111,18 +111,18 @@ If you choose to moderate submissions then every submission will start out as no
 
 **Allow comments**
 
-Can users comment on other users' submissions? As many sites use custom commenting solutions, Crowdsourcing does not use this flag directly. That will be up to the developers of your site to implement. 
+Can users comment on other users' submissions?
 
 **Allow voting**
 
-Similarly, can users vote on other users' submissions? Again, crowdsourcing does not dictate a voting system so your developers will need to support this feature.
+Similarly, can users vote on other users' submissions?
 
 **Archive policy**
 
 At what point will Crowdsourcing make the results public?
 
 * *immediate*: All results are immediately public.
-* *post-close*: Results are public on or after the ends at option documented below.
+* *post-close*: Results are public on or after the "ends at" option documented below.
 * *never*: Results are never public.
 
 **Starts at**
@@ -143,7 +143,7 @@ Send a notification to these e-mail addresses whenever someone submits an entry 
 
 **Site**
 
-What site is this survey associated with? Crowdsourcing does not use this field, but your developers may need it.
+What site is this survey associated with? 
 
 **Flickr group name**
 
@@ -151,18 +151,18 @@ Use the exact group name from flickr.com. If you use this field, then all images
 
 **Default report**
 
-Survey reports describe how you should display the results of a survey. If you specify a default report then Crowdsourcing will use that report to display the results of a survey unless they request a specific different report. If you don't specify a default report then Crowdsourcing will use its default behavior which gets documented thoroughly under Survey Report. 
+Survey reports describe how you should display the results of a survey. If you specify a default report then Crowdsourcing will use that report to display the results of a survey unless they request a specific different report. You request specific reports by using the urls pattern ``http://yoursite.com/crowdsourcing/survey-slug/survey-report-slug/``. If you don't specify a default report then Crowdsourcing will use its default behavior.
 
 The default report behavior is to display the filters and individual results. It creates one pie chart for every choice type question, and one map for every location text box question.
 
 Question
 ========
 
-A survey contains a list of questions. Drop Down List, Radio Button List, Numeric Drop Down List, and Numeric Radio Button List questions are choice type questions. These are useful as categories.
+A survey contains a list of questions. Drop Down List, Radio Button List, Numeric Drop Down List, Numeric Radio Button List, and Checkbox questions are choice type questions. These are useful as categories.
 
 **Fieldname**
 
-The fieldname is a single-word identifier used to track a question. It must begin with a letter and may contain alphanumerics and underscores (no spaces). You can not include two questions with the same field name in a survey, but you can reuse the same fieldname between surveys.
+The fieldname is a single-word identifier used to track a question. It must begin with a letter and may contain alphanumerics and underscores (no spaces). Fieldnames must be unique within a survey, but you can reuse the same fieldname in different surveys.
 
 **Question**
 
@@ -182,20 +182,20 @@ Is an answer to this question required?
 
 **Order**
 
-This must be an integer. Crowdsourcing will sort questions by this field when deciding what order to display questions in.
+This must be an whole number. Crowdsourcing will sort questions by this field when deciding what order to display questions in.
 
 **Option type**
 
 What type of question is this?
 
-* *Checkbox*: Use a checkbox for Yes / No type questions. If this question is not required this will actually display a drop down list with an empty option.
+* *Checkbox*: Use a checkbox for Yes / No type questions. If you make a checkbox question required, then crowdsourcing requires the user to check the box. You would use this for a EULA. 
 * *Checkbox List*: Sometimes you have a list of checkboxes but you don't want to bother making a new question for every checkbox. The downside to checkbox lists is that they don't work in aggregate results like pie charts.
-* *Decimal Text Box*: The user will only be able to enter a decimal number. This type of question is good for money questions for example.
+* *Decimal Text Box*: The user will only be able to enter a decimal number. This type of question is good for money questions.
 * *Drop Down List*: This choice type question displays the options in a drop down list.
 * *Email Text Box*: This text box has minimal validation for a valid e-mail address.
 * *Integer Text Box*: The user will only be able to enter a whole number.
-* *Location Text Box*: This type of question is good for addresses. Crowdsourcing has some support for address questions such as map display.
-* *Numeric Drop Down List*: This choice type question takes only numbers as options and is therefore good for mathematic aggregate results.
+* *Location Text Box*: This type of question is good for addresses. Crowdsourcing can display maps for address questions.
+* *Numeric Drop Down List*: This choice type question takes only numbers as options. You could use this type of question for ratings.
 * *Numeric Radio Button List*: This choice type question is identical to the Numeric Drop Down List type except that it displays the options as a radio button list.
 * *Photo Upload*: Photo uploads will allow the user to upload a single photo. If this survey has Flickr support the photo will also upload to Flickr.
 * *Radio Button List*: This choice type question is identical to the Drop Down List type except that it displays the options as a radio button list.
@@ -205,7 +205,7 @@ What type of question is this?
 
 **Options**
 
-All choice type questions requre a list of options. Put each option on its own line. For Numeric Drop Down List and Numeric Radio Button List questions every option must be a number. You can use a mix of decimals and integers.
+All choice type questions requre a list of options. Put each option on its own line. For Numeric Drop Down List and Numeric Radio Button List questions every option must be a number. You can use a mix of decimals and whole numbers.
 
 **Map icons**
 
@@ -222,7 +222,7 @@ On a survey report you have the option to display filters. Different questions d
 Survey Report
 =============
 
-Survey reports describe how you would like to display the results for your survey. Survey reports are a collection of options and optionally also a list of Survey Report Displays.
+Survey reports describe how you would like to display the results for your survey. Survey reports are a collection of options and optionally a list of Survey Report Displays.
 
 **Survey**
 
@@ -234,7 +234,7 @@ The title displays on the survey report page.
 
 **Slug**
 
-You may reuse slugs so long as the same survey has only one survey report per slug. Slugs are used to build urls that display specific surveys using specific reports.
+You may reuse slugs so long as the same survey has only one survey report per slug. Slugs are used to build urls that display specific surveys using specific reports, e.g., ``http://yoursite.com/crowdsourcing/survey-slug/survey-report-slug/``.
 
 **Summary**
 
@@ -242,15 +242,15 @@ The summary displays on the survey report page below the title. You can use html
 
 **Sort by rating**
 
-You can sort submissions either descending by the day they were submitted, or descending by their rating.
+You can sort submissions either descending by the when they were submitted, or descending by their rating.
 
 **Display the filters**
 
-When you view this survey report, should Crowdsourcing display the appropriate filters at the top of the page?
+When you view this survey report, should Crowdsourcing display the filters at the top of the page?
 
 **Limit results to**
 
-This option limits the number of results that Crowdsourcing displays. It's useful for displaying a top 10 list for example.
+This option limits the number of results that Crowdsourcing displays. You could use it to make a top 10 list.
 
 **Display individual results**
 
@@ -264,22 +264,22 @@ Think of Survey Report Displays as line items in Survey Reports. The describe a 
 **Display type**
 
 * *text*: Simply insert the annotation directly in the report. This is useful for including raw html.
-* *pie*: Pie charts require 1 or more fieldnames. Crowdsourcing will draw one pie chart for every fieldname. Choice type and checkbox questions are best for pie charts. Questions with a large number of possible answers such as decimal text box questions will have many slices and won't make sense. Pie charts require either the default or count aggregate type. Pie charts can't have an x axis fieldname as this doesn't make sense.
+* *pie*: Pie charts require 1 or more fieldnames. Crowdsourcing will draw one pie chart for every fieldname. Choice type and checkbox questions are best for pie charts. Questions with a large number of possible answers such as decimal text box questions will have many slices and won't make sense. Pie charts require either the default or count aggregate type. Pie charts can't have an x axis fieldname as this doesn't make sense. Pie charts will have a slice for every option that at least one user picked.
 * *map*: Maps require 1 or more fieldnames. Only location questions make sense. Crowdsourcing will draw a map and put a marker down for every submission that has a recognizable address in the question referenced in the fieldnames.
 * *bar*: Bar charts have an x axis and 1 or more y axes, entered in the fieldnames.
 * *line*: Line charts are identical to bar charts except that they use connected lines between points instead of vertical bars.
 
 **Fieldnames**
 
-Fieldnames is a space delimited list of questions referenced by their fieldname. Usually you have to include at least one fieldname or your survey report display won't do anything. Exceptions include text which simply inserts raw html, and bar or line charts that use the count aggregate type. For bar and line charts the fieldnames will become the y axes. For pie charts each fieldname will become a single pie chart. The pie chart will have a slice for every option that at least one user picked. If your question is optional, then you may end up with a blank slice. Maps will display one map per location fieldname.
+Fieldnames is a space delimited list of questions referenced by their fieldname. Usually you have to include at least one fieldname or your survey report display won't do anything. Exceptions include text which simply inserts raw html, and bar or line charts that use the count aggregate type. For bar and line charts the fieldnames will become the y axes. For pie charts each fieldname will become a single pie chart. Maps will display one map per location fieldname.
 
 **Annotation**
 
-The annotation is raw html that you can insert for any Survey Report Display.
+The annotation is raw html that you can insert for any survey report display.
 
 **Order**
 
-Crowdsourcing displays Survey Report Displays in ascending order. You can specify the order as -1 if you would like Crowdsourcing to automatically pick where to place your Survey Report Display, usually at the end.
+Crowdsourcing displays survey report displays in ascending order. You can specify the order as -1 if you would like crowdsourcing to automatically pick where to place your Survey Report Display, usually at the end.
 
 Pie, Line, and Bar Charts
 """""""""""""""""""""""""
