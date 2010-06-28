@@ -1,5 +1,9 @@
 from datetime import datetime, date, time
-import simplejson
+
+try:
+    import simplejson as json
+except ImportError:
+    import json
 
 
 FORMATS = {datetime: "%Y-%m-%dT%H:%M:%S",
@@ -9,15 +13,15 @@ FORMATS = {datetime: "%Y-%m-%dT%H:%M:%S",
 
 def dump(obj, fp, **kw):
     kw.setdefault('cls', Encoder)
-    return simplejson.dump(obj, fp, **kw)
+    return json.dump(obj, fp, **kw)
 
 
 def dumps(obj, **kw):
     kw.setdefault('cls', Encoder)
-    return simplejson.dumps(obj, **kw)
+    return json.dumps(obj, **kw)
 
 
-class Encoder(simplejson.JSONEncoder):
+class Encoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj, 'to_jsondata'):
             return obj.to_jsondata()
