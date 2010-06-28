@@ -268,6 +268,7 @@ Think of Survey Report Displays as line items in Survey Reports. The describe a 
 * *map*: Maps require 1 or more fieldnames. Only location questions make sense. Crowdsourcing will draw a map and put a marker down for every submission that has a recognizable address in the question referenced in the fieldnames.
 * *bar*: Bar charts have an x axis and 1 or more y axes, entered in the fieldnames.
 * *line*: Line charts are identical to bar charts except that they use connected lines between points instead of vertical bars.
+* *slideshow*: Crowdsourcing will display one slideshow per fieldname. Only photo upload questions make sense as slideshows.
 
 **Fieldnames**
 
@@ -300,6 +301,13 @@ The aggregate type is only useful for Line and Bar charts. It describes how you 
 **X axis fieldname**
 
 The x axis is only valid for line and bar charts. Like fieldnames, use the fieldname of a question from the survey. You may only specify a single x-axis. Choice type questions, numeric questions, and checkbox questions all work well for the x axis. If you choose a numeric x axis then the x axis will be ordered and continuous as you would expect. Otherwise for non-numeric choice type questions the x axis values will appear in the same order as the options in the question.
+
+Slideshow
+"""""""""
+
+**Caption fields**
+
+The answers to these questions will appear as captions below their corresponding slides. Separate by spaces.
 
 Maps
 """"

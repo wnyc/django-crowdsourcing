@@ -866,7 +866,10 @@ class SurveyReportDisplay(models.Model):
     caption_fields = models.CharField(
         max_length=200,
         blank=True,
-        help_text=_('Separate by spaces.'))
+        help_text=_('The answers to these questions will appear as '
+                    'captions below their corresponding slides. Separate by '
+                    'spaces.'))
+
     if PositionField:
         order = PositionField(collection=('report',))
     else:
