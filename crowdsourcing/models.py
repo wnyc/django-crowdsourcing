@@ -104,8 +104,7 @@ class Survey(models.Model):
         editable=False)
     flickr_group_name = models.CharField(
         max_length=255,
-        blank=True,
-        help_text="Use the exact group name from flickr.com")
+        blank=True)
     default_report = models.ForeignKey(
         'SurveyReport',
         blank=True,

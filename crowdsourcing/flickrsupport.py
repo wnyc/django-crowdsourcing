@@ -12,9 +12,14 @@ from . import settings as local_settings
 _flickr = None
 
 
+def _has_flickr():
+    return all([local_settings.FLICKR_API_KEY,
+                local_settings.FLICKR_API_SECRET,
+                local_settings.FLICKR_TOKEN])
+
 def _get_flickr():
     global _flickr
-    if not _flickr:
+    if not _flickr and _has_flickr():
         _flickr = flickrapi.FlickrAPI(local_settings.FLICKR_API_KEY,
                                       local_settings.FLICKR_API_SECRET,
                                       token=local_settings.FLICKR_TOKEN)
@@ -30,7 +35,9 @@ def get_photo_hash(djfile):
 
 def _get_groups():
     flickr = _get_flickr()
-    return flickr.groups_pools_getGroups()._children[0]._children
+    if flickr:
+        return flickr.groups_pools_getGroups()._children[0]._children
+    return []
 
 
 def get_group_names():
