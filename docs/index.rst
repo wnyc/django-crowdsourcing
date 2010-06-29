@@ -8,9 +8,12 @@ Welcome to django-crowdsourcing's documentation!
 
 Django-crowdsourcing is a highly configurable survey and report tool
 for journalists, with a feature set that supports a wide range of
-useful crowdsourcing projects.  It is developed and used at New York
-Public Radio with support from the Knight Foundation, and released
+useful crowdsourcing projects.  It is developed and used at `New York
+Public Radio`_ with support from the `Knight Foundation`_, and released
 under an MIT license.
+
+.. _`New York Public Radio`: http://www.wnyc.org/
+.. _`Knight Foundation`: http://www.knightfoundation.org/
 
 The fundamental content unit this app provides is the survey, which
 consists of a list of questions, some presentational metadata -- title
