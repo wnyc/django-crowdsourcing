@@ -104,8 +104,7 @@ class Survey(models.Model):
         editable=False)
     flickr_group_name = models.CharField(
         max_length=255,
-        blank=True,
-        help_text="Use the exact group name from flickr.com")
+        blank=True)
     default_report = models.ForeignKey(
         'SurveyReport',
         blank=True,
@@ -639,7 +638,7 @@ class AggregateResult2AxisCount(AggregateResult2Axis):
 
 class Submission(models.Model):
     survey = models.ForeignKey(Survey)
-    user = models.ForeignKey(User, null=True)
+    user = models.ForeignKey(User, blank=True, null=True)
     ip_address = models.IPAddressField()
     submitted_at = models.DateTimeField(default=datetime.datetime.now)
     session_key = models.CharField(max_length=40, blank=True, editable=False)
@@ -692,8 +691,8 @@ class Answer(models.Model):
     submission = models.ForeignKey(Submission)
     question = models.ForeignKey(Question)
     text_answer = models.TextField(blank=True)
-    integer_answer = models.IntegerField(null=True)
-    float_answer = models.FloatField(null=True)
+    integer_answer = models.IntegerField(blank=True, null=True)
+    float_answer = models.FloatField(blank=True, null=True)
     boolean_answer = models.NullBooleanField()
     image_answer = ImageWithThumbnailsField(
         max_length=500,

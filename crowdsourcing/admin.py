@@ -4,8 +4,10 @@ import re
 
 from django.contrib import admin
 from django.forms import ModelForm, ValidationError
+from django.forms.widgets import Select
 from django.utils.translation import ugettext_lazy as _
 
+from .flickrsupport import get_group_names
 from .models import (Question, Survey, Answer, Submission,
                      SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
                      SURVEY_DISPLAY_TYPE_CHOICES,
@@ -23,8 +25,9 @@ class QuestionForm(ModelForm):
     def clean(self):
         OTC = OPTION_TYPE_CHOICES
         opts = self.cleaned_data.get('options', "")
-        if self.cleaned_data.get('option_type', "") in (OTC.NUMERIC_SELECT,
-                                                OTC.NUMERIC_CHOICE,):
+        if self.cleaned_data.get('option_type', "") in (
+            OTC.NUMERIC_SELECT,
+            OTC.NUMERIC_CHOICE,):
             for option in filter(None, (s.strip() for s in opts.splitlines())):
                 try:
                     float(option)
@@ -50,11 +53,16 @@ class QuestionInline(admin.StackedInline):
     form = QuestionForm
 
 
+def _flickr_group_choices():
+    return [('', '------',)] + [(n, n,) for n in get_group_names()]
+
+
 class SurveyAdminForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super(SurveyAdminForm, self).__init__(*args, **kwargs)
         qs = SurveyReport.objects.filter(survey=self.instance)
         self.fields['default_report'].queryset = qs
+        self.fields['flickr_group_name'].widget = Select(choices=_flickr_group_choices())
 
     class Meta:
         model = Survey
@@ -109,6 +117,7 @@ class AnswerInline(admin.TabularInline):
 
 
 class SubmissionAdmin(admin.ModelAdmin):
+    raw_id_fields = ('user',)
     search_fields = ('answer__text_answer',)
     list_display = ('survey', 'submitted_at', 'user',
                     'ip_address', 'email', 'is_public',)
@@ -130,11 +139,11 @@ LINE = SURVEY_DISPLAY_TYPE_CHOICES.LINE
 
 class SurveyReportDisplayInlineForm(ModelForm):
     def clean(self):
-        display_type = self.cleaned_data("display_type", "")
-        aggregate_type = self.cleaned_data("aggregate_type", "")
-        fieldnames = self.cleaned_data("fieldnames", "")
-        x_axis_fieldname = self.cleaned_data("x_axis_fieldname", "")
-        annotation = self.cleaned_data("annotation", "")
+        display_type = self.cleaned_data.get("display_type", "")
+        aggregate_type = self.cleaned_data.get("aggregate_type", "")
+        fieldnames = self.cleaned_data.get("fieldnames", "")
+        x_axis_fieldname = self.cleaned_data.get("x_axis_fieldname", "")
+        annotation = self.cleaned_data.get("annotation", "")
         is_chart = display_type in (BAR, LINE,)
         is_count = aggregate_type == SURVEY_AGGREGATE_TYPE_CHOICES.COUNT
         one_axis_count = is_chart and is_count
