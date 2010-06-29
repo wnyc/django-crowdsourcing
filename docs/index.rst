@@ -6,15 +6,51 @@
 Welcome to django-crowdsourcing's documentation!
 ================================================
 
-django-crowdsourcing, hereafter just crowdsourcing, is a tool for making surveys and displaying the results. Your questions can be drop down lists, image uploads, video links, addresses, and more. You can display pie charts, maps, slideshows, graphs, an archive of the results, and more.
+Django-crowdsourcing is a highly configurable survey and report tool
+for journalists, with a feature set that supports a wide range of
+useful crowdsourcing projects.  It is developed and used at New York
+Public Radio with support from the Knight Foundation, and released
+under an MIT license.
 
-Crowdsourcing uses the Django admin. You set up surveys which consist of a list of questions. Users create submissions which consist of answers to those questions. You may set up survey reports which describe how you want to display those submissions.
+The fundamental content unit this app provides is the survey, which
+consists of a list of questions, some presentational metadata -- title
+and so on -- and configuration that determines some aspects of how the
+survey behaves.  The questions may solicit a variety of different
+types of input: text, numbers, choices from drop-down or radio lists,
+image uploads, video links, addresses, and more.  Survey forms exist
+in both full page and embeddable versions, for maximum flexibility in
+presentation.
 
-Crowdsourcing has some tools that help you embed survey entry forms and survey reports anywhere on your website.
+Users primarily participate by creating submissions which consist of
+answers to the survey's questions.  Whether these answers are
+published or not is defined on a per-survey basis.  Users may also,
+depending on how the survey is configured, be able to comment on
+and/or rate each other's contributions.
 
-Crowdsourcing is open source and under active development, so expect great new features soon.
+These submissions, if you wish to display them, may be presented in
+one or more survey reports, which represent different views on the
+data collected; reports can contain widgets such as pie charts, maps,
+slideshows, graphs, and more, as well as filterable archives of the
+results and, if you wish, editorial annotations.  If you don't
+configure any reports, the application will do its best to generate a
+reasonable report given the types of questions asked and the survey
+configuration.  Reports, like survey forms, can also be embedded
+in other pages.
 
-If your website runs on django and you want some slick surveys, crowdsourcing is a good way to go. It's easy enough to handle simple polls with pie charts, yet it's powerful enough to handle complicated surveys with rich multimedia responses plotted on a map with custom icons.
+Django-crowdsourcing is a reusable Django application, designed to be
+installed easily in any Django site.  It is site-aware, and works well
+in multi-site installations.  Its surveys are entirely
+configured within the admin interface that ships with Django.
+
+While the primary focus of development is support for crowdsourcing
+projects, the survey tool is general purpose and can be used for a
+variety of applications.  If your website runs on Django and you want
+some slick surveys, crowdsourcing is a good way to go. It's easy
+enough to handle simple polls with pie charts, yet it's powerful
+enough to handle complicated surveys with rich multimedia responses
+plotted on a map with custom icons.  And it is under active
+development, so expect more features soon.
+
 
 Contents
 ========
