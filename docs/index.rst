@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to django-crowdsourcing's documentation!
-================================================
+Django-Crowdsourcing
+====================
 
 Django-crowdsourcing is a highly configurable survey and report tool
 for journalists, with a feature set that supports a wide range of
@@ -41,9 +41,9 @@ configuration.  Reports, like survey forms, can also be embedded
 in other pages.
 
 Django-crowdsourcing is a reusable Django application, designed to be
-installed easily in any Django site.  It is site-aware, and works well
-in multi-site installations.  Its surveys are entirely
-configured within the admin interface that ships with Django.
+installed easily in any Django site.  It is site-aware, and thus works 
+well in multi-site installations.  Its surveys are entirely configured within 
+the admin interface that ships with Django.
 
 While the primary focus of development is support for crowdsourcing
 projects, the survey tool is general purpose and can be used for a
