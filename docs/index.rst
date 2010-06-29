@@ -37,8 +37,9 @@ slideshows, graphs, and more, as well as filterable archives of the
 results and, if you wish, editorial annotations.  If you don't
 configure any reports, the application will do its best to generate a
 reasonable report given the types of questions asked and the survey
-configuration.  Reports, like survey forms, can also be embedded
-in other pages.
+configuration.  Reports, like survey forms, can also be embedded in
+other pages.  Or, if you want to create your own mash-up from survey
+data, it can be queried by means of a flexible web api.
 
 Django-crowdsourcing is a reusable Django application, designed to be
 installed easily in any Django site.  It is site-aware, and thus works 
