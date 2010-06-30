@@ -16,7 +16,12 @@ urlpatterns = patterns(
     "",
     url(r'^submissions/$',
         submissions,
+        {"format": "json"},
         name='submissions'),
+
+    url(r'^submissions/(?P<format>[a-z]+)/$',
+        submissions,
+        name='submissions_by_format'),
 
     url(r'^submission/(?P<id>\d+)/$',
         submission),
