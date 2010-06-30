@@ -320,7 +320,7 @@ def submissions(request, format):
                 "also be trying to pull some hotshot move like, 'Get me all "
                 "submissions that belong to a survey with a filter named %s "
                 "that match %s.' Crowdsourcing could support this, but it "
-                "would be pretty inneficient and, we're guessing, pretty "
+                "would be pretty inefficient and, we're guessing, pretty "
                 "rare. If that's what you're trying to do I'm afraid you'll "
                 "have to do something more complicated like iterating through "
                 "all your surveys.")
