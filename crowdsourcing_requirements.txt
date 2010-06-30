@@ -17,3 +17,6 @@ geopy
 
 # For building the documentation.
 # Sphinx
+
+# For flickr support
+flickrapi
