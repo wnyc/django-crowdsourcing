@@ -3,6 +3,11 @@ var yahooChartCallbacks = [];
 var googleMapAPILoaded = false;
 var yahooChartAPILoaded = false;
 function loadMapsAndCharts() {
+  /* We don't want to necessarily load the google map and yahoo chart APIs on
+   * every page. Luckily, both APIs provide a mechanism for lazy loading.
+   * The crowdsourcing maps and charts register the code they need to run in
+   * googleMapCallbacks and yahooChartCallbacks. This gives loadMapsAndCharts
+   * a chance to load the APIs before attempting to load any charts or maps. */
   if (googleMapCallbacks.length) {
     var onAPILoaded = function() {
       while (googleMapCallbacks.length) {

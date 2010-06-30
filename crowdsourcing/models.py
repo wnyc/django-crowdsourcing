@@ -650,14 +650,17 @@ class Submission(models.Model):
     class Meta:
         ordering = ('-submitted_at',)
 
-    def to_jsondata(self):
+    def to_jsondata(self, answer_lookup=None):
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
+        if answer_lookup:
+            answers = answer_lookup[self.pk]
+        else:
+            answers = self.answer_set.filter(question__answer_is_public=True)
         return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
-                                      for a in self.answer_set.filter(
-                                      question__answer_is_public=True)),
+                                      for a in answers),
                             survey=self.survey.slug,
                             submitted_at=self.submitted_at,
                             featured=self.featured)

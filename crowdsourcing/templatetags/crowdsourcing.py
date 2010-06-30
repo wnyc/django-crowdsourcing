@@ -52,6 +52,22 @@ def yahoo_api():
 register.simple_tag(yahoo_api)
 
 
+def jquery_and_google_api():
+    key = ""
+    if local_settings.GOOGLE_MAPS_API_KEY:
+        key = '?key=%s' % local_settings.GOOGLE_MAPS_API_KEY
+    jsapi = "".join([
+        '<script type="text/javascript" src="http://www.google.com/jsapi',
+        key,
+        '"></script>'])
+    return mark_safe("\n".join([
+        jsapi,
+        '<script type="text/javascript">',
+        '  google.load("jquery", "1.4");',
+        '</script>']))
+register.simple_tag(jquery_and_google_api)
+
+
 def filter(wrapper_format, key, label, html):
     label_html = '<label for="%s">%s</label>' % (key, label,)
     return mark_safe(wrapper_format % (label_html + html))
@@ -291,142 +307,6 @@ def _yahoo_chart(display, unique_id, args):
     return mark_safe("\n".join(out))
 
 
-def video_html(vid, maxheight, maxwidth):
-    key = "%s_%d_%d" % (vid, maxheight, maxwidth)
-    value = cache.get(key, None)
-    if not value:
-        value = "Unable to find video %s." % escape(vid)
-        try: 
-            data = oembed_expand(vid, maxheight=maxheight, maxwidth=maxwidth)
-            if data and 'html' in data:
-                html = '<div class="videoplayer">%s</div>' % data['html']
-                value = mark_safe(html)
-        except Exception as ex:
-            logging.warn("oembed_expand exception: %s" % str(ex))
-        # This shouldn't really change and it's an expensive runtime lookup.
-        # Cache it for a very long time.
-        cache.set(key, value, 7 * 24 * 60 * 60)
-    return value
-
-
-def submission_fields(submission,
-                      fields=None,
-                      page_answers=None,
-                      video_height=360,
-                      video_width=288):
-    if not page_answers:
-        page_answers = get_all_answers([submission])
-    if not fields:
-        fields = list(submission.survey.get_public_fields())
-    out = []
-    answer_list = page_answers[submission.id]
-    answers = {}
-    for answer in answer_list:
-        answers[answer.question] = answer
-    for question in fields:
-        out.append('<div class="field">')
-        answer = answers.get(question, None)
-        if answer and answer.value:
-            out.append('<label>%s</label>' % question.label)
-            if answer.image_answer:
-                try:
-                    thmb = answer.image_answer.thumbnail.absolute_url
-                    args = (thmb, answer.id,)
-                    out.append('<img src="%s" id="img_%d" />' % args)
-                    # This extra hidden input is in case you want to enlarge
-                    # images. Don't bother enlarging images unless we'll
-                    # increase their dimensions by at least 10%.
-                    thumb_width = answer.image_answer.thumbnail.width()
-                    if float(answer.image_answer.width) / thumb_width > 1.1:
-                        format = ('<input type="hidden" id="img_%d_full_url" '
-                                  'value="%s" class="enlargeable" />')
-                        args = (answer.id, answer.image_answer.url)
-                        out.append(format % args)
-                except ThumbnailException as ex:
-                    out.append('<div class="error">%s</div>' % str(ex))
-            elif question.option_type == OPTION_TYPE_CHOICES.VIDEO:
-                if oembed_expand:
-                    html = video_html(answer.value, video_height, video_width)
-                    out.append(html)
-                else:
-                    args = {"val": escape(answer.value)}
-                    out.append('<a href="%(val)s">%(val)s</a>' % args)
-            else:
-                out.append(escape(answer.value))
-        out.append('</div>')
-    return mark_safe("\n".join(out))
-register.simple_tag(submission_fields)
-
-
-DETAIL_SURVEY_NONE = ChoiceEnum('detail survey none')
-
-
-def submissions(object_list, fields):
-    out = []
-    page_answers = get_all_answers(object_list)
-    for submission in object_list:
-        out.append('<div class="submission">')
-        out.append(submission_fields(submission, fields, page_answers))
-        D = link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL
-        out.append(submission_link(submission, D))
-        out.append('</div>')
-    return mark_safe("\n".join(out))
-register.simple_tag(submissions)
-
-
-def submission_link(submission,
-                    link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
-    out = ['<div class="permalink">']
-    if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
-        return ""
-    elif link_detail_survey_none == DETAIL_SURVEY_NONE.SURVEY:
-        text = "Back to %s" % submission.survey.title
-        kwargs = {"slug": submission.survey.slug}
-        view = "survey_default_report_page_1"
-        if submission.survey.default_report:
-            kwargs["report"] = submission.survey.default_report.slug
-            view = "survey_report_page_1"
-        url = reverse(view, kwargs=kwargs)
-    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
-        url = submission.get_absolute_url()
-        text = "Permalink"
-    out.append('<a href="%s">%s</a>' % (url, text,))
-    out.append('</div>')
-    return mark_safe("\n".join(out))
-register.simple_tag(submission_link)
-
-
-def paginator(survey, report, pages_to_link, page_obj):
-    out = []
-    url_args = dict(slug=survey.slug, page=0)
-    view_name = "survey_default_report"
-    if report.slug:
-        view_name = "survey_report"
-        url_args["report"] = report.slug
-    if len(pages_to_link) > 1:
-        out.append('<div class="pages">')
-        if page_obj.has_previous():
-            url_args["page"] = page_obj.previous_page_number()
-            url = reverse(view_name, kwargs=url_args)
-            out.append('<a href="%s">&laquo; Previous</a>' % url)
-        for page in pages_to_link:
-            if not page:
-                out.append("...")
-            elif page_obj.number == page:
-                out.append(str(page))
-            else:
-                url_args["page"] = page
-                url = reverse(view_name, kwargs=url_args)
-                out.append('<a href="%s">%d</a>' % (url, page))
-        if page_obj.has_next():
-            url_args["page"] = page_obj.next_page_number()
-            url = reverse(view_name, kwargs=url_args)
-            out.append('<a href="%s">Next &raquo;</a>' % url)
-        out.append("</div>")
-    return mark_safe("\n".join(out))
-register.simple_tag(paginator)
-
-
 def google_map(display, question, ids):
     map_id = "map_%d" % question.id
     detail_id = "map_detail_%d" % question.id
@@ -502,10 +382,148 @@ def simple_slideshow(display, question, request_GET, css):
 register.simple_tag(simple_slideshow)
 
 
-def number_to_javascript(number):
-    if isinstance(number, (int, float,)):
-        return str(number)
-    return "null"
+def load_maps_and_charts():
+    return mark_safe("\n".join([
+        '<script type="text/javascript">',
+        '  loadMapsAndCharts();',
+        '</script>']))
+register.simple_tag(load_maps_and_charts)
+
+
+def submission_fields(submission,
+                      fields=None,
+                      page_answers=None,
+                      video_height=360,
+                      video_width=288):
+    if not page_answers:
+        page_answers = get_all_answers([submission])
+    if not fields:
+        fields = list(submission.survey.get_public_fields())
+    out = []
+    answer_list = page_answers[submission.id]
+    answers = {}
+    for answer in answer_list:
+        answers[answer.question] = answer
+    for question in fields:
+        out.append('<div class="field">')
+        answer = answers.get(question, None)
+        if answer and answer.value:
+            out.append('<label>%s</label>' % question.label)
+            if answer.image_answer:
+                try:
+                    thmb = answer.image_answer.thumbnail.absolute_url
+                    args = (thmb, answer.id,)
+                    out.append('<img src="%s" id="img_%d" />' % args)
+                    # This extra hidden input is in case you want to enlarge
+                    # images. Don't bother enlarging images unless we'll
+                    # increase their dimensions by at least 10%.
+                    thumb_width = answer.image_answer.thumbnail.width()
+                    if float(answer.image_answer.width) / thumb_width > 1.1:
+                        format = ('<input type="hidden" id="img_%d_full_url" '
+                                  'value="%s" class="enlargeable" />')
+                        args = (answer.id, answer.image_answer.url)
+                        out.append(format % args)
+                except ThumbnailException as ex:
+                    out.append('<div class="error">%s</div>' % str(ex))
+            elif question.option_type == OPTION_TYPE_CHOICES.VIDEO:
+                if oembed_expand:
+                    html = video_html(answer.value, video_height, video_width)
+                    out.append(html)
+                else:
+                    args = {"val": escape(answer.value)}
+                    out.append('<a href="%(val)s">%(val)s</a>' % args)
+            else:
+                out.append(escape(answer.value))
+        out.append('</div>')
+    return mark_safe("\n".join(out))
+register.simple_tag(submission_fields)
+
+
+def video_html(vid, maxheight, maxwidth):
+    key = "%s_%d_%d" % (vid, maxheight, maxwidth)
+    value = cache.get(key, None)
+    if not value:
+        value = "Unable to find video %s." % escape(vid)
+        try: 
+            data = oembed_expand(vid, maxheight=maxheight, maxwidth=maxwidth)
+            if data and 'html' in data:
+                html = '<div class="videoplayer">%s</div>' % data['html']
+                value = mark_safe(html)
+        except Exception as ex:
+            logging.warn("oembed_expand exception: %s" % str(ex))
+        # This shouldn't really change and it's an expensive runtime lookup.
+        # Cache it for a very long time.
+        cache.set(key, value, 7 * 24 * 60 * 60)
+    return value
+
+
+DETAIL_SURVEY_NONE = ChoiceEnum('detail survey none')
+
+
+def submissions(object_list, fields):
+    out = []
+    page_answers = get_all_answers(object_list)
+    for submission in object_list:
+        out.append('<div class="submission">')
+        out.append(submission_fields(submission, fields, page_answers))
+        D = link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL
+        out.append(submission_link(submission, D))
+        out.append('</div>')
+    return mark_safe("\n".join(out))
+register.simple_tag(submissions)
+
+
+def submission_link(submission,
+                    link_detail_survey_none=DETAIL_SURVEY_NONE.SURVEY):
+    out = ['<div class="permalink">']
+    if link_detail_survey_none == DETAIL_SURVEY_NONE.NONE:
+        return ""
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.SURVEY:
+        text = "Back to %s" % submission.survey.title
+        kwargs = {"slug": submission.survey.slug}
+        view = "survey_default_report_page_1"
+        if submission.survey.default_report:
+            kwargs["report"] = submission.survey.default_report.slug
+            view = "survey_report_page_1"
+        url = reverse(view, kwargs=kwargs)
+    elif link_detail_survey_none == DETAIL_SURVEY_NONE.DETAIL:
+        url = submission.get_absolute_url()
+        text = "Permalink"
+    out.append('<a href="%s">%s</a>' % (url, text,))
+    out.append('</div>')
+    return mark_safe("\n".join(out))
+register.simple_tag(submission_link)
+
+
+def paginator(survey, report, pages_to_link, page_obj):
+    out = []
+    url_args = dict(slug=survey.slug, page=0)
+    view_name = "survey_default_report"
+    if report.slug:
+        view_name = "survey_report"
+        url_args["report"] = report.slug
+    if len(pages_to_link) > 1:
+        out.append('<div class="pages">')
+        if page_obj.has_previous():
+            url_args["page"] = page_obj.previous_page_number()
+            url = reverse(view_name, kwargs=url_args)
+            out.append('<a href="%s">&laquo; Previous</a>' % url)
+        for page in pages_to_link:
+            if not page:
+                out.append("...")
+            elif page_obj.number == page:
+                out.append(str(page))
+            else:
+                url_args["page"] = page
+                url = reverse(view_name, kwargs=url_args)
+                out.append('<a href="%s">%d</a>' % (url, page))
+        if page_obj.has_next():
+            url_args["page"] = page_obj.next_page_number()
+            url = reverse(view_name, kwargs=url_args)
+            out.append('<a href="%s">Next &raquo;</a>' % url)
+        out.append("</div>")
+    return mark_safe("\n".join(out))
+register.simple_tag(paginator)
 
 
 def map_key(survey):
@@ -522,28 +540,10 @@ def map_key(survey):
 register.simple_tag(map_key)
 
 
-def jquery_and_google_api():
-    key = ""
-    if local_settings.GOOGLE_MAPS_API_KEY:
-        key = '?key=%s' % local_settings.GOOGLE_MAPS_API_KEY
-    jsapi = "".join([
-        '<script type="text/javascript" src="http://www.google.com/jsapi',
-        key,
-        '"></script>'])
-    return mark_safe("\n".join([
-        jsapi,
-        '<script type="text/javascript">',
-        '  google.load("jquery", "1.4");',
-        '</script>']))
-register.simple_tag(jquery_and_google_api)
-
-
-def load_maps_and_charts():
-    return mark_safe("\n".join([
-        '<script type="text/javascript">',
-        '  loadMapsAndCharts();',
-        '</script>']))
-register.simple_tag(load_maps_and_charts)
+def number_to_javascript(number):
+    if isinstance(number, (int, float,)):
+        return str(number)
+    return "null"
 
 
 def issue(message):

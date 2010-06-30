@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import csv
 from datetime import datetime
 import httplib
 from itertools import count
@@ -224,9 +225,14 @@ def questions(request, slug):
     return response
 
 
-def submissions(request):
-    """ Use this view to make arbitrary queries on submissions. Use the query
-    string to pass keys and values. For example,
+FORMAT_CHOICES = ('json', 'csv', 'xml', 'http',)
+
+
+def submissions(request, format):
+    """ Use this view to make arbitrary queries on submissions. If the user is
+    a logged in staff member, ignore submission.is_public,
+    question.answer_is_public, and survey.can_have_public_submissions. Use the
+    query string to pass keys and values. For example,
     /crowdsourcing/submissions/?survey=my-survey will return all submissions
     for the survey with slug my-survey.
     survey - the slug for the survey
@@ -235,47 +241,135 @@ def submissions(request):
     submitted_from and submitted_to - strings in the format YYYY-mm-ddThh:mm:ss
         For example, 2010-04-05T13:02:03
     featured - A blank value, 'f', 'false', 0, 'n', and 'no' all mean ignore
-        the featured flag. Everything else means display only featured. """
-    response = HttpResponse(mimetype='application/json')
-    results = Submission.objects.filter(is_public=True)
-    valid_filters = (
+        the featured flag. Everything else means display only featured.
+    You can also use filters in the survey report sense. Rather than document
+    exactly what parameters you would pass, follow these steps to figure it
+    out:
+    1. Enable filters on your survey and the questions you want to filter on.
+    2. Go to the report page and fill out the filters you want.
+    3. Click Submit. 
+    4. Examine the query string of the page you end up on and note which
+        parameters are filled out. Use those same parameters here. """
+    format = format.lower()
+    if format not in FORMAT_CHOICES:
+        msg = ("%s is an unrecognized format. Crowdsourcing recognizes "
+               "these: %s") % (format, ", ".join(FORMAT_CHOICES))
+        return HttpResponse(msg)
+    is_staff = request.user.is_authenticated() and request.user.is_staff
+    if is_staff:
+        results = Submission.objects.all()
+    else:
+        # survey.can_have_public_submissions is complicated enough that
+        # we'll check it in Python, not the database.
+        results = Submission.objects.filter(
+            is_public=True,
+            question__answer_is_public=True)
+    results = results.select_related("survey")
+    basic_filters = (
         'survey',
         'user',
         'submitted_from',
         'submitted_to',
         'featured')
-    for field in request.GET.keys():
-        if field in valid_filters:
-            value = request.GET[field]
-            if 'survey' == field:
-                field = 'survey__slug'
-            elif 'user' == field:
-                if '' == value:
-                    field = 'user'
-                    value = None
-                else:
-                    field = 'user__username'
-            elif field in ('submitted_from', 'submitted_to'):
-                format = "%Y-%m-%dT%H:%M:%S"
-                try:
-                    value = datetime.strptime(value, format)
-                except ValueError:
-                    return HttpResponse(
-                        ("Invalid %s format. Try, for example, "
-                         "%s") % (field, datetime.now().strftime(format),))
-                if 'submitted_from' == field:
-                    field = 'submitted_at__gte'
-                else:
-                    field = 'submitted_at__lte'
-            elif 'featured' == field:
-                falses = ('f', 'false', 'no', 'n', '0',)
-                value = len(value) and not value.lower() in falses
-            # field is unicode but needs to be ascii.
-            results = results.filter(**{str(field): value})
+    get = request.GET.copy()
+    keys = get.keys()
+    survey_slug = ""
+    for field in [f for f in keys if f in basic_filters]:
+        value = get[field]
+        if 'survey' == field:
+            search_field = 'survey__slug'
+            survey_slug = value
+        elif 'user' == field:
+            if '' == value:
+                search_field = 'user'
+                value = None
+            else:
+                search_field = 'user__username'
+        elif field in ('submitted_from', 'submitted_to'):
+            format = "%Y-%m-%dT%H:%M:%S"
+            try:
+                value = datetime.strptime(value, format)
+            except ValueError:
+                return HttpResponse(
+                    ("Invalid %s format. Try, for example, "
+                     "%s") % (field, datetime.now().strftime(format),))
+            if 'submitted_from' == field:
+                search_field = 'submitted_at__gte'
+            else:
+                search_field = 'submitted_at__lte'
+        elif 'featured' == field:
+            falses = ('f', 'false', 'no', 'n', '0',)
+            value = len(value) and not value.lower() in falses
+        # search_field is unicode but needs to be ascii.
+        results = results.filter(**{str(search_field): value})
+        get.pop(field)
+    if get:
+        if survey_slug:
+            results = extra_from_filters(
+                results,
+                "submission.id",
+                Survey.objects.get(slug=survey_slug),
+                get)
         else:
-            return HttpResponse(("You can't filter on %s. Valid options are "
-                                 "%s.") % (field, valid_filters))
-    dump([result.to_jsondata() for result in results], response)
+            message = (
+                "You've got a couple of extra filters here, and we "
+                "aren't sure what to do with them. You may have just "
+                "misspelled one of the basic filters (%s). You may have a "
+                "filter from a particular survey in mind. In that case, just "
+                "include survey=my-survey-slug in the query string. You may "
+                "also be trying to pull some hotshot move like, 'Get me all "
+                "submissions that belong to a survey with a filter named %s "
+                "that match %s.' Crowdsourcing could support this, but it "
+                "would be pretty inneficient and, we're guessing, pretty "
+                "rare. If that's what you're trying to do I'm afraid you'll "
+                "have to do something more complicated like iterating through "
+                "all your surveys.")
+            item = get.items()[0]
+            message = message % (", ".join(basic_filters), item[0], item[1])
+    if not is_staff:
+        rs = [r for r in results if r.survey.can_have_public_submissions()]
+        results = rs
+    answer_lookup = get_all_answers(results)
+    result_data = [result.to_jsondata(answer_lookup) for result in results]
+
+    for data in result_data:
+        data.update(data["data"])
+        data.pop("data")
+
+    def get_keys():
+        key_lookup = {}
+        for data in result_data:
+            for key in data.keys():
+                key_lookup[key] = True
+        return sorted(key_lookup.keys())
+
+    if format == 'json':
+        response = HttpResponse(mimetype='application/json')
+        dump(result_data, response)
+    elif format == 'csv':
+        response = HttpResponse(mimetype='text/csv')
+        keys = get_keys()
+        writer.writerow(keys)
+        for data in result_data:
+            writer.writerow([data.get(key, "") for key in keys])
+    elif format == 'xml':
+        data_list = []
+        for data in result_data:
+            values = ["<%s>%s</%s>" % (k, str(v), k) for k, v in data.items()]
+            data_list.append("<submission>%s</submission>" % "".join(values))
+        subs = "<submissions>%s</submissions>" % "\n".join(data_list)
+        response = HttpResponse(subs, mimetype='text/xml')
+    elif format == 'http': # mostly for debugging.
+        data_list = []
+        keys = get_keys()
+        results = [
+            "<html><body><table>",
+            "<tr>%s</tr>" % "".join(["<th>%s</th>" % k for k in keys])]
+        for data in result_data:
+            cells = ["<td>%s</td>" % data.get(key, "") for key in keys]
+            results.append("<tr>%s</tr>" % "".join(cells))
+        results.append("</table></body></html>")
+        response = HttpResponse("\n".join(results))
     return response
 
 
