@@ -1,23 +1,59 @@
-django-crowdsourcing is a survey application that began life as a fork
-of Doug Napoleone's django-survey to meet a couple of objectives:
+====================
+django-crowdsourcing
+====================
 
-1. survey creation can be done effectively in the django admin.
-2. there is support for photo uploads and video embeds.
-3. results are available via a JSON api.
-4. depending on the nature of a survey, submissions may be  displayed in 
-   archives as well as aggregated in various ways.
+Django-crowdsourcing is an MIT-licensed survey and report tool for
+journalists, supporting many types of survey questions and a wide
+variety of reporting options.  A reusable Django application, it is
+designed to be installed easily in any Django site, including
+multi-site installations.  Its surveys are entirely configured within
+the admin interface that ships with Django.
+
+While the primary focus of development is support for crowdsourcing
+projects, the survey tool is general purpose and can be used for a
+variety of applications.  It is easy enough to handle simple polls
+with pie charts, yet powerful enough to handle complicated surveys
+with rich multimedia responses plotted on a map with custom icons.
+
+History/Credits
+~~~~~~~~~~~~~~~
+
+Django-crowdsourcing began life as a fork of Doug Napoleone's
+`django-survey`_.  Jacob Smullyan and James Richards started the project;
+Dave Smith wrote most of the 1.x version.
+
+.. _`django-survey`: http://code.google.com/p/django-survey/ 
 
 Running The Example App
-1. $ easy_install pip
-2. $ pip install -r crowdsourcing_requirements.txt
-3. $ pip install -r example_app/example_app_requirements.txt
-4. By default the example app will use a sqlite db; if if you want to
-   change that, modify example_app/local_settings.py accordingly.
-5. $ cd example_app
-6. $ ./manage.py syncdb
-7. $ ./manage.py runserver 
-8. Add some surveys in /admin/
+~~~~~~~~~~~~~~~~~~~~~~~
+
+  1. $ easy_install pip
+  2. $ pip install -r crowdsourcing_requirements.txt
+  3. $ pip install -r example_app/example_app_requirements.txt
+  4. By default the example app will use a sqlite db; if if you want to
+     change that, modify example_app/local_settings.py accordingly.
+  5. $ cd example_app
+  6. $ ./manage.py syncdb
+  7. $ ./manage.py runserver 
+  8. Add some surveys in /admin/
 
 Notes
-1. Should work under Django 1.1 and 1.2
-2. Only tested on Python 2.6
+~~~~~
+
+  1. Should work under Django 1.1 and 1.2
+  2. Only tested on Python 2.6
+
+Documentation
+~~~~~~~~~~~~~
+
+Extensive documentation is included, or can be read `online`_.
+
+.. _`online`: http://packages.python.org/django-crowdsourcing/
+
+Other Resources
+~~~~~~~~~~~~~~~
+
+ * Python Cheeseshop page: http://pypi.python.org/pypi/django-crowdsourcing
+ * Source code repository and ticket tracker: http://code.google.com/p/django-crowdsourcing/  
+ * Discussion group: http://groups.google.com/groups/django-crowdsourcing/
+ 
