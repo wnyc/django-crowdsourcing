@@ -24,6 +24,26 @@ Dave Smith wrote most of the 1.x version.
 
 .. _`django-survey`: http://code.google.com/p/django-survey/ 
 
+Installation
+~~~~~~~~~~~~
+
+Prerequisites are:
+
+ * Django itself, of course -- 1.1 or better.
+ * `PIL`_
+ * `django-positions`_
+ * `sorl-thumbnail`_
+
+Django-crowdsourcing itself can be installed with `pip`_::
+
+  $ # probably in a virtualenv ...
+  $ pip install django-crowdsourcing 
+
+.. _`PIL`: http://pythonware.com/products/pil/
+.. _`django-positions`: http://github.com/jpwatts/django-positions 
+.. _`sorl-thumbnail`: http://code.google.com/p/sorl-thumbnail/
+.. _`pip`: http://pip.openplans.org/
+
 Running The Example App
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -55,5 +75,5 @@ Other Resources
 
  * Python Cheeseshop page: http://pypi.python.org/pypi/django-crowdsourcing
  * Source code repository and ticket tracker: http://code.google.com/p/django-crowdsourcing/  
- * Discussion group: http://groups.google.com/groups/django-crowdsourcing/
+ * Discussion group: http://groups.google.com/group/django-crowdsourcing/
  

@@ -16,9 +16,24 @@ If you want to go directly to the source, these files are particularly important
 Installation
 ============
 
-::
 
-  $ pip install django-crowdsourcing
+Prerequisites are:
+
+ * Django itself, of course -- 1.1 or better.
+ * `PIL`_
+ * `django-positions`_
+ * `sorl-thumbnail`_
+
+Django-crowdsourcing itself can be installed with `pip`_::
+
+  $ # probably in a virtualenv ...
+  $ pip install django-crowdsourcing 
+
+.. _`PIL`: http://pythonware.com/products/pil/
+.. _`django-positions`: http://github.com/jpwatts/django-positions 
+.. _`sorl-thumbnail`: http://code.google.com/p/sorl-thumbnail/
+.. _`pip`: http://pip.openplans.org/
+
 
 Setting Up the Example Application
 ==================================
