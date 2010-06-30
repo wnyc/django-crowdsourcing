@@ -15,5 +15,5 @@ sorl-thumbnail==3.2.5
 # For geocoding addresses and address lookups
 geopy
 
-# For building the documentation
-Sphinx
+# For building the documentation.
+# Sphinx
