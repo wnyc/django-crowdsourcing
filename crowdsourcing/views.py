@@ -261,10 +261,8 @@ def submissions(request, format):
     else:
         # survey.can_have_public_submissions is complicated enough that
         # we'll check it in Python, not the database.
-        results = Submission.objects.filter(
-            is_public=True,
-            question__answer_is_public=True)
-    results = results.select_related("survey")
+        results = Submission.objects.filter(is_public=True)
+    results = results.select_related("survey", "user")
     basic_filters = (
         'survey',
         'user',
@@ -307,7 +305,7 @@ def submissions(request, format):
         if survey_slug:
             results = extra_from_filters(
                 results,
-                "submission.id",
+                "crowdsourcing_submission.id",
                 Survey.objects.get(slug=survey_slug),
                 get)
         else:
@@ -317,15 +315,16 @@ def submissions(request, format):
                 "misspelled one of the basic filters (%s). You may have a "
                 "filter from a particular survey in mind. In that case, just "
                 "include survey=my-survey-slug in the query string. You may "
-                "also be trying to pull some hotshot move like, 'Get me all "
-                "submissions that belong to a survey with a filter named %s "
-                "that match %s.' Crowdsourcing could support this, but it "
+                "also be trying to pull some hotshot move like, \"Get me all "
+                "submissions that belong to a survey with a filter named '%s' "
+                "that match '%s'.\" Crowdsourcing could support this, but it "
                 "would be pretty inefficient and, we're guessing, pretty "
                 "rare. If that's what you're trying to do I'm afraid you'll "
                 "have to do something more complicated like iterating through "
                 "all your surveys.")
             item = get.items()[0]
             message = message % (", ".join(basic_filters), item[0], item[1])
+            return HttpResponse(message)
     if not is_staff:
         rs = [r for r in results if r.survey.can_have_public_submissions()]
         results = rs
