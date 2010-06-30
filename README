@@ -1,6 +1,6 @@
-======
-README
-======
+====================
+django-crowdsourcing
+====================
 
 Django-crowdsourcing is an MIT-licensed survey and report tool for
 journalists, supporting many types of survey questions and a wide
