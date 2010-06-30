@@ -7,7 +7,6 @@ from django.forms import ModelForm, ValidationError
 from django.forms.widgets import Select
 from django.utils.translation import ugettext_lazy as _
 
-from .flickrsupport import get_group_names
 from .models import (Question, Survey, Answer, Submission,
                      SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
                      SURVEY_DISPLAY_TYPE_CHOICES,
@@ -54,7 +53,10 @@ class QuestionInline(admin.StackedInline):
 
 
 def _flickr_group_choices():
-    return [('', '------',)] + [(n, n,) for n in get_group_names()]
+    blank = [('', '------',)]
+    if get_group_names:
+        return blank + [(n, n,) for n in get_group_names()]
+    return blank
 
 
 class SurveyAdminForm(ModelForm):
