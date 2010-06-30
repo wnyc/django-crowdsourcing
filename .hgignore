@@ -5,4 +5,7 @@ Crowdsourcing.egg*
 build/lib/crowdsourcing/*
 example_app/local_settings.py
 example_app/media/shared/crowdsourcing/images/*
+example_app/dev.db
 docs/_build/*
+dist/*
+django_crowdsourcing.egg-info/*
