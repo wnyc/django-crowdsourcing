@@ -1,3 +1,7 @@
+Version 1.1.7
+-----------------------
+* fix for unintentional dependency on flickrapi (now optional)
+
 Version 1.1.6
 -----------------------
 * first release.
