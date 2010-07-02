@@ -13,7 +13,7 @@ from . import settings as local_settings
 logger = logging.getLogger('crowdsourcing.tasks')
 
 class SyncFlickr(PeriodicTask):
-    run_every = timedelta(minutes=1)
+    run_every = timedelta(minutes=5)
 
     def run(self, *args, **kwargs):
         logger.debug("Syncing flickr")
