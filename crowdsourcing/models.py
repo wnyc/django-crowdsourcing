@@ -650,20 +650,20 @@ class Submission(models.Model):
     class Meta:
         ordering = ('-submitted_at',)
 
-    def to_jsondata(self, answer_lookup=None):
+    def to_jsondata(self, answer_lookup=None, include_private_questions=False):
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
-        if answer_lookup:
-            answers = answer_lookup[self.pk]
-        else:
-            answers = self.answer_set.filter(question__answer_is_public=True)
+        if not answer_lookup:
+            answer_lookup = get_all_answers([self], include_private_questions)
+        answers = answer_lookup[self.pk]
         return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
                                       for a in answers),
                             survey=self.survey.slug,
                             submitted_at=self.submitted_at,
-                            featured=self.featured)
+                            featured=self.featured,
+                            is_public=self.is_public)
         if self.user:
             return_value["user"] = self.user.username
         return return_value
@@ -939,9 +939,12 @@ class SurveyReportDisplay(models.Model):
         return super(SurveyReportDisplay, self).__getattribute__(key)
 
 
-def get_all_answers(submission_list):
+def get_all_answers(submission_list, include_private_questions=False):
     ids = [submission.id for submission in submission_list]
     page_answers_list = Answer.objects.filter(submission__id__in=ids)
+    if not include_private_questions:
+        kwargs = dict(question__answer_is_public=True)
+        page_answers_list = page_answers_list.filter(**kwargs)
     page_answers_list = page_answers_list.select_related("question")
     page_answers = {}
     for answer in page_answers_list:

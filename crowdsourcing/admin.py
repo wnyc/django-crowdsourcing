@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import re
 
 from django.contrib import admin
+from django.core.urlresolvers import reverse
 from django.forms import ModelForm, ValidationError
 from django.forms.widgets import Select
 from django.utils.translation import ugettext_lazy as _
@@ -11,6 +12,7 @@ from .models import (Question, Survey, Answer, Submission,
                      SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
                      SURVEY_DISPLAY_TYPE_CHOICES,
                      SURVEY_AGGREGATE_TYPE_CHOICES)
+from .views import FORMAT_CHOICES
 
 try:
     from .flickrsupport import get_group_names, get_group_id
@@ -92,6 +94,18 @@ class SurveyAdminForm(ModelForm):
         return group
 
 
+def submissions_as(obj):
+    downloads = []
+    for format in sorted(FORMAT_CHOICES):
+        url = reverse('submissions_by_format', kwargs={"format": format})
+        url += "?survey=" + obj.slug
+        a = '<a target="_blank" href="%s">%s</a>'
+        downloads.append(a % (url, format,))
+    return ", ".join(downloads)
+submissions_as.allow_tags=True
+submissions_as.short_description = 'Submissions as'
+
+
 class SurveyAdmin(admin.ModelAdmin):
     save_as = True
     form = SurveyAdminForm
@@ -103,7 +117,8 @@ class SurveyAdmin(admin.ModelAdmin):
         'survey_date',
         'ends_at',
         'is_published',
-        'site')
+        'site',
+        submissions_as)
     list_filter = ('survey_date', 'is_published', 'site')
     date_hierarchy = 'survey_date'
     inlines = [QuestionInline]

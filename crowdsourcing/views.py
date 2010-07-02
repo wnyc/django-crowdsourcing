@@ -31,7 +31,7 @@ from .models import (
     extra_from_filters,
     get_all_answers,
     get_filters)
-from .jsonutils import dump, dumps
+from .jsonutils import dump, dumps, datetime_to_string
 
 from .util import ChoiceEnum, get_function
 from . import settings as local_settings
@@ -225,7 +225,7 @@ def questions(request, slug):
     return response
 
 
-FORMAT_CHOICES = ('json', 'csv', 'xml', 'http',)
+FORMAT_CHOICES = ('json', 'csv', 'xml', 'html',)
 
 
 def submissions(request, format):
@@ -263,50 +263,58 @@ def submissions(request, format):
         # we'll check it in Python, not the database.
         results = Submission.objects.filter(is_public=True)
     results = results.select_related("survey", "user")
+    get = request.GET.copy()
+    limit = int(get.pop("limit", [0])[0])
+    keys = get.keys()
     basic_filters = (
         'survey',
         'user',
         'submitted_from',
         'submitted_to',
-        'featured')
-    get = request.GET.copy()
-    keys = get.keys()
+        'featured',
+        'is_public')
     survey_slug = ""
     for field in [f for f in keys if f in basic_filters]:
         value = get[field]
+        search_field = field
         if 'survey' == field:
             search_field = 'survey__slug'
             survey_slug = value
         elif 'user' == field:
             if '' == value:
-                search_field = 'user'
                 value = None
             else:
                 search_field = 'user__username'
         elif field in ('submitted_from', 'submitted_to'):
-            format = "%Y-%m-%dT%H:%M:%S"
+            date_format = "%Y-%m-%dT%H:%M:%S"
             try:
-                value = datetime.strptime(value, format)
+                value = datetime.strptime(value, date_format)
             except ValueError:
                 return HttpResponse(
                     ("Invalid %s format. Try, for example, "
-                     "%s") % (field, datetime.now().strftime(format),))
+                     "%s") % (field, datetime.now().strftime(date_format),))
             if 'submitted_from' == field:
                 search_field = 'submitted_at__gte'
             else:
                 search_field = 'submitted_at__lte'
-        elif 'featured' == field:
+        elif field in('featured', 'is_public',):
             falses = ('f', 'false', 'no', 'n', '0',)
             value = len(value) and not value.lower() in falses
         # search_field is unicode but needs to be ascii.
         results = results.filter(**{str(search_field): value})
         get.pop(field)
+
+    def get_survey():
+        survey = Survey.objects.get(slug=survey_slug)
+        get_survey = lambda: survey
+        return survey
+
     if get:
         if survey_slug:
             results = extra_from_filters(
                 results,
                 "crowdsourcing_submission.id",
-                Survey.objects.get(slug=survey_slug),
+                get_survey(),
                 get)
         else:
             message = (
@@ -326,9 +334,15 @@ def submissions(request, format):
             message = message % (", ".join(basic_filters), item[0], item[1])
             return HttpResponse(message)
     if not is_staff:
-        rs = [r for r in results if r.survey.can_have_public_submissions()]
-        results = rs
-    answer_lookup = get_all_answers(results)
+        if survey_slug:
+            if not get_survey().can_have_public_submissions():
+                results = []
+        else:
+            rs = [r for r in results if r.survey.can_have_public_submissions()]
+            results = rs
+    if limit:
+        results = results[:limit]
+    answer_lookup = get_all_answers(results, is_staff)
     result_data = [result.to_jsondata(answer_lookup) for result in results]
 
     for data in result_data:
@@ -347,30 +361,39 @@ def submissions(request, format):
         dump(result_data, response)
     elif format == 'csv':
         response = HttpResponse(mimetype='text/csv')
+        writer = csv.writer(response)
         keys = get_keys()
         writer.writerow(keys)
         for data in result_data:
-            writer.writerow([data.get(key, "") for key in keys])
+            writer.writerow([_encode(data.get(key, "")) for key in keys])
     elif format == 'xml':
         data_list = []
         for data in result_data:
-            values = ["<%s>%s</%s>" % (k, str(v), k) for k, v in data.items()]
+            items = data.items()
+            cell = "<%s>%s</%s>"
+            values = [cell % (k, str(_encode(v)), k) for k, v in items if v]
             data_list.append("<submission>%s</submission>" % "".join(values))
         subs = "<submissions>%s</submissions>" % "\n".join(data_list)
         response = HttpResponse(subs, mimetype='text/xml')
-    elif format == 'http': # mostly for debugging.
+    elif format == 'html': # mostly for debugging.
         data_list = []
         keys = get_keys()
         results = [
             "<html><body><table>",
             "<tr>%s</tr>" % "".join(["<th>%s</th>" % k for k in keys])]
         for data in result_data:
-            cells = ["<td>%s</td>" % data.get(key, "") for key in keys]
+            cell = "<td>%s</td>"
+            cells = [cell % _encode(data.get(key, "")) for key in keys]
             results.append("<tr>%s</tr>" % "".join(cells))
         results.append("</table></body></html>")
         response = HttpResponse("\n".join(results))
+    else:
+        return HttpResponse("Unsure how to handle %s format" % format)
     return response
 
+def _encode(possible):
+    return datetime_to_string(possible) or possible
+    
 
 def submission(request, id):
     template = 'crowdsourcing/submission.html'
