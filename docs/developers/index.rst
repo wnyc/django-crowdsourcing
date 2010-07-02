@@ -336,6 +336,16 @@ This will retrieve a json report of the 10 most recent featured submissions acro
 
 ``/crowdsourcing/submissions/json/?featured=true&limit=10``
 
+(A)Synchronous Flickr
+=====================
+
+Crowdsourcing is set up to synchronously sync with Flickr when you save an answer. Asynchronously is ideal. Here's how to set it up.
+
+#. Set CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD to False
+#. Set up a regular call to crowdsourcing.models.Answer.sync_to_flickr() If you have celery installed and working then crowdsourcing/tasks.py should wire that up for you.
+
+See CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD below for more details.
+
 Settings
 ========
 
@@ -392,3 +402,7 @@ crowdsourcing.templatetags.crowdsourcing.google_map uses this setting.
 **CROWDSOURCING_EXTRA_THUMBNAILS**
 
 A dictionary of extra thumbnails for Submission.image_answer, which is a sorl ImageWithThumbnailsField. For example, ``{'slideshow': {'size': (620, 350)}}``
+
+**CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD**
+
+Syncing flickr synchronously means that crowdsourcing will attempt to sync on save. This is not ideal because it makes a slow user experience, and failed synching goes unresolved. Synchronously is the default however because asynchronously synching is more difficult. Crowdsourcing syncs synchronously by default. crowdsourcing/tasks.py attempts to set up a celery task.

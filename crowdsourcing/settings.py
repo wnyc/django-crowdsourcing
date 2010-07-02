@@ -111,3 +111,14 @@ GOOGLE_MAPS_API_KEY = getattr(
 # A dictionary of extra thumbnails for Submission.image_answer, which is a sorl
 # ImageWithThumbnailsField. For example, {'slideshow': {'size': (620, 350)}}
 EXTRA_THUMBNAILS = getattr(_gs, 'CROWDSOURCING_EXTRA_THUMBNAILS', {})
+
+
+# Syncing flickr synchronously means that crowdsourcing will attempt to sync on
+# save. This is not ideal because it makes a slow user experience, and failed
+# synching goes unresolved. Synchronously is the default however because
+# asynchronously synching is more difficult. crowdsourcing/tasks.py attempts to
+# set up a celery task.
+SYNCHRONOUS_FLICKR_UPLOAD = getattr(
+    _gs,
+    'CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD',
+    True)

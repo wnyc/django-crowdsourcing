@@ -741,9 +741,17 @@ class Answer(models.Model):
         ordering = ('question',)
 
     def save(self, **kwargs):
-        super(Answer, self).save(**kwargs)
         # or should this be in a signal?  Or build in an option
         # to manage asynchronously? @TBD
+        if local_settings.SYNCHRONOUS_FLICKR_UPLOAD:
+            self._sync_self_to_flickr()
+        super(Answer, self).save(**kwargs)
+
+    def __unicode__(self):
+        return unicode(self.question)
+
+    def _sync_self_to_flickr(self):
+        """ Does not save. You must save after syncing. """
         if sync_to_flickr:
             survey = self.question.survey
             if survey.flickr_group_id:
@@ -753,8 +761,17 @@ class Answer(models.Model):
                     message = "error in syncing to flickr: %s" % str(ex)
                     logging.exception(message)
 
-    def __unicode__(self):
-        return unicode(self.question)
+    @classmethod
+    def sync_to_flickr(cls):
+        if sync_to_flickr:
+            answers = cls.objects.filter(
+                image_answer__gt='',
+                flickr_id='',
+                question__survey__flickr_group_id__gt='')
+            answers = answers.select_related("question__survey")
+            for answer in answers:
+                answer._sync_self_to_flickr()
+                answer.save()
 
 
 class SurveyReport(models.Model):
