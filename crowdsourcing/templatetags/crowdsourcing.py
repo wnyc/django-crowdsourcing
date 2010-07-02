@@ -329,6 +329,7 @@ def google_map(display, question, ids):
     map_args = (map_id, detail_id, data_url, lat, lng, zoom)
     out = [
         '<div class="google_map_wrapper">',
+        '  <h2 class="chart_title">%s</h2>' % display.annotation,
         '  <div id="%s" class="google_map">' % map_id,
         '    ' + img,
         '  </div>',
@@ -345,12 +346,13 @@ register.simple_tag(google_map)
 def simple_slideshow(display, question, request_GET, css):
     id = "slideshow_%d_%d" % (display.order, question.id)
     out = [
+        '<h2 class="chart_title">%s</h2>' % display.annotation,
+        '<ul class="%s" id="%s">' % (css, id),
         '<script type="text/javascript">',
         '$(function() {',
         "  $('#%s').jcarousel();" % id,
         '});',
-        '</script>',
-        '<ul class="%s" id="%s">' % (css, id)]
+        '</script>']
     caption_fieldnames = display.get_caption_fieldnames()
     caption_lookup = {}
     if caption_fieldnames:
