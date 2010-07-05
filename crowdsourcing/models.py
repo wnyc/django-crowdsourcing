@@ -313,6 +313,12 @@ class Question(models.Model):
                     cms_id=self.id,
                     help_text=self.help_text)
 
+    @property
+    def public_answers(self):
+        if self.answer_is_public:
+            return self.answer_set.filter(submission__is_public=True)
+        return self.answer_set.none()
+
     class Meta:
         ordering = ('order',)
         unique_together = ('fieldname', 'survey')
@@ -530,7 +536,7 @@ class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     pie charts. """
     def __init__(self, survey, field, request_data):
-        self.answer_set = field.answer_set.values(field.value_column)
+        self.answer_set = field.public_answers.values(field.value_column)
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
@@ -592,7 +598,10 @@ class AggregateResult2Axis(object):
                 ") AS y_value FROM crowdsourcing_answer AS y_axis ",
                 "JOIN crowdsourcing_answer AS x_axis "
                 "ON y_axis.submission_id = x_axis.submission_id ",
-                "WHERE y_axis.question_id = %s AND ",
+                "JOIN crowdsourcing_submission AS submission ",
+                "ON submission.id = y_axis.submission_id ",
+                "WHERE submission.is_public = true AND ",
+                "y_axis.question_id = %s AND ",
                 y_axis_column,
                 " IS NOT NULL AND x_axis.question_id = %s"]
             y = "y_axis.submission_id"
@@ -605,7 +614,9 @@ class AggregateResult2Axis(object):
             query.append(x_value_column)
             cursor = connection.cursor()
             cursor.execute("".join(query), params)
+            found_any = False
             for x_value, y_value in cursor.fetchall():
+                found_any = True
                 if isinstance(y_value, Decimal):
                     y_value = round(y_value, 2)
                 answer_value = answer_value_lookup.get(x_value)
@@ -615,6 +626,8 @@ class AggregateResult2Axis(object):
         if x_axis.is_numeric:
             key = x_axis.fieldname
             self.answer_values.sort(lambda x, y: x[key] - y[key])
+        if not found_any:
+            self.answer_values = []
         self.yahoo_answer_string = json.dumps(self.answer_values)
 
 

@@ -358,7 +358,8 @@ def simple_slideshow(display, question, request_GET, css):
     if caption_fieldnames:
         captions = Answer.objects.filter(
             question__fieldname__in=caption_fieldnames,
-            question__survey=display.report.survey)
+            question__survey=display.report.survey,
+            is_public=True)
         for caption in captions:
             if not caption.submission_id in caption_lookup:
                 caption_lookup[caption.submission_id] = []
