@@ -74,9 +74,12 @@ function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
         wrapper.before(element.html(text));
       }
     };
-    beforeWrapper(survey.title, $("<h3/>"));
-    beforeWrapper(survey.tease, $("<p/>").addClass("subtitle"));
-    beforeWrapper(survey.description, $("<p/>").addClass("description"));
+    beforeWrapper(survey.title, $("<h1/>"));
+    if (survey.description) {
+      beforeWrapper(survey.description, $("<p/>").addClass("description"));
+    } else if (survey.tease) {
+      beforeWrapper(survey.tease, $("<p/>").addClass("subtitle"));
+    }
     var form = $("<form/>").attr("method", "POST");
     form.attr("action", survey.submit_url);
     form.addClass(isPoll ? "vote" : "survey").appendTo(wrapper);
@@ -91,7 +94,7 @@ function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
     } else {
       for (questionI in survey.questions) {
         var question = survey.questions[questionI];
-        $("<h2/>").html(question.question).appendTo(div);
+        $("<h3/>").html(question.question).appendTo(div);
         if (isPoll) {
           appendChoiceButtons(survey, question, div);
         } else {

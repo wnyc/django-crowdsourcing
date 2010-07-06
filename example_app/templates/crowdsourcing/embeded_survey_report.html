@@ -1,13 +1,13 @@
 {% load crowdsourcing %}
 
-<h1>{{ survey.title }}</h1>
+<h1>{{ survey.title }} Report</h1>
 
 {% if thanks %}
   <p>Thanks for your submission.</p>
 {% endif %}
 
 {% if filters %}
-  <h2>Filters</h2>
+  <h2>Filters:</h2>
   {% filters_as_ul filters %}
 {% endif %}
 
@@ -15,6 +15,7 @@
   All questions in this survey have private answers.
 {% endif %}
 
+<h2>Displays:</h2>
 {% for display in report.get_survey_report_displays %}
   {% if display.is_text %}
     {{ display.annotation|safe }}
@@ -39,6 +40,7 @@
 {% load_maps_and_charts %}
 
 {% if archive_fields %}
+<h2>Submissions:</h2>
   {% submissions page_obj.object_list fields %}
   {% paginator survey report pages_to_link page_obj %}
 {% endif %}

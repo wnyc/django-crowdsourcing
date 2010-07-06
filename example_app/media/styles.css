@@ -1,6 +1,80 @@
+body {
+	font: 9.5pt Arial, Helvetica, 'Liberation Sans', FreeSans, sans-serif;
+}
+
+ul {
+	list-style-type: none;
+	padding: 0;
+}	
+
+ul li {
+	margin: 4px 0;
+}
+
+.survey label, .survey input, .survey textarea {
+	display: block;
+	margin: 2px 0;
+}
+
+.survey label.help_text {
+	display: inline;
+}
+
+.required {
+        color: #dd0000;
+        margin: 0 5px;
+}
+
 .enlarge_link { background-image: url('/media/enlarge-icon.png'); }
 
-h2 { color: #055; }
+#latest_survey_results_div {
+	border-top: 2px solid #ddd;
+	margin-top: 20px;
+}
+
+form .filters {
+        margin: 10px 0 15px;
+        padding: 10px 12px;
+        background-color: #f6f6f6;
+        border: 1px solid #ddd;
+}
+
+form .filters ul li {
+        margin: 5px 0;
+}
+
+form .filters label {
+        margin-right: 10px;
+}
+
+form .filters #location label,
+form .filters #number label,
+form .filters #decimal label {
+        color: #666;
+        margin: 0 0 0 5px;
+}
+
+h2.chart_title {
+	background-color: #F6F6F6;
+	border-top: 1px solid #DDDDDD;
+	display: block;
+	margin: 20px 0 0;
+	padding: 5px 10px;
+}
+
+.submission {
+	border-top: 2px dotted #CCCCCC;
+	padding: 15px 0;
+}
+
+.submission .field {
+	padding: 3px 0;
+} 
+
+.submission .field label {
+	font-weight: bold;
+	padding-right: 2px;
+}
 
 .jcarousel-skin-tango .jcarousel-clip-horizontal {
   height: 275px;
