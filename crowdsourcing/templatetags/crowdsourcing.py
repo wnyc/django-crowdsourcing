@@ -359,7 +359,7 @@ def simple_slideshow(display, question, request_GET, css):
         captions = Answer.objects.filter(
             question__fieldname__in=caption_fieldnames,
             question__survey=display.report.survey,
-            is_public=True)
+            submission__is_public=True)
         for caption in captions:
             if not caption.submission_id in caption_lookup:
                 caption_lookup[caption.submission_id] = []
@@ -403,7 +403,7 @@ def submission_fields(submission,
     if not fields:
         fields = list(submission.survey.get_public_fields())
     out = []
-    answer_list = page_answers[submission.id]
+    answer_list = page_answers.get(submission.id, [])
     answers = {}
     for answer in answer_list:
         answers[answer.question] = answer

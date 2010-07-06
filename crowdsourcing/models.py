@@ -670,9 +670,8 @@ class Submission(models.Model):
             return v
         if not answer_lookup:
             answer_lookup = get_all_answers([self], include_private_questions)
-        answers = answer_lookup[self.pk]
         return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
-                                      for a in answers),
+                                      for a in answer_lookup.get(self.pk, [])),
                             survey=self.survey.slug,
                             submitted_at=self.submitted_at,
                             featured=self.featured,
