@@ -795,8 +795,14 @@ class SurveyReport(models.Model):
     and an annotation.  It also has article-like fields of its own.
     """
     survey = models.ForeignKey(Survey)
-    title = models.CharField(max_length=50)
-    slug = models.CharField(max_length=50)
+    title = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text=_("You may leave this field blank. Crowdsourcing will use "
+                    "the survey title as a default."))
+    slug = models.CharField(
+        max_length=50,
+        help_text=_("The default is the description of the survey."))
     # some text at the beginning
     summary = models.TextField(blank=True)
     # As crowdsourcing doesn't implement rating because we want to let you use
@@ -849,8 +855,14 @@ class SurveyReport(models.Model):
         unique_together = (('survey', 'slug'),)
         ordering = ('title',)
 
+    def get_title(self):
+        return self.title or self.survey.title
+
+    def get_summary(self):
+        return self.summary or self.survey.description or self.survey.tease
+
     def __unicode__(self):
-        return self.title
+        return self.get_title()
 
 
 SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')

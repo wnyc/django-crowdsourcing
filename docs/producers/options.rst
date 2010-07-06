@@ -314,7 +314,7 @@ You associate a survey report with a single survey.
 
 **Title**
 
-The title displays on the survey report page.
+The title displays on the survey report page. If you leave this field blank, crowdsourcing will use the survey title.
 
 **Slug**
 
@@ -325,7 +325,7 @@ surveys using specific reports, e.g.,
 
 **Summary**
 
-The summary displays on the survey report page below the title. You can use html.
+The summary displays on the survey report page below the title. You can use html. If you leave this field blank, crowdsourcing will use the survey description. If that is blank, crowdsourcing will use the survey tease as a last result.
 
 **Sort by rating**
 
