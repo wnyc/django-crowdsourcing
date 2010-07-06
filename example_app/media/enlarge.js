@@ -18,34 +18,23 @@ function enlargeImage(img_id, url, credits, credits_url) {
     credits_url = "";
   }
   var img = $("#" + img_id);
-  var background = $("#enlarge_bg").show();
-  var enlarge = $("#enlarge");
-  var imgElement = $("#enlarge img");
-  var imgCaption = $("#enlarge .caption");
-  var imgCredits = $("#enlarge .credits").empty();
-  var loading = $("#enlarge .loading");
-  if (!background.length) {
-    background = $("<div/>").appendTo($("body")).attr("id", "enlarge_bg");
-    background.css("opacity", 0.2).click(hideEnlarge);
-    enlarge = $("<div/>").attr("id", "enlarge").appendTo($("body")).hide();
-    var close1 = $("<div/>").addClass("close").append($("<a/>").html("Close"));
-    close1.click(hideEnlarge);
-    enlarge.append(close1);
-    imgElement = $("<img/>").appendTo($("<div/>").addClass("image"));
-    imgElement.appendTo(enlarge).click(hideEnlarge);
-    loading = $("<div/>").addClass("loading").html("Loading...");
-    loading.appendTo(enlarge);
-    imgCaption = $("<div/>").addClass("caption").appendTo(enlarge);
-    imgCredits = $("<div/>").addClass("credit").appendTo(enlarge);
-  }
+
+  var background = $("<div/>").appendTo($("body")).attr("id", "enlarge_bg");
+  background.css("opacity", 0.5).click(hideEnlarge);
+  var enlarge = $("<div/>").attr("id", "enlarge").appendTo($("body")).hide();
+  var close1 = $("<div/>").addClass("close").append($("<a/>").html("Close"));
+  close1.click(hideEnlarge);
+  enlarge.append(close1);
+  var imgElement = $("<img/>").appendTo($("<div/>").addClass("image"));
+  imgElement.appendTo(enlarge).click(hideEnlarge);
+  var loading = $("<div/>").addClass("loading").html("Loading...");
+  loading.appendTo(enlarge);
+  var imgCaption = $("<div/>").addClass("caption").appendTo(enlarge);
+  var imgCredits = $("<div/>").addClass("credit").appendTo(enlarge);
+
   var caption = img.attr("title");
-  
   imgCaption.text(caption);
-  if (caption) {
-    imgCaption.show();
-  } else {
-    imgCaption.hide();
-  }
+  imgCaption.hide(); /* Caption shown after image width determined */
   var strippedHtml = function(element, credits) {
     if ("undefined" != typeof element.strippedHtml) {
       element.strippedHtml(credits);
@@ -93,8 +82,8 @@ function setEnlargeLeft(enlargeWidth, animateTime) {
 }
 
 function hideEnlarge() {
-  $("#enlarge_bg").hide();
-  $("#enlarge").hide();
+  $("#enlarge_bg").detach();
+  $("#enlarge").detach();
   $("embed").css("visibility", "visible");
 }
 
@@ -104,8 +93,11 @@ function imgLoad() {
   var imgElement = $("#enlarge img");
   var enlarge = $("#enlarge");
   var loading = $("#enlarge .loading");
+  var imgCaption = $("#enlarge .caption");
+
   if (!imgLoaded && imgElement[0].complete) {
     imgLoaded = true;
+    imgCaption.show();
     var enlargeWidth = imgElement.outerWidth() + edgeWidth(enlarge);
     setEnlargeLeft(enlargeWidth, animateTime);
     var attrs = {width: imgElement.width(), height: imgElement.height()};
