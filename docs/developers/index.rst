@@ -23,6 +23,7 @@ Prerequisites are:
  * `PIL`_
  * `django-positions`_
  * `sorl-thumbnail`_
+ * `flickrapi`_ (optional)
 
 Django-crowdsourcing itself can be installed with `pip`_::
 
@@ -33,6 +34,7 @@ Django-crowdsourcing itself can be installed with `pip`_::
 .. _`django-positions`: http://github.com/jpwatts/django-positions 
 .. _`sorl-thumbnail`: http://code.google.com/p/sorl-thumbnail/
 .. _`pip`: http://pip.openplans.org/
+.. _`flickrapi`: http://stuvel.eu/projects/flickrapi
 
 
 Setting Up the Example Application
