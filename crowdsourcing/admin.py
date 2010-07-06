@@ -26,9 +26,9 @@ class QuestionForm(ModelForm):
     def clean(self):
         OTC = OPTION_TYPE_CHOICES
         opts = self.cleaned_data.get('options', "")
-        if self.cleaned_data.get('option_type', "") in (
-            OTC.NUMERIC_SELECT,
-            OTC.NUMERIC_CHOICE,):
+        option_type = self.cleaned_data.get('option_type', "")
+        numeric_list = option_type in (OTC.NUMERIC_SELECT, OTC.NUMERIC_CHOICE,)
+        if numeric_list:
             for option in filter(None, (s.strip() for s in opts.splitlines())):
                 try:
                     float(option)
@@ -37,6 +37,10 @@ class QuestionForm(ModelForm):
                         "For numeric select or numeric choice, all your "
                         "options must be a number. This is not a number: ") +
                         option)
+        if numeric_list or option_type in (OTC.SELECT, OTC.CHOICE,):
+            if not opts.splitlines():
+                raise ValidationError(_(
+                    "Choice type questions require a list of options."))
         return self.cleaned_data
 
     def clean_fieldname(self):
