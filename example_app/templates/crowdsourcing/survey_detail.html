@@ -1,6 +1,7 @@
 <html>
 <head>
   <title>{{ survey.title }}</title>
+  {% include "header_tags.html" %}
 </head>
 <body>
 
@@ -13,7 +14,7 @@
   {% endifequal %}
 </p>
 {% if forms %}
-  <form method="POST" enctype="multipart/form-data">
+  <form method="POST" enctype="multipart/form-data" class="survey">
     {% for form in forms %}
       {{ form.as_p }}
     {% endfor %}

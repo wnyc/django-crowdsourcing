@@ -16,6 +16,14 @@ ul li {
 	margin: 2px 0;
 }
 
+.survey label {
+	font-weight: bold;
+}
+
+.survey ul li input {
+	display: inline;
+}
+
 .survey label.help_text {
 	display: inline;
 }
