@@ -75,14 +75,19 @@ register.simple_tag(filter)
 
 
 def select_filter(wrapper_format, key, label, value, choices, blank=True):
+    """ choices can contain either strings which will be used for both the
+    value and the display, or (value, display) tuples. """
     html = ['<select id="%s" name="%s">' % (key, key,)]
     if blank:
         html.append('<option value="">---------</option>')
     for choice in choices:
-        html.append('<option value="%s"' % choice)
-        if value == u"%s" % choice:
+        value = display = choice
+        if hasattr(choice, "__iter__"):
+            value, display = choice[0], choice[1]
+        html.append('<option value="%s"' % value)
+        if value == u"%s" % value:
             html.append('selected="selected"')
-        html.append('>%s</option>' % choice)
+        html.append('>%s</option>' % display)
     html.append('</select>')
     return filter(wrapper_format, key, label, "\n".join(html))
 register.simple_tag(select_filter)
