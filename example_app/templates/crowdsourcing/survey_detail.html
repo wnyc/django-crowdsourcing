@@ -1,19 +1,18 @@
+{% load crowdsourcing %}
 <html>
 <head>
   <title>{{ survey.title }}</title>
+  {% include "header_tags.html" %}
 </head>
 <body>
 
 <h1>{{ survey.title }}</h1>
-<p>
-  {% ifequal request.method "POST" %}
-    {{ survey.thanks }}
-  {% else %}
-    {{ survey.description }}
-  {% endifequal %}
-</p>
+
+{% thanks_for_entering entered request forms %}
+<p>{% firstof survey.description survey.tease %} </p>
+
 {% if forms %}
-  <form method="POST" enctype="multipart/form-data">
+  <form method="POST" enctype="multipart/form-data" class="survey">
     {% for form in forms %}
       {{ form.as_p }}
     {% endfor %}

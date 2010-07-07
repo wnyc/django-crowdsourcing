@@ -329,6 +329,7 @@ def google_map(display, question, ids):
     map_args = (map_id, detail_id, data_url, lat, lng, zoom)
     out = [
         '<div class="google_map_wrapper">',
+        '  <h2 class="chart_title">%s</h2>' % display.annotation,
         '  <div id="%s" class="google_map">' % map_id,
         '    ' + img,
         '  </div>',
@@ -345,18 +346,20 @@ register.simple_tag(google_map)
 def simple_slideshow(display, question, request_GET, css):
     id = "slideshow_%d_%d" % (display.order, question.id)
     out = [
+        '<h2 class="chart_title">%s</h2>' % display.annotation,
+        '<ul class="%s" id="%s">' % (css, id),
         '<script type="text/javascript">',
         '$(function() {',
         "  $('#%s').jcarousel();" % id,
         '});',
-        '</script>',
-        '<ul class="%s" id="%s">' % (css, id)]
+        '</script>']
     caption_fieldnames = display.get_caption_fieldnames()
     caption_lookup = {}
     if caption_fieldnames:
         captions = Answer.objects.filter(
             question__fieldname__in=caption_fieldnames,
-            question__survey=display.report.survey)
+            question__survey=display.report.survey,
+            submission__is_public=True)
         for caption in captions:
             if not caption.submission_id in caption_lookup:
                 caption_lookup[caption.submission_id] = []
@@ -400,7 +403,7 @@ def submission_fields(submission,
     if not fields:
         fields = list(submission.survey.get_public_fields())
     out = []
-    answer_list = page_answers[submission.id]
+    answer_list = page_answers.get(submission.id, [])
     answers = {}
     for answer in answer_list:
         answers[answer.question] = answer
@@ -549,3 +552,11 @@ def number_to_javascript(number):
 def issue(message):
     return mark_safe("<div class=\"issue\">%s</div>" % message)
 register.simple_tag(issue)
+
+
+def thanks_for_entering(entered, request, forms):
+    if entered and "POST" == request.method and all([f.is_valid() for f in forms]):
+        message = survey.thanks or "Thanks for entering!"
+        return mark_safe("<p>%s</p>" % message)
+    return ""
+register.simple_tag(thanks_for_entering)

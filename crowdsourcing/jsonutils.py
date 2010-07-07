@@ -1,9 +1,6 @@
 from datetime import datetime, date, time
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import json
 
 
 FORMATS = {datetime: "%Y-%m-%dT%H:%M:%S",
@@ -21,11 +18,14 @@ def dumps(obj, **kw):
     return json.dumps(obj, **kw)
 
 
+def datetime_to_string(dt):
+    for k in FORMATS:
+        if isinstance(dt, k):
+            return dt.strftime(FORMATS[k])
+
 class Encoder(json.JSONEncoder):
     def default(self, obj):
         if hasattr(obj, 'to_jsondata'):
             return obj.to_jsondata()
-        for k in FORMATS:
-            if isinstance(obj, k):
-                return obj.strftime(FORMATS[k])
-        return super(Encoder, self).default(obj)
+        dt_format = datetime_to_string(obj)
+        return dt_format if dt_format else super(Encoder, self).default(obj)

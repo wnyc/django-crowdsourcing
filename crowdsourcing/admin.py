@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import re
 
 from django.contrib import admin
+from django.core.urlresolvers import reverse
 from django.forms import ModelForm, ValidationError
 from django.forms.widgets import Select
 from django.utils.translation import ugettext_lazy as _
@@ -11,6 +12,7 @@ from .models import (Question, Survey, Answer, Submission,
                      SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
                      SURVEY_DISPLAY_TYPE_CHOICES,
                      SURVEY_AGGREGATE_TYPE_CHOICES)
+from .views import FORMAT_CHOICES
 
 try:
     from .flickrsupport import get_group_names, get_group_id
@@ -24,9 +26,9 @@ class QuestionForm(ModelForm):
     def clean(self):
         OTC = OPTION_TYPE_CHOICES
         opts = self.cleaned_data.get('options', "")
-        if self.cleaned_data.get('option_type', "") in (
-            OTC.NUMERIC_SELECT,
-            OTC.NUMERIC_CHOICE,):
+        option_type = self.cleaned_data.get('option_type', "")
+        numeric_list = option_type in (OTC.NUMERIC_SELECT, OTC.NUMERIC_CHOICE,)
+        if numeric_list:
             for option in filter(None, (s.strip() for s in opts.splitlines())):
                 try:
                     float(option)
@@ -35,6 +37,10 @@ class QuestionForm(ModelForm):
                         "For numeric select or numeric choice, all your "
                         "options must be a number. This is not a number: ") +
                         option)
+        if numeric_list or option_type in (OTC.SELECT, OTC.CHOICE,):
+            if not opts.splitlines():
+                raise ValidationError(_(
+                    "Choice type questions require a list of options."))
         return self.cleaned_data
 
     def clean_fieldname(self):
@@ -92,6 +98,18 @@ class SurveyAdminForm(ModelForm):
         return group
 
 
+def submissions_as(obj):
+    downloads = []
+    for format in sorted(FORMAT_CHOICES):
+        url = reverse('submissions_by_format', kwargs={"format": format})
+        url += "?survey=" + obj.slug
+        a = '<a target="_blank" href="%s">%s</a>'
+        downloads.append(a % (url, format,))
+    return ", ".join(downloads)
+submissions_as.allow_tags=True
+submissions_as.short_description = 'Submissions as'
+
+
 class SurveyAdmin(admin.ModelAdmin):
     save_as = True
     form = SurveyAdminForm
@@ -103,7 +121,8 @@ class SurveyAdmin(admin.ModelAdmin):
         'survey_date',
         'ends_at',
         'is_published',
-        'site')
+        'site',
+        submissions_as)
     list_filter = ('survey_date', 'is_published', 'site')
     date_hierarchy = 'survey_date'
     inlines = [QuestionInline]

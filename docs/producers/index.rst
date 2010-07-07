@@ -10,3 +10,4 @@ This documentation is meant for the people who will create the surveys, curate t
    examples/index
    filters
    live
+   download

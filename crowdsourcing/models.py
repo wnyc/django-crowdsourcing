@@ -313,6 +313,12 @@ class Question(models.Model):
                     cms_id=self.id,
                     help_text=self.help_text)
 
+    @property
+    def public_answers(self):
+        if self.answer_is_public:
+            return self.answer_set.filter(submission__is_public=True)
+        return self.answer_set.none()
+
     class Meta:
         ordering = ('order',)
         unique_together = ('fieldname', 'survey')
@@ -530,7 +536,7 @@ class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     pie charts. """
     def __init__(self, survey, field, request_data):
-        self.answer_set = field.answer_set.values(field.value_column)
+        self.answer_set = field.public_answers.values(field.value_column)
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
@@ -592,7 +598,10 @@ class AggregateResult2Axis(object):
                 ") AS y_value FROM crowdsourcing_answer AS y_axis ",
                 "JOIN crowdsourcing_answer AS x_axis "
                 "ON y_axis.submission_id = x_axis.submission_id ",
-                "WHERE y_axis.question_id = %s AND ",
+                "JOIN crowdsourcing_submission AS submission ",
+                "ON submission.id = y_axis.submission_id ",
+                "WHERE submission.is_public = true AND ",
+                "y_axis.question_id = %s AND ",
                 y_axis_column,
                 " IS NOT NULL AND x_axis.question_id = %s"]
             y = "y_axis.submission_id"
@@ -605,7 +614,9 @@ class AggregateResult2Axis(object):
             query.append(x_value_column)
             cursor = connection.cursor()
             cursor.execute("".join(query), params)
+            found_any = False
             for x_value, y_value in cursor.fetchall():
+                found_any = True
                 if isinstance(y_value, Decimal):
                     y_value = round(y_value, 2)
                 answer_value = answer_value_lookup.get(x_value)
@@ -615,6 +626,8 @@ class AggregateResult2Axis(object):
         if x_axis.is_numeric:
             key = x_axis.fieldname
             self.answer_values.sort(lambda x, y: x[key] - y[key])
+        if not found_any:
+            self.answer_values = []
         self.yahoo_answer_string = json.dumps(self.answer_values)
 
 
@@ -650,20 +663,19 @@ class Submission(models.Model):
     class Meta:
         ordering = ('-submitted_at',)
 
-    def to_jsondata(self, answer_lookup=None):
+    def to_jsondata(self, answer_lookup=None, include_private_questions=False):
         def to_json(v):
             if isinstance(v, ImageFieldFile):
                 return v.url if v else ''
             return v
-        if answer_lookup:
-            answers = answer_lookup[self.pk]
-        else:
-            answers = self.answer_set.filter(question__answer_is_public=True)
+        if not answer_lookup:
+            answer_lookup = get_all_answers([self], include_private_questions)
         return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
-                                      for a in answers),
+                                      for a in answer_lookup.get(self.pk, [])),
                             survey=self.survey.slug,
                             submitted_at=self.submitted_at,
-                            featured=self.featured)
+                            featured=self.featured,
+                            is_public=self.is_public)
         if self.user:
             return_value["user"] = self.user.username
         return return_value
@@ -741,9 +753,17 @@ class Answer(models.Model):
         ordering = ('question',)
 
     def save(self, **kwargs):
-        super(Answer, self).save(**kwargs)
         # or should this be in a signal?  Or build in an option
         # to manage asynchronously? @TBD
+        if local_settings.SYNCHRONOUS_FLICKR_UPLOAD:
+            self._sync_self_to_flickr()
+        super(Answer, self).save(**kwargs)
+
+    def __unicode__(self):
+        return unicode(self.question)
+
+    def _sync_self_to_flickr(self):
+        """ Does not save. You must save after syncing. """
         if sync_to_flickr:
             survey = self.question.survey
             if survey.flickr_group_id:
@@ -753,8 +773,17 @@ class Answer(models.Model):
                     message = "error in syncing to flickr: %s" % str(ex)
                     logging.exception(message)
 
-    def __unicode__(self):
-        return unicode(self.question)
+    @classmethod
+    def sync_to_flickr(cls):
+        if sync_to_flickr:
+            answers = cls.objects.filter(
+                image_answer__gt='',
+                flickr_id='',
+                question__survey__flickr_group_id__gt='')
+            answers = answers.select_related("question__survey")
+            for answer in answers:
+                answer._sync_self_to_flickr()
+                answer.save()
 
 
 class SurveyReport(models.Model):
@@ -765,8 +794,14 @@ class SurveyReport(models.Model):
     and an annotation.  It also has article-like fields of its own.
     """
     survey = models.ForeignKey(Survey)
-    title = models.CharField(max_length=50)
-    slug = models.CharField(max_length=50)
+    title = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text=_("You may leave this field blank. Crowdsourcing will use "
+                    "the survey title as a default."))
+    slug = models.CharField(
+        max_length=50,
+        help_text=_("The default is the description of the survey."))
     # some text at the beginning
     summary = models.TextField(blank=True)
     # As crowdsourcing doesn't implement rating because we want to let you use
@@ -819,8 +854,14 @@ class SurveyReport(models.Model):
         unique_together = (('survey', 'slug'),)
         ordering = ('title',)
 
+    def get_title(self):
+        return self.title or self.survey.title
+
+    def get_summary(self):
+        return self.summary or self.survey.description or self.survey.tease
+
     def __unicode__(self):
-        return self.title
+        return self.get_title()
 
 
 SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')
@@ -939,9 +980,12 @@ class SurveyReportDisplay(models.Model):
         return super(SurveyReportDisplay, self).__getattribute__(key)
 
 
-def get_all_answers(submission_list):
+def get_all_answers(submission_list, include_private_questions=False):
     ids = [submission.id for submission in submission_list]
     page_answers_list = Answer.objects.filter(submission__id__in=ids)
+    if not include_private_questions:
+        kwargs = dict(question__answer_is_public=True)
+        page_answers_list = page_answers_list.filter(**kwargs)
     page_answers_list = page_answers_list.select_related("question")
     page_answers = {}
     for answer in page_answers_list:

@@ -255,6 +255,97 @@ Next, create this setting to let crowdsourcing know where to find your hook::
 
   CROWDSOURCING_PRE_REPORT = 'my.app_path.my_pre_report_filter'
 
+.. _API:
+
+API
+===
+
+Crowdsourcing has an api that allows you to query submissions. The results return in reverse chronological order by the date they were submitted. If you are a logged in staff user all submissions and all fields will return regardless of whether or not they are public. Every result always has these fields with the exception of empty fields in xml such as the user when the user was not logged in:
+
+* *submitted_at*: The date and time the submission was submitted in the format yyyy-mm-ddThh:mm:ss, e.g. 2010-05-15T14:22:49.
+* *survey*: The slug of the survey for the submission.
+* *user*: The username of the user if the user was logged in. The xml format drops this field if the user was not logged in.
+* *featured*: True or False
+* *is_public*: True or False
+
+URL
+"""
+
+It depends where your crowdsourcing root url is. If your urls.py file contains the line ``(r'^crowdsourcing/', include('crowdsourcing.urls')),`` then your url will look something like ``/crowdsourcing/submissions/<format>/?<filters>``
+
+Format
+""""""
+
+* *json*
+* *csv*: The first row contains the column names.
+* *xml*: This format includes only non-empty fields
+
+::
+
+  <submissions>
+    <submission>
+      <submitted_at>2010-05-18T15:21:16</submitted_at>
+      <survey>test_survey</survey>
+      <user>dsmith</user>
+      <category>Republican</category>
+      <first_car>Saturn</category>
+    </submission>
+    <submission>
+      <submitted_at>2010-05-18T15:21:16</submitted_at>
+      <survey>test_survey</survey>
+      <category>Republican</category>
+    </submission>
+  </submissions>
+
+* *html*: You will probably use this format for debugging.
+
+Filters
+"""""""
+
+You pass filters through query string parameters.
+
+These filters are always available.
+
+* *limit*: Include only these many results.
+* *survey*: Return only submissions for this survey, identified by its slug. 
+* *user*: The username of the submittor.
+* *submitted_from*: Include only submissions submitted on or after this date in the format yyyy-mm-ddThh:mm:ss, e.g. 2010-05-18T15:21:16
+* *submitted_to*: Submissions on or before this date in the same format at submitted_from.
+* *featured*: Use true to retrieve only featured submissions, and false to retrieve only non-featured submissions.
+* *is_public*: Use true to retrieve only public submissions, and false to retrieve only non-public submissions.
+
+If you use the survey filter, you can also use specific filters from that survey. To see what parameters you use exactly for a particular survey, follow these steps:
+
+#. Pull up a report for your survey with filters enabled.
+#. Fill out the filters how you would like the API to filter.
+#. Click submit.
+#. Observe the query string of the page you land on. Use similar query string values to filter the API.
+
+Examples
+""""""""
+
+Let's say you have a survey with slug liberals-vs-conservatives with a choice type question with fieldname *affiliation* and options *Liberal* and *Conservative*. This url will pull up a human readable html version of all submissions for that survey.
+
+``/crowdsourcing/submissions/html/?survey=liberals-vs-conservatives``
+
+This will retrieve an xml report of all liberals in that survey.
+
+``/crowdsourcing/submissions/xml/?survey=liberals-vs-conservatives&affiliation=Liberal``
+
+This will retrieve a json report of the 10 most recent featured submissions across the whole site.
+
+``/crowdsourcing/submissions/json/?featured=true&limit=10``
+
+(A)Synchronous Flickr
+=====================
+
+Crowdsourcing is set up to synchronously sync with Flickr when you save an answer. Asynchronously is ideal. Here's how to set it up.
+
+#. Set CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD to False
+#. Set up a regular call to crowdsourcing.models.Answer.sync_to_flickr() If you have celery installed and working then crowdsourcing/tasks.py should wire that up for you.
+
+See CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD below for more details.
+
 Settings
 ========
 
@@ -311,3 +402,7 @@ crowdsourcing.templatetags.crowdsourcing.google_map uses this setting.
 **CROWDSOURCING_EXTRA_THUMBNAILS**
 
 A dictionary of extra thumbnails for Submission.image_answer, which is a sorl ImageWithThumbnailsField. For example, ``{'slideshow': {'size': (620, 350)}}``
+
+**CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD**
+
+Syncing flickr synchronously means that crowdsourcing will attempt to sync on save. This is not ideal because it makes a slow user experience, and failed synching goes unresolved. Crowdsourcing syncs synchronously by default however because asynchronously synching is more difficult to set up. crowdsourcing/tasks.py attempts to set up a celery task, so if you have celery running to can just make this setting false.
