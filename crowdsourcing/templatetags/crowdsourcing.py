@@ -413,9 +413,9 @@ def submission_fields(submission,
     for answer in answer_list:
         answers[answer.question] = answer
     for question in fields:
-        out.append('<div class="field">')
         answer = answers.get(question, None)
         if answer and answer.value:
+            out.append('<div class="field">')
             out.append('<label>%s</label>' % question.label)
             if answer.image_answer:
                 try:
@@ -442,7 +442,7 @@ def submission_fields(submission,
                     out.append('<a href="%(val)s">%(val)s</a>' % args)
             else:
                 out.append(escape(answer.value))
-        out.append('</div>')
+            out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submission_fields)
 
