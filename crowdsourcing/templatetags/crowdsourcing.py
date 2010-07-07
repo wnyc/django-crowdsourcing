@@ -552,3 +552,11 @@ def number_to_javascript(number):
 def issue(message):
     return mark_safe("<div class=\"issue\">%s</div>" % message)
 register.simple_tag(issue)
+
+
+def thanks_for_entering(entered, request, forms):
+    if entered and "POST" == request.method and all([f.is_valid() for f in forms]):
+        message = survey.thanks or "Thanks for entering!"
+        return mark_safe("<p>%s</p>" % message)
+    return ""
+register.simple_tag(thanks_for_entering)

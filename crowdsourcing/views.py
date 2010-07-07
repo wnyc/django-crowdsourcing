@@ -164,7 +164,8 @@ def _survey_show_form(request, survey, forms):
                               dict(survey=survey,
                                    forms=forms,
                                    entered=entered,
-                                   login_url=_login_url(request)),
+                                   login_url=_login_url(request),
+                                   request=request),
                               _rc(request))
 
 
