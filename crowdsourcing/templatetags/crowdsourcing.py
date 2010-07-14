@@ -69,7 +69,7 @@ register.simple_tag(jquery_and_google_api)
 
 
 def filter(wrapper_format, key, label, html):
-    label_html = '<label for="%s">%s</label>' % (key, label,)
+    label_html = '<label for="%s">%s:</label> ' % (key, label,)
     return mark_safe(wrapper_format % (label_html + html))
 register.simple_tag(filter)
 
@@ -410,13 +410,15 @@ def submission_fields(submission,
     out = []
     answer_list = page_answers.get(submission.id, [])
     answers = {}
+    when = submission.submitted_at.strftime("%B %d, %Y %I:%M:%S %p")
+    out.append('<div class="date">%s</div>' % when)
     for answer in answer_list:
         answers[answer.question] = answer
     for question in fields:
         answer = answers.get(question, None)
         if answer and answer.value:
             out.append('<div class="field">')
-            out.append('<label>%s</label>' % question.label)
+            out.append('<label>%s</label>: ' % question.label)
             if answer.image_answer:
                 try:
                     thmb = answer.image_answer.thumbnail.absolute_url
@@ -559,7 +561,7 @@ def issue(message):
 register.simple_tag(issue)
 
 
-def thanks_for_entering(entered, request, forms):
+def thanks_for_entering(entered, request, forms, survey):
     if entered and "POST" == request.method and all([f.is_valid() for f in forms]):
         message = survey.thanks or "Thanks for entering!"
         return mark_safe("<p>%s</p>" % message)

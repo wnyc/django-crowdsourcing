@@ -116,7 +116,7 @@ class Survey(models.Model):
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
-        submit_url = reverse('survey_detail', kwargs=kwargs)
+        submit_url = reverse('embeded_survey_questions', kwargs=kwargs)
         report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
         questions = self.questions.order_by("order")
         return dict(title=self.title,
@@ -264,7 +264,9 @@ class Question(models.Model):
         blank=True)
     required = models.BooleanField(
         default=False,
-        help_text=_("Unsafe to change on live surveys."))
+        help_text=_("Unsafe to change on live surveys. Radio button list and "
+                    "drop down list questions will have a blank option if "
+                    "they aren't required."))
     if PositionField:
         order = PositionField(collection=('survey',))
     else:
@@ -658,7 +660,11 @@ class Submission(models.Model):
     featured = models.BooleanField(default=False)
 
     # for moderation
-    is_public = models.BooleanField(default=True)
+    is_public = models.BooleanField(
+        default=True,
+        help_text=_("Crowdsourcing only displays public submissions. The "
+                    "'Moderate submissions' checkbox of the survey determines "
+                    "the default value of this field."))
 
     class Meta:
         ordering = ('-submitted_at',)
@@ -877,8 +883,10 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     aggregate_type = models.PositiveIntegerField(
         choices=SURVEY_AGGREGATE_TYPE_CHOICES,
-        help_text=_("We only use this field if you chose a Pie, Bar, or Line "
-                    "Chart."),
+        help_text=_("We only use this field if you chose a Bar or Line Chart. "
+                    "How should we aggregate the y-axis? 'Average' is good "
+                    "for things like ratings, 'Sum' is good for totals, and "
+                    "'Count' is good for a show of hands."),
         default=SURVEY_AGGREGATE_TYPE_CHOICES.DEFAULT)
     fieldnames = models.TextField(
         blank=True,

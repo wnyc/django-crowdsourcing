@@ -84,33 +84,37 @@ def _survey_submit(request, survey):
 
     forms = forms_for_survey(survey, request)
 
-    if all(form.is_valid() for form in forms):
-        submission_form = forms[0]
-        submission = submission_form.save(commit=False)
-        submission.survey = survey
-        submission.ip_address = _get_remote_ip(request)
-        submission.is_public = not survey.moderate_submissions
-        if request.user.is_authenticated():
-            submission.user = request.user
-        submission.save()
-        for form in forms[1:]:
-            answer = form.save(commit=False)
-            if isinstance(answer, (list, tuple)):
-                for a in answer:
-                    a.submission=submission
-                    a.save()
-            else:
-                if answer:
-                    answer.submission=submission
-                    answer.save()
-        # go to survey results/thanks page
-        if survey.email:
-            _send_survey_email(request, survey, submission)
+    if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
             return _survey_results_redirect(request, survey, thanks=True)
         return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
+
+
+def _submit_valid_forms(forms, request, survey):
+    if not all(form.is_valid() for form in forms):
+        return False
+    submission_form = forms[0]
+    submission = submission_form.save(commit=False)
+    submission.survey = survey
+    submission.ip_address = _get_remote_ip(request)
+    submission.is_public = not survey.moderate_submissions
+    if request.user.is_authenticated():
+        submission.user = request.user
+    submission.save()
+    for form in forms[1:]:
+        answer = form.save(commit=False)
+        if isinstance(answer, (list, tuple)):
+            for a in answer:
+                a.submission = submission
+                a.save()
+        elif answer:
+                answer.submission = submission
+                answer.save()
+    if survey.email:
+        _send_survey_email(request, survey, submission)
+    return True
 
 
 def _url_for_edit(request, obj):
@@ -198,6 +202,24 @@ def survey_detail(request, slug):
     else: # Survey is closed with private results.
         forms = ()
     return _survey_show_form(request, survey, forms)
+
+
+def embeded_survey_questions(request, slug):
+    survey = _get_survey_or_404(slug)
+    templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
+                 'crowdsourcing/embeded_survey_questions.html']
+    forms = ()
+    if _can_show_form(request, survey):
+        forms = forms_for_survey(survey, request)
+        if request.method == 'POST':
+            if _submit_valid_forms(forms, request, survey):
+                forms = ()
+    return render_to_response(templates, dict(
+        entered=_user_entered_survey(request, survey),
+        request=request,
+        forms=forms,
+        survey=survey,
+        login_url=_login_url(request)), _rc(request))
 
 
 def _survey_results_redirect(request, survey, thanks=False):
@@ -391,6 +413,7 @@ def submissions(request, format):
     else:
         return HttpResponse("Unsure how to handle %s format" % format)
     return response
+
 
 def _encode(possible):
     return datetime_to_string(possible) or possible

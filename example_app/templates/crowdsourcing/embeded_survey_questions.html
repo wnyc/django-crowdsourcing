@@ -1,0 +1,12 @@
+{% load crowdsourcing %}
+<%namespace name="survey_functions" file="survey_functions.html" />
+
+{% thanks_for_entering entered request forms survey %}
+
+{% if not (entered and valid) %}
+  ## ${survey_functions.survey_questions(forms)}
+  <input type="submit" value="Submit" />
+  {% if entered %}
+    <span class="error">Please fix the problems above.</span>
+  {% endif %}
+{% endif %}
