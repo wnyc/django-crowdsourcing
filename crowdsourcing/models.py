@@ -147,6 +147,15 @@ class Survey(models.Model):
             return self.starts_at <= now < self.ends_at
         return self.starts_at <= now
 
+    @property
+    def is_live(self):
+        now = datetime.datetime.now()
+        return all([
+            self.is_published,
+            self.starts_at <= now,
+            any([self.archive_policy != ARCHIVE_POLICY_CHOICES.NEVER,
+                not self.ends_at or self.ends_at < now])])
+
     def get_public_fields(self, fieldnames=None):
         if not "_public_fields" in self.__dict__:
             questions = self.questions.filter(answer_is_public=True)

@@ -63,8 +63,11 @@ def _login_url(request):
     return "/?login_required=true"
 
 
-def _get_survey_or_404(slug):
-    return get_object_or_404(Survey.live, slug=slug)
+def _get_survey_or_404(slug, request):
+    manager = Survey.live
+    if request.user.is_staff:
+        manager = Survey.objects
+    return get_object_or_404(manager, slug=slug)
 
 
 def _survey_submit(request, survey):
@@ -185,7 +188,7 @@ def survey_detail(request, slug):
     """ When you load the survey, this view decides what to do. It displays
     the form, redirects to the results page, displays messages, or whatever
     makes sense based on the survey, the user, and the user's entries. """
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
     need_login = (survey.is_open
@@ -205,7 +208,7 @@ def survey_detail(request, slug):
 
 
 def embeded_survey_questions(request, slug):
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
                  'crowdsourcing/embeded_survey_questions.html']
     forms = ()
@@ -235,7 +238,7 @@ def _survey_report_url(survey):
 
 
 def allowed_actions(request, slug):
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     response = HttpResponse(mimetype='application/json')
     dump({"enter": _can_show_form(request, survey),
           "view": survey.can_have_public_submissions()}, response)
@@ -244,7 +247,7 @@ def allowed_actions(request, slug):
 
 def questions(request, slug):
     response = HttpResponse(mimetype='application/json')
-    dump(_get_survey_or_404(slug).to_jsondata(), response)
+    dump(_get_survey_or_404(slug, request).to_jsondata(), response)
     return response
 
 
@@ -482,9 +485,10 @@ def _survey_report(request, slug, report, page, templates):
             page = int(page)
         except ValueError:
             raise Http404
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     # is the survey anything we can actually have a report on?
-    if not survey.can_have_public_submissions():
+    is_public = survey.is_live and survey.can_have_public_submissions()
+    if not is_public and not request.user.is_staff:
         raise Http404
     reports = survey.surveyreport_set.all()
     if report:
@@ -542,6 +546,7 @@ def _survey_report(request, slug, report, page, templates):
         filters=filters,
         report=report_obj,
         page_answers=page_answers,
+        is_public=is_public,
         request=request)
 
     return render_to_response(templates, context, _rc(request))
