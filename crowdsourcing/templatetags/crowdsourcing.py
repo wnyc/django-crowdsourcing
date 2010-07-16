@@ -431,7 +431,10 @@ def submission_fields(submission,
                     if float(answer.image_answer.width) / thumb_width > 1.1:
                         format = ('<input type="hidden" id="img_%d_full_url" '
                                   'value="%s" class="enlargeable" />')
-                        args = (answer.id, answer.image_answer.url)
+                        enlarge = answer.image_answer
+                        enlarge = enlarge.extra_thumbnails["max_enlarge"]
+                        enlarge = enlarge.absolute_url
+                        args = (answer.id, enlarge)
                         out.append(format % args)
                 except ThumbnailException as ex:
                     out.append('<div class="error">%s</div>' % str(ex))
