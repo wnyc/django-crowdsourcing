@@ -61,6 +61,9 @@ class LiveSurveyManager(models.Manager):
             models.Q(ends_at__gt=now))
 
 
+FORMAT_CHOICES = ('json', 'csv', 'xml', 'html',)
+
+
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -229,6 +232,20 @@ class Survey(models.Model):
     @models.permalink
     def get_absolute_url(self):
         return ('survey_detail', (), {'slug': self.slug})
+
+    def get_download_url(self, format):
+        url = reverse('submissions_by_format', kwargs={"format": format})
+        return url + "?survey=" + self.slug
+
+    def get_download_tag(self, format):
+        a = '<a target="_blank" href="%s">%s</a>'
+        return a % (self.get_download_url(format), format,)
+
+    def get_download_tags(self, delimiter=", "):
+        downloads = []
+        for format in sorted(FORMAT_CHOICES):
+            downloads.append(self.get_download_tag(format))
+        return delimiter.join(downloads)
 
     objects = models.Manager()
     live = LiveSurveyManager()
@@ -884,7 +901,8 @@ class SurveyReport(models.Model):
         return self.get_title()
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum(
+    'text pie map bar line slideshow download')
 
 
 SURVEY_AGGREGATE_TYPE_CHOICES = ChoiceEnum('default sum count average')

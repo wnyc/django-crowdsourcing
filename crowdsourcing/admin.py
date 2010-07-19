@@ -11,8 +11,8 @@ from django.utils.translation import ugettext_lazy as _
 from .models import (Question, Survey, Answer, Submission,
                      SurveyReport, SurveyReportDisplay, OPTION_TYPE_CHOICES,
                      SURVEY_DISPLAY_TYPE_CHOICES,
-                     SURVEY_AGGREGATE_TYPE_CHOICES)
-from .views import FORMAT_CHOICES
+                     SURVEY_AGGREGATE_TYPE_CHOICES, FORMAT_CHOICES)
+
 
 try:
     from .flickrsupport import get_group_names, get_group_id
@@ -99,13 +99,7 @@ class SurveyAdminForm(ModelForm):
 
 
 def submissions_as(obj):
-    downloads = []
-    for format in sorted(FORMAT_CHOICES):
-        url = reverse('submissions_by_format', kwargs={"format": format})
-        url += "?survey=" + obj.slug
-        a = '<a target="_blank" href="%s">%s</a>'
-        downloads.append(a % (url, format,))
-    return ", ".join(downloads)
+    return obj.get_download_tags()
 submissions_as.allow_tags=True
 submissions_as.short_description = 'Submissions as'
 
@@ -151,11 +145,13 @@ class SubmissionAdmin(admin.ModelAdmin):
 admin.site.register(Submission, SubmissionAdmin)
 
 
-TEXT = SURVEY_DISPLAY_TYPE_CHOICES.TEXT
-PIE = SURVEY_DISPLAY_TYPE_CHOICES.PIE
-MAP = SURVEY_DISPLAY_TYPE_CHOICES.MAP
-BAR = SURVEY_DISPLAY_TYPE_CHOICES.BAR
-LINE = SURVEY_DISPLAY_TYPE_CHOICES.LINE
+SDTC = SURVEY_DISPLAY_TYPE_CHOICES
+TEXT = SDTC.TEXT
+PIE = SDTC.PIE
+MAP = SDTC.MAP
+BAR = SDTC.BAR
+LINE = SDTC.LINE
+DOWNLOAD = SDTC.DOWNLOAD
 
 
 class SurveyReportDisplayInlineForm(ModelForm):
@@ -173,7 +169,7 @@ class SurveyReportDisplayInlineForm(ModelForm):
                 raise ValidationError(_(
                     "Use the 'annotation' of Text Survey Report Displays to "
                     "insert arbitrary text."))
-        elif not one_axis_count and not fieldnames:
+        elif not any([one_axis_count, fieldnames, display_type == DOWNLOAD]):
             raise ValidationError(_(
                 "Given the options you picked, you need to specify some "
                 "fieldnames or this Survey Report Display won't do "

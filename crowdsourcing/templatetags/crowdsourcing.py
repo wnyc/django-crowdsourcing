@@ -572,8 +572,16 @@ register.simple_tag(issue)
 
 
 def thanks_for_entering(entered, request, forms, survey):
-    if entered and "POST" == request.method and all([f.is_valid() for f in forms]):
+    check_forms = entered and "POST" == request.method
+    if check_forms and all([f.is_valid() for f in forms]):
         message = survey.thanks or "Thanks for entering!"
         return mark_safe("<p>%s</p>" % message)
     return ""
 register.simple_tag(thanks_for_entering)
+
+
+def download_tags(survey):
+    return mark_safe("\n".join([
+        '<h2 class="chart_title">Download Results As...</h2>',
+        '<p class="download_tags">%s</p>' % survey.get_download_tags()]))
+register.simple_tag(download_tags)

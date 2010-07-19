@@ -21,6 +21,7 @@ from django.utils.html import escape
 from .forms import forms_for_survey
 from .models import (
     Answer,
+    FORMAT_CHOICES,
     OPTION_TYPE_CHOICES,
     Question,
     SURVEY_DISPLAY_TYPE_CHOICES,
@@ -249,9 +250,6 @@ def questions(request, slug):
     response = HttpResponse(mimetype='application/json')
     dump(_get_survey_or_404(slug, request).to_jsondata(), response)
     return response
-
-
-FORMAT_CHOICES = ('json', 'csv', 'xml', 'html',)
 
 
 def submissions(request, format):
