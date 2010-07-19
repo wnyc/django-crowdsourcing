@@ -157,11 +157,16 @@ class Survey(models.Model):
                 not self.ends_at or self.ends_at < now])])
 
     def get_public_fields(self, fieldnames=None):
-        if not "_public_fields" in self.__dict__:
-            questions = self.questions.filter(answer_is_public=True)
+        if fieldnames:
+            return self.get_fields(fieldnames)
+        return [f for f in self.get_fields() if f.answer_is_public]
+
+    def get_fields(self, fieldnames=None):
+        if not "_fields" in self.__dict__:
+            questions = self.questions.all()
             questions = questions.select_related("survey")
-            self.__dict__["_public_fields"] = list(questions.order_by("order"))
-        fields = self.__dict__["_public_fields"]
+            self.__dict__["_fields"] = list(questions.order_by("order"))
+        fields = self.__dict__["_fields"]
         if fieldnames:
             return [f for f in fields if f.fieldname in fieldnames]
         return fields

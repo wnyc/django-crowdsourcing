@@ -401,12 +401,19 @@ register.simple_tag(load_maps_and_charts)
 def submission_fields(submission,
                       fields=None,
                       page_answers=None,
+                      request=None,
                       video_height=360,
                       video_width=288):
+    is_staff = request and request.user.is_staff
     if not page_answers:
-        page_answers = get_all_answers([submission])
+        page_answers = get_all_answers(
+            [submission],
+            include_private_questions=is_staff)
     if not fields:
-        fields = list(submission.survey.get_public_fields())
+        if is_staff:
+            fields = list(submission.survey.get_fields())
+        else:
+            fields = list(submission.survey.get_public_fields())
     out = []
     answer_list = page_answers.get(submission.id, [])
     answers = {}

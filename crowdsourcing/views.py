@@ -501,7 +501,11 @@ def _survey_report(request, slug, report, page, templates):
         report_obj = _default_report(survey)
 
     archive_fields = list(survey.get_public_archive_fields())
-    fields = list(survey.get_public_fields())
+    is_staff = request.user.is_staff
+    if is_staff:
+        fields = list(survey.get_fields())
+    else:
+        fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
 
     public = survey.public_submissions()
@@ -523,7 +527,9 @@ def _survey_report(request, slug, report, page, templates):
         submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
 
-    page_answers = get_all_answers(page_obj.object_list)
+    page_answers = get_all_answers(
+        page_obj.object_list,
+        include_private_questions=is_staff)
 
     pages_to_link = []
     for i in range(page - 5, page + 5):
