@@ -45,7 +45,7 @@ def _get_groups():
         if not groups:
             try:
                 groups = flickr.groups_pools_getGroups()._children[0]._children
-            except URLError as ex:
+            except (URLError, flickrapi.FlickrError) as ex:
                 logging.exception("Flick error retrieving groups: %s", str(ex))
                 groups = []
             cache.set(key, groups)
