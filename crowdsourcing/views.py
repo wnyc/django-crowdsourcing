@@ -64,9 +64,9 @@ def _login_url(request):
     return "/?login_required=true"
 
 
-def _get_survey_or_404(slug, request):
+def _get_survey_or_404(slug, request=None):
     manager = Survey.live
-    if request.user.is_staff:
+    if request and request.user.is_staff:
         manager = Survey.objects
     return get_object_or_404(manager, slug=slug)
 
