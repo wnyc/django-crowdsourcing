@@ -5,6 +5,7 @@ import datetime
 import logging
 from math import sin, cos
 from operator import itemgetter
+import re
 from textwrap import fill
 
 try:
@@ -524,7 +525,8 @@ def _extra_from_distance(filter, submission_id_column):
                                   cos(lat1) * cos(lat2) *
                                   cos(lng2 - lng1)) * 3959
     The "radius" of the earth varies between 3,950 and 3,963 miles. """
-    key = "lat_lng_of_" + str(filter.location_value.lower())
+    spaces = re.compile(r'\s')
+    key = spaces.sub("+", "lat_lng_of_" + str(filter.location_value.lower()))
     lat_lng = cache.get(key, None)
     if lat_lng is None:
         lat_lng = get_latitude_and_longitude(filter.location_value)
