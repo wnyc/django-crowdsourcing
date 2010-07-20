@@ -362,6 +362,7 @@ report.
 * *bar*: Bar charts have an x axis and 1 or more y axes, entered in the fieldnames.
 * *line*: Line charts are identical to bar charts except that they use connected lines between points instead of vertical bars.
 * *slideshow*: Crowdsourcing will display one slideshow per fieldname. Only photo upload questions make sense as slideshows.
+* *download*: Display links that allow the user to download the survey results in several formats, e.g. csv.
 
 **Fieldnames**
 

@@ -21,6 +21,7 @@ from django.utils.html import escape
 from .forms import forms_for_survey
 from .models import (
     Answer,
+    FORMAT_CHOICES,
     OPTION_TYPE_CHOICES,
     Question,
     SURVEY_DISPLAY_TYPE_CHOICES,
@@ -63,8 +64,11 @@ def _login_url(request):
     return "/?login_required=true"
 
 
-def _get_survey_or_404(slug):
-    return get_object_or_404(Survey.live, slug=slug)
+def _get_survey_or_404(slug, request=None):
+    manager = Survey.live
+    if request and request.user.is_staff:
+        manager = Survey.objects
+    return get_object_or_404(manager, slug=slug)
 
 
 def _survey_submit(request, survey):
@@ -84,33 +88,37 @@ def _survey_submit(request, survey):
 
     forms = forms_for_survey(survey, request)
 
-    if all(form.is_valid() for form in forms):
-        submission_form = forms[0]
-        submission = submission_form.save(commit=False)
-        submission.survey = survey
-        submission.ip_address = _get_remote_ip(request)
-        submission.is_public = not survey.moderate_submissions
-        if request.user.is_authenticated():
-            submission.user = request.user
-        submission.save()
-        for form in forms[1:]:
-            answer = form.save(commit=False)
-            if isinstance(answer, (list, tuple)):
-                for a in answer:
-                    a.submission=submission
-                    a.save()
-            else:
-                if answer:
-                    answer.submission=submission
-                    answer.save()
-        # go to survey results/thanks page
-        if survey.email:
-            _send_survey_email(request, survey, submission)
+    if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
             return _survey_results_redirect(request, survey, thanks=True)
         return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
+
+
+def _submit_valid_forms(forms, request, survey):
+    if not all(form.is_valid() for form in forms):
+        return False
+    submission_form = forms[0]
+    submission = submission_form.save(commit=False)
+    submission.survey = survey
+    submission.ip_address = _get_remote_ip(request)
+    submission.is_public = not survey.moderate_submissions
+    if request.user.is_authenticated():
+        submission.user = request.user
+    submission.save()
+    for form in forms[1:]:
+        answer = form.save(commit=False)
+        if isinstance(answer, (list, tuple)):
+            for a in answer:
+                a.submission = submission
+                a.save()
+        elif answer:
+                answer.submission = submission
+                answer.save()
+    if survey.email:
+        _send_survey_email(request, survey, submission)
+    return True
 
 
 def _url_for_edit(request, obj):
@@ -181,7 +189,7 @@ def survey_detail(request, slug):
     """ When you load the survey, this view decides what to do. It displays
     the form, redirects to the results page, displays messages, or whatever
     makes sense based on the survey, the user, and the user's entries. """
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
     need_login = (survey.is_open
@@ -200,6 +208,24 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
+def embeded_survey_questions(request, slug):
+    survey = _get_survey_or_404(slug, request)
+    templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
+                 'crowdsourcing/embeded_survey_questions.html']
+    forms = ()
+    if _can_show_form(request, survey):
+        forms = forms_for_survey(survey, request)
+        if request.method == 'POST':
+            if _submit_valid_forms(forms, request, survey):
+                forms = ()
+    return render_to_response(templates, dict(
+        entered=_user_entered_survey(request, survey),
+        request=request,
+        forms=forms,
+        survey=survey,
+        login_url=_login_url(request)), _rc(request))
+
+
 def _survey_results_redirect(request, survey, thanks=False):
     response = HttpResponseRedirect(_survey_report_url(survey))
     if thanks:
@@ -213,7 +239,7 @@ def _survey_report_url(survey):
 
 
 def allowed_actions(request, slug):
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     response = HttpResponse(mimetype='application/json')
     dump({"enter": _can_show_form(request, survey),
           "view": survey.can_have_public_submissions()}, response)
@@ -222,11 +248,8 @@ def allowed_actions(request, slug):
 
 def questions(request, slug):
     response = HttpResponse(mimetype='application/json')
-    dump(_get_survey_or_404(slug).to_jsondata(), response)
+    dump(_get_survey_or_404(slug, request).to_jsondata(), response)
     return response
-
-
-FORMAT_CHOICES = ('json', 'csv', 'xml', 'html',)
 
 
 def submissions(request, format):
@@ -392,6 +415,7 @@ def submissions(request, format):
         return HttpResponse("Unsure how to handle %s format" % format)
     return response
 
+
 def _encode(possible):
     return datetime_to_string(possible) or possible
     
@@ -459,9 +483,10 @@ def _survey_report(request, slug, report, page, templates):
             page = int(page)
         except ValueError:
             raise Http404
-    survey = _get_survey_or_404(slug)
+    survey = _get_survey_or_404(slug, request)
     # is the survey anything we can actually have a report on?
-    if not survey.can_have_public_submissions():
+    is_public = survey.is_live and survey.can_have_public_submissions()
+    if not is_public and not request.user.is_staff:
         raise Http404
     reports = survey.surveyreport_set.all()
     if report:
@@ -474,7 +499,11 @@ def _survey_report(request, slug, report, page, templates):
         report_obj = _default_report(survey)
 
     archive_fields = list(survey.get_public_archive_fields())
-    fields = list(survey.get_public_fields())
+    is_staff = request.user.is_staff
+    if is_staff:
+        fields = list(survey.get_fields())
+    else:
+        fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
 
     public = survey.public_submissions()
@@ -496,7 +525,9 @@ def _survey_report(request, slug, report, page, templates):
         submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
 
-    page_answers = get_all_answers(page_obj.object_list)
+    page_answers = get_all_answers(
+        page_obj.object_list,
+        include_private_questions=is_staff)
 
     pages_to_link = []
     for i in range(page - 5, page + 5):
@@ -519,6 +550,7 @@ def _survey_report(request, slug, report, page, templates):
         filters=filters,
         report=report_obj,
         page_answers=page_answers,
+        is_public=is_public,
         request=request)
 
     return render_to_response(templates, context, _rc(request))

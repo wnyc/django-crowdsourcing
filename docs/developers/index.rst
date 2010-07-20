@@ -93,9 +93,14 @@ Create a crowdsourcing folder in your templates directory. You'll need the follo
 This template displays the survey entry form. The context is
 
 * *survey*
-* *forms*: One Django form per question
-* *entered*: Whether or not the current user has entered the survey. 
-* *login_url*
+* *forms*: One Django form per question. If the user can't enter the survey, forms will be an empty tuple.
+* *entered*: Whether or not the current user has entered the survey.
+* *login_url*: The URL to redirect the user to if the survey requires login and they aren't logged in.
+* *request*
+
+**embeded_survey_questions.html**
+
+This template displays just the questions and the submit button for the survey entry form. It's used by the Javascript to embed survey entry forms. Reuse code between this template and survey_detail.html. The context is the same for ``survey_detail.html``.
 
 **survey_report.html**
 
@@ -139,7 +144,9 @@ Javascript
 
 The example app comes with some pretty handy Javascript. It embeds surveys and survey reports, renders charts and maps, and so on. As the Javascript generates a certain amount of HTML, it may not fit your site's structure exactly so you'll want to use it with caution. However, it's still a great place to start and you may want to include it directly on your site.
 
-Both the example application and WNYC's website, crowdsourcing's flagship site, use crowdsourcing's Javascript. 
+Both the example application and WNYC's website, crowdsourcing's flagship site, use crowdsourcing's Javascript. The Javascript assumes that all crowdsourcing urls are under /crowdsourcing/, i.e., you have a urls.py file with the line ``(r'^crowdsourcing/', include('crowdsourcing.urls'))``.
+
+survey.js uses different markup for surveys that consist of a single choice type question. This markup allows you to enter such a survey with a single click.
 
 Template Tags
 =============

@@ -61,6 +61,9 @@ class LiveSurveyManager(models.Manager):
             models.Q(ends_at__gt=now))
 
 
+FORMAT_CHOICES = ('json', 'csv', 'xml', 'html',)
+
+
 class Survey(models.Model):
     title = models.CharField(max_length=80)
     slug = models.SlugField(unique=True)
@@ -116,7 +119,7 @@ class Survey(models.Model):
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
-        submit_url = reverse('survey_detail', kwargs=kwargs)
+        submit_url = reverse('embeded_survey_questions', kwargs=kwargs)
         report_url = reverse('survey_default_report_page_1', kwargs=kwargs)
         questions = self.questions.order_by("order")
         return dict(title=self.title,
@@ -147,12 +150,26 @@ class Survey(models.Model):
             return self.starts_at <= now < self.ends_at
         return self.starts_at <= now
 
+    @property
+    def is_live(self):
+        now = datetime.datetime.now()
+        return all([
+            self.is_published,
+            self.starts_at <= now,
+            any([self.archive_policy != ARCHIVE_POLICY_CHOICES.NEVER,
+                not self.ends_at or self.ends_at < now])])
+
     def get_public_fields(self, fieldnames=None):
-        if not "_public_fields" in self.__dict__:
-            questions = self.questions.filter(answer_is_public=True)
+        if fieldnames:
+            return self.get_fields(fieldnames)
+        return [f for f in self.get_fields() if f.answer_is_public]
+
+    def get_fields(self, fieldnames=None):
+        if not "_fields" in self.__dict__:
+            questions = self.questions.all()
             questions = questions.select_related("survey")
-            self.__dict__["_public_fields"] = list(questions.order_by("order"))
-        fields = self.__dict__["_public_fields"]
+            self.__dict__["_fields"] = list(questions.order_by("order"))
+        fields = self.__dict__["_fields"]
         if fieldnames:
             return [f for f in fields if f.fieldname in fieldnames]
         return fields
@@ -216,6 +233,20 @@ class Survey(models.Model):
     def get_absolute_url(self):
         return ('survey_detail', (), {'slug': self.slug})
 
+    def get_download_url(self, format):
+        url = reverse('submissions_by_format', kwargs={"format": format})
+        return url + "?survey=" + self.slug
+
+    def get_download_tag(self, format):
+        a = '<a target="_blank" href="%s">%s</a>'
+        return a % (self.get_download_url(format), format,)
+
+    def get_download_tags(self, delimiter=", "):
+        downloads = []
+        for format in sorted(FORMAT_CHOICES):
+            downloads.append(self.get_download_tag(format))
+        return delimiter.join(downloads)
+
     objects = models.Manager()
     live = LiveSurveyManager()
 
@@ -264,7 +295,9 @@ class Question(models.Model):
         blank=True)
     required = models.BooleanField(
         default=False,
-        help_text=_("Unsafe to change on live surveys."))
+        help_text=_("Unsafe to change on live surveys. Radio button list and "
+                    "drop down list questions will have a blank option if "
+                    "they aren't required."))
     if PositionField:
         order = PositionField(collection=('survey',))
     else:
@@ -658,7 +691,11 @@ class Submission(models.Model):
     featured = models.BooleanField(default=False)
 
     # for moderation
-    is_public = models.BooleanField(default=True)
+    is_public = models.BooleanField(
+        default=True,
+        help_text=_("Crowdsourcing only displays public submissions. The "
+                    "'Moderate submissions' checkbox of the survey determines "
+                    "the default value of this field."))
 
     class Meta:
         ordering = ('-submitted_at',)
@@ -864,7 +901,8 @@ class SurveyReport(models.Model):
         return self.get_title()
 
 
-SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum('text pie map bar line slideshow')
+SURVEY_DISPLAY_TYPE_CHOICES = ChoiceEnum(
+    'text pie map bar line slideshow download')
 
 
 SURVEY_AGGREGATE_TYPE_CHOICES = ChoiceEnum('default sum count average')
@@ -877,8 +915,10 @@ class SurveyReportDisplay(models.Model):
         choices=SURVEY_DISPLAY_TYPE_CHOICES)
     aggregate_type = models.PositiveIntegerField(
         choices=SURVEY_AGGREGATE_TYPE_CHOICES,
-        help_text=_("We only use this field if you chose a Pie, Bar, or Line "
-                    "Chart."),
+        help_text=_("We only use this field if you chose a Bar or Line Chart. "
+                    "How should we aggregate the y-axis? 'Average' is good "
+                    "for things like ratings, 'Sum' is good for totals, and "
+                    "'Count' is good for a show of hands."),
         default=SURVEY_AGGREGATE_TYPE_CHOICES.DEFAULT)
     fieldnames = models.TextField(
         blank=True,

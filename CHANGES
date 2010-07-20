@@ -1,3 +1,29 @@
+Version 1.1.9
+-----------------------
+* Don't output <div class='field'> if there isn't an answer.
+* The embedded entry form now uses the exact same template as the full page version. Also, all validation is now server side through AJAX. In other wo
+rds, embedded forms and full page forms are much more consistent.
+* There's a new is_public context variable for survey reports.
+* Survey reports that aren't public do display to logged in staff users.
+* The image enlarging tools now cap the enlarged dimensions to 1000 x 1000.
+* Private question answers are now visible in reports and submission permalinks to staff users.
+* There is a new survey report display that lets the user download the results.
+
+Backwards incompatible changes
+* If you use embedded survey forms with the Javascript that comes with the example app you need a new template: crowdsourcing/embeded_survey_questions.html
+* The GOOGLE_API_KEY settings has been renamed GOOGLE_MAPS_API_KEY.
+* Certain useless survey reports will now return errors in the Django admin. For example, if you specify a bar chart with a sum aggregate type and no field names you'll get an error message.
+
+Version 1.1.8
+-----------------------
+* There is an API that returns csv, json, xml, and html results.
+* Added titles to slideshows and maps.
+* Flickr updates asynchronously which causes fewer timeout issues, and attemplts the same upload multiple times.
+* Don't display not-is_public submissions in aggregate results.
+* Make smarter use of survey report titles and summaries. For example, on a survey report display whichever is first nonempty in this order: survey report summary, survey description, survey tease.
+* Empty submissions were blowing up.
+* When you incorrectly submit a survey form, the form no longer thanks you for entering the survey.
+
 Version 1.1.7
 -----------------------
 * fix for unintentional dependency on flickrapi (now optional)

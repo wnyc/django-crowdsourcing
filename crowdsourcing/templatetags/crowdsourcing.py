@@ -69,20 +69,25 @@ register.simple_tag(jquery_and_google_api)
 
 
 def filter(wrapper_format, key, label, html):
-    label_html = '<label for="%s">%s</label>' % (key, label,)
+    label_html = '<label for="%s">%s:</label> ' % (key, label,)
     return mark_safe(wrapper_format % (label_html + html))
 register.simple_tag(filter)
 
 
 def select_filter(wrapper_format, key, label, value, choices, blank=True):
+    """ choices can contain either strings which will be used for both the
+    value and the display, or (value, display) tuples. """
     html = ['<select id="%s" name="%s">' % (key, key,)]
     if blank:
         html.append('<option value="">---------</option>')
     for choice in choices:
-        html.append('<option value="%s"' % choice)
-        if value == u"%s" % choice:
+        value = display = choice
+        if hasattr(choice, "__iter__"):
+            value, display = choice[0], choice[1]
+        html.append('<option value="%s"' % value)
+        if value == u"%s" % value:
             html.append('selected="selected"')
-        html.append('>%s</option>' % choice)
+        html.append('>%s</option>' % display)
     html.append('</select>')
     return filter(wrapper_format, key, label, "\n".join(html))
 register.simple_tag(select_filter)
@@ -396,22 +401,31 @@ register.simple_tag(load_maps_and_charts)
 def submission_fields(submission,
                       fields=None,
                       page_answers=None,
+                      request=None,
                       video_height=360,
                       video_width=288):
+    is_staff = request and request.user.is_staff
     if not page_answers:
-        page_answers = get_all_answers([submission])
+        page_answers = get_all_answers(
+            [submission],
+            include_private_questions=is_staff)
     if not fields:
-        fields = list(submission.survey.get_public_fields())
+        if is_staff:
+            fields = list(submission.survey.get_fields())
+        else:
+            fields = list(submission.survey.get_public_fields())
     out = []
     answer_list = page_answers.get(submission.id, [])
     answers = {}
+    when = submission.submitted_at.strftime("%B %d, %Y %I:%M:%S %p")
+    out.append('<div class="date">%s</div>' % when)
     for answer in answer_list:
         answers[answer.question] = answer
     for question in fields:
-        out.append('<div class="field">')
         answer = answers.get(question, None)
         if answer and answer.value:
-            out.append('<label>%s</label>' % question.label)
+            out.append('<div class="field">')
+            out.append('<label>%s</label>: ' % question.label)
             if answer.image_answer:
                 try:
                     thmb = answer.image_answer.thumbnail.absolute_url
@@ -424,7 +438,10 @@ def submission_fields(submission,
                     if float(answer.image_answer.width) / thumb_width > 1.1:
                         format = ('<input type="hidden" id="img_%d_full_url" '
                                   'value="%s" class="enlargeable" />')
-                        args = (answer.id, answer.image_answer.url)
+                        enlarge = answer.image_answer
+                        enlarge = enlarge.extra_thumbnails["max_enlarge"]
+                        enlarge = enlarge.absolute_url
+                        args = (answer.id, enlarge)
                         out.append(format % args)
                 except ThumbnailException as ex:
                     out.append('<div class="error">%s</div>' % str(ex))
@@ -437,7 +454,7 @@ def submission_fields(submission,
                     out.append('<a href="%(val)s">%(val)s</a>' % args)
             else:
                 out.append(escape(answer.value))
-        out.append('</div>')
+            out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submission_fields)
 
@@ -554,9 +571,17 @@ def issue(message):
 register.simple_tag(issue)
 
 
-def thanks_for_entering(entered, request, forms):
-    if entered and "POST" == request.method and all([f.is_valid() for f in forms]):
+def thanks_for_entering(entered, request, forms, survey):
+    check_forms = entered and "POST" == request.method
+    if check_forms and all([f.is_valid() for f in forms]):
         message = survey.thanks or "Thanks for entering!"
         return mark_safe("<p>%s</p>" % message)
     return ""
 register.simple_tag(thanks_for_entering)
+
+
+def download_tags(survey):
+    return mark_safe("\n".join([
+        '<h2 class="chart_title">Download Results As...</h2>',
+        '<p class="download_tags">%s</p>' % survey.get_download_tags()]))
+register.simple_tag(download_tags)

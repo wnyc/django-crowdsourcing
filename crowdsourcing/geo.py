@@ -10,12 +10,14 @@ except ImportError:
 
 from django.conf import settings
 
+from . import settings as local_settings
+
 def get_latitude_and_longitude(location):
     if geopy is None:
         raise ImportError("No module named geopy")
-    google_key = getattr(settings, 'GOOGLE_API_KEY', None)
+    google_key = local_settings.GOOGLE_MAPS_API_KEY
     if google_key:
-        g = geopy.geocoders.Google(settings.GOOGLE_API_KEY)
+        g = geopy.geocoders.Google(google_key)
     else:
         g = geopy.geocoders.GeoNames(output_format='json')
     oldstdout = sys.stdout
