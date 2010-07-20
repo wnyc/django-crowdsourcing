@@ -2,6 +2,10 @@
 support for mirroring submitted photos on Flickr.
 """
 from __future__ import absolute_import
+import logging
+from urllib2 import URLError
+
+from django.core.cache import cache
 
 import flickrapi
 import hashlib
@@ -36,7 +40,16 @@ def get_photo_hash(djfile):
 def _get_groups():
     flickr = _get_flickr()
     if flickr:
-        return flickr.groups_pools_getGroups()._children[0]._children
+        key = "flickr_groups"
+        groups = cache.get(key, None)
+        if not groups:
+            try:
+                groups = flickr.groups_pools_getGroups()._children[0]._children
+            except URLError as ex:
+                logging.exception("Flick error retrieving groups: %s", str(ex))
+                groups = []
+            cache.set(key, groups)
+        return groups
     return []
 
 
