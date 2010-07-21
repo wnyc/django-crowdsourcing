@@ -81,11 +81,11 @@ def select_filter(wrapper_format, key, label, value, choices, blank=True):
     if blank:
         html.append('<option value="">---------</option>')
     for choice in choices:
-        value = display = choice
+        option_value = display = choice
         if hasattr(choice, "__iter__"):
-            value, display = choice[0], choice[1]
-        html.append('<option value="%s"' % value)
-        if value == u"%s" % value:
+            option_value, display = choice[0], choice[1]
+        html.append('<option value="%s"' % option_value)
+        if value == u"%s" % option_value:
             html.append('selected="selected"')
         html.append('>%s</option>' % display)
     html.append('</select>')
