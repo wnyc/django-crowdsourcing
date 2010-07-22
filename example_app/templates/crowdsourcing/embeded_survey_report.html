@@ -26,7 +26,7 @@
     {% endfor %}
   {% else %}{% if display.is_map %}
     {% for question in display.questions %}
-      {% google_map display question ids %}
+      {% google_map display question report %}
     {% endfor %}
   {% else %}{% if display.is_bar %}
     {% yahoo_bar_chart display request.GET %}

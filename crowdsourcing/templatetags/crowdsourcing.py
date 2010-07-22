@@ -160,8 +160,9 @@ register.simple_tag(filters_as_ul)
     
 
 def yahoo_pie_chart(display, question, request_get):
-    survey = display.get_report().survey
-    aggregate = AggregateResultCount(survey, question, request_get)
+    report = display.get_report()
+    survey = report.survey
+    aggregate = AggregateResultCount(survey, question, request_get, report)
     if not aggregate.answer_values:
         return ""
     fieldname = question.fieldname
@@ -210,20 +211,29 @@ def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
                    "this survey.") % display.x_axis_fieldname
         return issue(message)
     single_count = False
+    report = display.get_report()
     if display.aggregate_type in [SATC.DEFAULT, SATC.SUM]:
         aggregate_function = "Sum"
-        aggregate = AggregateResultSum(y_axes, x_axis, request_get)
+        aggregate = AggregateResultSum(y_axes, x_axis, request_get, report)
     elif display.aggregate_type == SATC.AVERAGE:
         aggregate_function = "Average"
-        aggregate = AggregateResultAverage(y_axes, x_axis, request_get)
+        aggregate = AggregateResultAverage(y_axes, x_axis, request_get, report)
     elif display.aggregate_type == SATC.COUNT:
         aggregate_function = "Count"
         if y_axes:
-            aggregate = AggregateResult2AxisCount(y_axes, x_axis, request_get)
+            aggregate = AggregateResult2AxisCount(
+                y_axes,
+                x_axis,
+                request_get,
+                report)
         else:
             single_count = True
             survey = x_axis.survey
-            aggregate = AggregateResultCount(survey, x_axis, request_get)
+            aggregate = AggregateResultCount(
+                survey,
+                x_axis,
+                request_get,
+                report)
     if not aggregate.answer_values:
         return ""
     answer_string = aggregate.yahoo_answer_string
@@ -312,21 +322,15 @@ def _yahoo_chart(display, unique_id, args):
     return mark_safe("\n".join(out))
 
 
-def google_map(display, question, ids):
-    map_id = "map_%d" % question.id
+def google_map(display, question, report):
+    map_id = "map_%d" % display.order
     detail_id = "map_detail_%d" % question.id
-    view = "location_question_results"
-    kwargs = {"question_id": question.pk}
-    if ids:
-        view = "location_question_results_ids"
-        kwargs["submission_ids"] = ids
-        if display.limit_map_answers:
-            split = ids.split(",")[:display.limit_map_answers]
-            kwargs["submission_ids"] = ",".join(split)
-    elif display.limit_map_answers:
-        view = "location_question_results_limit"
-        kwargs["limit_map_answers"] = display.limit_map_answers
-    data_url = reverse(view, kwargs=kwargs)
+    data_url = reverse(
+        "location_question_results",
+        kwargs={
+            "question_id": question.pk,
+            "limit_map_answers": display.limit_map_answers or "",
+            "survey_report_slug": report.slug})
     img = '<img class="loading" src="/media/img/loading.gif" alt="loading" />'
     lat = number_to_javascript(display.map_center_latitude)
     lng = number_to_javascript(display.map_center_longitude)

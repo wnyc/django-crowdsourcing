@@ -516,11 +516,10 @@ def _survey_report(request, slug, report, page, templates):
             submissions=submissions,
             report=report_obj,
             request=request)
-
-    ids = None
+    if report_obj.featured:
+        submissions = submissions.filter(featured=True)
     if report_obj.limit_results_to:
         submissions = submissions[:report_obj.limit_results_to]
-        ids = ",".join([str(s.pk) for s in submissions])
     if not report_obj.display_individual_results:
         submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
@@ -543,7 +542,6 @@ def _survey_report(request, slug, report, page, templates):
         submissions=submissions,
         paginator=paginator,
         page_obj=page_obj,
-        ids=ids,
         pages_to_link=pages_to_link,
         fields=fields,
         archive_fields=archive_fields,
@@ -576,13 +574,19 @@ def paginate_or_404(queryset, page, num_per_page=20):
 def location_question_results(
     request,
     question_id,
-    submission_ids=None,
-    limit_map_answers=None):
+    limit_map_answers,
+    survey_report_slug=""):
     question = get_object_or_404(Question.objects.select_related("survey"),
                                  pk=question_id,
                                  answer_is_public=True)
     if not question.survey.can_have_public_submissions():
         raise Http404
+    featured = limit_results_to = False
+    if survey_report_slug:
+        survey_report = get_object_or_404(SurveyReport.objects,
+                                          slug=survey_report_slug)
+        featured = survey_report.featured
+        limit_results_to = survey_report.limit_results_to
     icon_lookup = {}
     icon_questions = question.survey.icon_questions()
     for icon_question in icon_questions:
@@ -599,15 +603,16 @@ def location_question_results(
         ~Q(latitude=None),
         ~Q(longitude=None),
         submission__is_public=True)
+    if featured:
+        answers = answers.filter(submission__featured=True)
     answers = extra_from_filters(
         answers,
         "submission_id",
         question.survey,
         request.GET)
-    if submission_ids:
-        answers = answers.filter(submission__in=submission_ids.split(","))
-    if limit_map_answers:
-        answers = answers[:limit_map_answers]
+    limit_map_answers = int(limit_map_answers) if limit_map_answers else 0
+    if limit_map_answers or limit_results_to:
+        answers = answers[:min(filter(None, [limit_map_answers, limit_results_to,]))]
     entries = []
     view = "crowdsourcing.views.submission_for_map"
     for answer in answers:
