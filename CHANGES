@@ -1,3 +1,8 @@
+Backwards incompatible changes
+* The SurveyReport model has a new field featured = models.BooleanField(default=False). You will need to add this field to the SurveyReport table.
+* The google_map(display, question, ids) template tag is now google_map(display, question, report).
+* The survey_report.html and embeded_survey_report.html templates no longer get the "ids" context variable.
+
 Version 1.1.9
 -----------------------
 * Don't output <div class='field'> if there isn't an answer.
