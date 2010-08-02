@@ -6,6 +6,7 @@ import httplib
 from itertools import count
 import logging
 import smtplib
+from xml.dom.minidom import Document
 
 from django.conf import settings
 from django.core.exceptions import FieldError
@@ -389,16 +390,23 @@ def submissions(request, format):
         keys = get_keys()
         writer.writerow(keys)
         for data in result_data:
-            writer.writerow([_encode(data.get(key, "")) for key in keys])
+            row = []
+            for k in keys:
+                row.append((u"%s" % _encode(data.get(k, ""))).encode("utf-8"))
+            writer.writerow(row)
     elif format == 'xml':
-        data_list = []
+        doc = Document()
+        submissions = doc.createElement("submissions")
+        doc.appendChild(submissions)
         for data in result_data:
-            items = data.items()
-            cell = "<%s>%s</%s>"
-            values = [cell % (k, str(_encode(v)), k) for k, v in items if v]
-            data_list.append("<submission>%s</submission>" % "".join(values))
-        subs = "<submissions>%s</submissions>" % "\n".join(data_list)
-        response = HttpResponse(subs, mimetype='text/xml')
+            submission = doc.createElement("submission")
+            submissions.appendChild(submission)
+            for key, value in data.items():
+                if value:
+                    cell = doc.createElement(key)
+                    submission.appendChild(cell)
+                    cell.appendChild(doc.createTextNode(u"%s" % value))
+        response = HttpResponse(doc.toxml(), mimetype='text/xml')
     elif format == 'html': # mostly for debugging.
         data_list = []
         keys = get_keys()
