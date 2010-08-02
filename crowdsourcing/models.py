@@ -769,10 +769,11 @@ class Answer(models.Model):
     integer_answer = models.IntegerField(blank=True, null=True)
     float_answer = models.FloatField(blank=True, null=True)
     boolean_answer = models.NullBooleanField()
+    image_answer_thumbnail_meta = dict(size=(250, 250)) # width, height
     image_answer = ImageWithThumbnailsField(
         max_length=500,
         blank=True,
-        thumbnail=dict(size=(250, 250)),
+        thumbnail=image_answer_thumbnail_meta,
         extra_thumbnails=local_settings.EXTRA_THUMBNAILS,
         upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)

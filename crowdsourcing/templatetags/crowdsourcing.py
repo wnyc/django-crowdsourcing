@@ -438,7 +438,7 @@ def submission_fields(submission,
                     # This extra hidden input is in case you want to enlarge
                     # images. Don't bother enlarging images unless we'll
                     # increase their dimensions by at least 10%.
-                    thumb_width = answer.image_answer.thumbnail.width()
+                    thumb_width = Answer.image_answer_thumbnail_meta["size"][0]
                     if float(answer.image_answer.width) / thumb_width > 1.1:
                         format = ('<input type="hidden" id="img_%d_full_url" '
                                   'value="%s" class="enlargeable" />')
