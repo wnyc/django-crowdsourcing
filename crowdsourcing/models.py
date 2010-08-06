@@ -299,8 +299,7 @@ class Question(models.Model):
                     'alphanumerics and underscores (no spaces).'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
-    label = models.CharField(max_length=32, help_text=_(
-        "Appears on the results page."))
+    label = models.TextField(help_text=_("Appears on the results page."))
     help_text = models.TextField(
         blank=True)
     required = models.BooleanField(
