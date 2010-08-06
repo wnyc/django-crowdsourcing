@@ -556,6 +556,10 @@ def _extra_from_distance(filter, submission_id_column):
         "%f * sin(latitude / %f) + "
         "%f * cos(latitude / %f) * "
         "cos((longitude - %f) / %f)") % acos_of_args
+    # if acos_of >= 1 then the address in the database is practically the
+    # same address we're searching for and acos(acos_of) is mathematically 
+    # impossible so just always include it. If acos_of < 1 then we need to
+    # check the distance.
     where = "".join((
         submission_id_column,
         " IN (SELECT ca.submission_id FROM ",
@@ -564,9 +568,11 @@ def _extra_from_distance(filter, submission_id_column):
         "WHERE cs.survey_id = %s AND latitude IS NOT NULL ",
         "AND longitude IS NOT NULL AND ",
         acos_of,
+        " >= 1 OR (",
+        acos_of,
         " < 1 AND 3959.0 * acos(",
         acos_of,
-        ") <= %s)"))
+        ") <= %s))"))
     params = [int(filter.field.survey_id), int(filter.within_value)]
     return where, params
 

@@ -602,7 +602,7 @@ def location_question_results(
         for (option, icon) in icon_question.parsed_option_icon_pairs():
             if icon:
                 icon_by_answer[option] = icon
-        for answer in icon_question.answer_set.all():
+        for answer in icon_question.answer_set.all().select_related("question"):
             if answer.value in icon_by_answer:
                 icon = icon_by_answer[answer.value]
                 icon_lookup[answer.submission_id] = icon
