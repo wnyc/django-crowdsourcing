@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import re
 
 from django.conf import settings
+from django.core.files.images import get_image_dimensions
 from django.forms import (
     BooleanField,
     CharField,
@@ -145,6 +146,14 @@ class VideoAnswer(BaseAnswerForm):
 class PhotoUpload(BaseAnswerForm):
     answer = ImageField()
 
+    def clean_answer(self):
+        answer = self.cleaned_data['answer']
+        if not get_image_dimensions(answer.file):
+            raise ValidationError(_(
+                "We couldn't read your file. Make sure it's a .jpeg, .png, or "
+                ".gif file, not a .psd or other unsupported type."))
+        return answer
+
 
 class LocationAnswer(BaseAnswerForm):
     answer = CharField()
@@ -162,7 +171,8 @@ class LocationAnswer(BaseAnswerForm):
 class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
-        choices = [(strip_html(x), mark_safe(x)) for x in self.question.parsed_options]
+        options = self.question.parsed_options
+        choices = [(strip_html(x), mark_safe(x)) for x in options]
         if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices
