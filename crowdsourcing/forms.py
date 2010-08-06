@@ -25,13 +25,13 @@ from django.forms.formsets import BaseFormSet
 from django.forms.models import ModelForm
 from django.template import Context, loader
 from django.template.defaultfilters import slugify
+from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
 from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
-from .util import strip_html
 
 try:
     from .oembedutils import oembed_expand
@@ -172,7 +172,7 @@ class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
         options = self.question.parsed_options
-        choices = [(strip_html(x), mark_safe(x)) for x in options]
+        choices = [(strip_tags(x), mark_safe(x)) for x in options]
         if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices
