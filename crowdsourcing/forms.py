@@ -30,6 +30,7 @@ from django.utils.translation import ugettext_lazy as _
 from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
+from .util import strip_html
 
 try:
     from .oembedutils import oembed_expand
@@ -161,7 +162,7 @@ class LocationAnswer(BaseAnswerForm):
 class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
-        choices = [(x, x) for x in self.question.parsed_options]
+        choices = [(strip_html(x), mark_safe(x)) for x in self.question.parsed_options]
         if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices

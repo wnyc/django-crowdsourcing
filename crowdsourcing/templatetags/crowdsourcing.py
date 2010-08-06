@@ -1,4 +1,5 @@
 import logging
+import re
 
 from django import template
 from django.core.urlresolvers import reverse
@@ -12,7 +13,7 @@ from ..crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
     AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
     OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
-from ..crowdsourcing.util import ChoiceEnum, get_function
+from ..crowdsourcing.util import ChoiceEnum, get_function, strip_html
 from ..crowdsourcing import settings as local_settings
 
 if local_settings.OEMBED_EXPAND:
@@ -84,6 +85,7 @@ def select_filter(wrapper_format, key, label, value, choices, blank=True):
         option_value = display = choice
         if hasattr(choice, "__iter__"):
             option_value, display = choice[0], choice[1]
+        option_value, display = strip_html(option_value), strip_html(display)
         html.append('<option value="%s"' % option_value)
         if value == u"%s" % option_value:
             html.append('selected="selected"')

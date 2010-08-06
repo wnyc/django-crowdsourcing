@@ -592,7 +592,7 @@ class AggregateResultCount:
             self.answer_set = self.answer_set.filter(submission__featured=True)
         self.answer_value_lookup = {}
         for answer in self.answer_set:
-            text = fill(str(answer[field.value_column]), 30)
+            text = fill(u"%s" % answer[field.value_column], 30)
             if answer["count"]:
                 self.answer_value_lookup[text] = {
                     field.fieldname: text,
