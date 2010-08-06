@@ -6,6 +6,7 @@ import httplib
 from itertools import count
 import logging
 import smtplib
+from xml.dom.minidom import Document
 
 from django.conf import settings
 from django.core.exceptions import FieldError
@@ -389,16 +390,23 @@ def submissions(request, format):
         keys = get_keys()
         writer.writerow(keys)
         for data in result_data:
-            writer.writerow([_encode(data.get(key, "")) for key in keys])
+            row = []
+            for k in keys:
+                row.append((u"%s" % _encode(data.get(k, ""))).encode("utf-8"))
+            writer.writerow(row)
     elif format == 'xml':
-        data_list = []
+        doc = Document()
+        submissions = doc.createElement("submissions")
+        doc.appendChild(submissions)
         for data in result_data:
-            items = data.items()
-            cell = "<%s>%s</%s>"
-            values = [cell % (k, str(_encode(v)), k) for k, v in items if v]
-            data_list.append("<submission>%s</submission>" % "".join(values))
-        subs = "<submissions>%s</submissions>" % "\n".join(data_list)
-        response = HttpResponse(subs, mimetype='text/xml')
+            submission = doc.createElement("submission")
+            submissions.appendChild(submission)
+            for key, value in data.items():
+                if value:
+                    cell = doc.createElement(key)
+                    submission.appendChild(cell)
+                    cell.appendChild(doc.createTextNode(u"%s" % value))
+        response = HttpResponse(doc.toxml(), mimetype='text/xml')
     elif format == 'html': # mostly for debugging.
         data_list = []
         keys = get_keys()
@@ -516,11 +524,10 @@ def _survey_report(request, slug, report, page, templates):
             submissions=submissions,
             report=report_obj,
             request=request)
-
-    ids = None
+    if report_obj.featured:
+        submissions = submissions.filter(featured=True)
     if report_obj.limit_results_to:
         submissions = submissions[:report_obj.limit_results_to]
-        ids = ",".join([str(s.pk) for s in submissions])
     if not report_obj.display_individual_results:
         submissions = submissions.none()
     paginator, page_obj = paginate_or_404(submissions, page)
@@ -543,7 +550,6 @@ def _survey_report(request, slug, report, page, templates):
         submissions=submissions,
         paginator=paginator,
         page_obj=page_obj,
-        ids=ids,
         pages_to_link=pages_to_link,
         fields=fields,
         archive_fields=archive_fields,
@@ -576,13 +582,19 @@ def paginate_or_404(queryset, page, num_per_page=20):
 def location_question_results(
     request,
     question_id,
-    submission_ids=None,
-    limit_map_answers=None):
+    limit_map_answers,
+    survey_report_slug=""):
     question = get_object_or_404(Question.objects.select_related("survey"),
                                  pk=question_id,
                                  answer_is_public=True)
     if not question.survey.can_have_public_submissions():
         raise Http404
+    featured = limit_results_to = False
+    if survey_report_slug:
+        survey_report = get_object_or_404(SurveyReport.objects,
+                                          slug=survey_report_slug)
+        featured = survey_report.featured
+        limit_results_to = survey_report.limit_results_to
     icon_lookup = {}
     icon_questions = question.survey.icon_questions()
     for icon_question in icon_questions:
@@ -590,7 +602,7 @@ def location_question_results(
         for (option, icon) in icon_question.parsed_option_icon_pairs():
             if icon:
                 icon_by_answer[option] = icon
-        for answer in icon_question.answer_set.all():
+        for answer in icon_question.answer_set.all().select_related("question"):
             if answer.value in icon_by_answer:
                 icon = icon_by_answer[answer.value]
                 icon_lookup[answer.submission_id] = icon
@@ -599,15 +611,16 @@ def location_question_results(
         ~Q(latitude=None),
         ~Q(longitude=None),
         submission__is_public=True)
+    if featured:
+        answers = answers.filter(submission__featured=True)
     answers = extra_from_filters(
         answers,
         "submission_id",
         question.survey,
         request.GET)
-    if submission_ids:
-        answers = answers.filter(submission__in=submission_ids.split(","))
-    if limit_map_answers:
-        answers = answers[:limit_map_answers]
+    limit_map_answers = int(limit_map_answers) if limit_map_answers else 0
+    if limit_map_answers or limit_results_to:
+        answers = answers[:min(filter(None, [limit_map_answers, limit_results_to,]))]
     entries = []
     view = "crowdsourcing.views.submission_for_map"
     for answer in answers:

@@ -90,7 +90,12 @@ class Survey(models.Model):
         help_text="Users can vote on submissions.")
     archive_policy = models.IntegerField(
         choices=ARCHIVE_POLICY_CHOICES,
-        default=ARCHIVE_POLICY_CHOICES.IMMEDIATE)
+        default=ARCHIVE_POLICY_CHOICES.IMMEDIATE,
+        help_text=_("At what point will Crowdsourcing make the results "
+                    "public? immediate: All results are immediately public. "
+                    "post-close: Results are public on or after the "
+                    "\"ends at\" option documented below. never: Results are "
+                    "never public."))
     starts_at = models.DateTimeField(default=datetime.datetime.now)
     survey_date = models.DateField(blank=True, null=True, editable=False)
     ends_at = models.DateTimeField(null=True, blank=True)
@@ -281,6 +286,10 @@ FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.LOCATION,
                            OPTION_TYPE_CHOICES.NUMERIC_CHOICE)
 
 
+POSITION_HELP = ("What order does this question appear in the survey form and "
+                 "in permalinks?")
+
+
 class Question(models.Model):
     survey = models.ForeignKey(Survey, related_name="questions")
     fieldname = models.CharField(
@@ -290,8 +299,7 @@ class Question(models.Model):
                     'alphanumerics and underscores (no spaces).'))
     question = models.TextField(help_text=_(
         "Appears on the survey entry page."))
-    label = models.CharField(max_length=32, help_text=_(
-        "Appears on the results page."))
+    label = models.TextField(help_text=_("Appears on the results page."))
     help_text = models.TextField(
         blank=True)
     required = models.BooleanField(
@@ -300,9 +308,11 @@ class Question(models.Model):
                     "drop down list questions will have a blank option if "
                     "they aren't required."))
     if PositionField:
-        order = PositionField(collection=('survey',))
+        order = PositionField(
+            collection=('survey',),
+            help_text=_(POSITION_HELP + " Use -1 to auto-assign."))
     else:
-        order = models.IntegerField()
+        order = models.IntegerField(help_text=POSITION_HELP)
     option_type = models.CharField(
         max_length=max([len(key) for key, v in OPTION_TYPE_CHOICES._choices]),
         choices=OPTION_TYPE_CHOICES,
@@ -313,9 +323,9 @@ class Question(models.Model):
         blank=True,
         default='',
         help_text=_(
-            'On a live survey you can modify the order of these options. You '
-            'can, at your own risk, add new options, but you must not change '
-            'or remove options.'))
+            'Use one option per line. On a live survey you can modify the '
+            'order of these options. You can, at your own risk, add new '
+            'options, but you must not change or remove options.'))
     map_icons = models.TextField(
         blank=True,
         default='',
@@ -545,6 +555,10 @@ def _extra_from_distance(filter, submission_id_column):
         "%f * sin(latitude / %f) + "
         "%f * cos(latitude / %f) * "
         "cos((longitude - %f) / %f)") % acos_of_args
+    # if acos_of >= 1 then the address in the database is practically the
+    # same address we're searching for and acos(acos_of) is mathematically 
+    # impossible so just always include it. If acos_of < 1 then we need to
+    # check the distance.
     where = "".join((
         submission_id_column,
         " IN (SELECT ca.submission_id FROM ",
@@ -553,9 +567,11 @@ def _extra_from_distance(filter, submission_id_column):
         "WHERE cs.survey_id = %s AND latitude IS NOT NULL ",
         "AND longitude IS NOT NULL AND ",
         acos_of,
+        " >= 1 OR (",
+        acos_of,
         " < 1 AND 3959.0 * acos(",
         acos_of,
-        ") <= %s)"))
+        ") <= %s))"))
     params = [int(filter.field.survey_id), int(filter.within_value)]
     return where, params
 
@@ -570,16 +586,18 @@ def _radians(degrees):
 class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     pie charts. """
-    def __init__(self, survey, field, request_data):
+    def __init__(self, survey, field, request_data, surveyreport=None):
         self.answer_set = field.public_answers.values(field.value_column)
         self.answer_set = self.answer_set.annotate(count=Count("id"))
         self.answer_set = extra_from_filters(self.answer_set,
                                              "submission_id",
                                              survey,
                                              request_data)
+        if surveyreport and surveyreport.featured:
+            self.answer_set = self.answer_set.filter(submission__featured=True)
         self.answer_value_lookup = {}
         for answer in self.answer_set:
-            text = fill(str(answer[field.value_column]), 30)
+            text = fill(u"%s" % answer[field.value_column], 30)
             if answer["count"]:
                 self.answer_value_lookup[text] = {
                     field.fieldname: text,
@@ -598,7 +616,13 @@ class AggregateResultCount:
 
 
 class AggregateResult2Axis(object):
-    def __init__(self, y_axes, x_axis, request_data, aggregate_function):
+    def __init__(
+        self,
+        y_axes,
+        x_axis,
+        request_data,
+        aggregate_function,
+        report):
         self.answer_values = []
         answer_value_lookup = {}
 
@@ -639,6 +663,8 @@ class AggregateResult2Axis(object):
                 "y_axis.question_id = %s AND ",
                 y_axis_column,
                 " IS NOT NULL AND x_axis.question_id = %s"]
+            if report and report.featured:
+                query.append(" AND submission.featured = true")
             y = "y_axis.submission_id"
             extras = extra_clauses_from_filters(y, x_axis.survey, request_data)
             for where, next_params in extras:
@@ -667,21 +693,21 @@ class AggregateResult2Axis(object):
 
 
 class AggregateResultSum(AggregateResult2Axis):
-    def __init__(self, y_axes, x_axis, request_data):
+    def __init__(self, y_axes, x_axis, request_data, report=None):
         sup = super(AggregateResultSum, self)
-        sup.__init__(y_axes, x_axis, request_data, "SUM")
+        sup.__init__(y_axes, x_axis, request_data, "SUM", report)
 
 
 class AggregateResultAverage(AggregateResult2Axis):
-    def __init__(self, y_axes, x_axis, request_data):
+    def __init__(self, y_axes, x_axis, request_data, report=None):
         sup = super(AggregateResultAverage, self)
-        sup.__init__(y_axes, x_axis, request_data, "AVG")
+        sup.__init__(y_axes, x_axis, request_data, "AVG", report)
 
 
 class AggregateResult2AxisCount(AggregateResult2Axis):
-    def __init__(self, y_axes, x_axis, request_data):
+    def __init__(self, y_axes, x_axis, request_data, report=None):
         sup = super(AggregateResult2AxisCount, self)
-        sup.__init__(y_axes, x_axis, request_data, "COUNT")
+        sup.__init__(y_axes, x_axis, request_data, "COUNT", report)
 
 
 class Submission(models.Model):
@@ -748,10 +774,11 @@ class Answer(models.Model):
     integer_answer = models.IntegerField(blank=True, null=True)
     float_answer = models.FloatField(blank=True, null=True)
     boolean_answer = models.NullBooleanField()
+    image_answer_thumbnail_meta = dict(size=(250, 250)) # width, height
     image_answer = ImageWithThumbnailsField(
         max_length=500,
         blank=True,
-        thumbnail=dict(size=(250, 250)),
+        thumbnail=image_answer_thumbnail_meta,
         extra_thumbnails=local_settings.EXTRA_THUMBNAILS,
         upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)
@@ -857,11 +884,14 @@ class SurveyReport(models.Model):
         blank=True,
         null=True,
         help_text="Only use the top X submissions.")
+    featured = models.BooleanField(
+        default=False,
+        help_text=_("Include only featured submissions."))
     display_individual_results = models.BooleanField(
         default=True,
-        help_text="Display separate, individual results if this field is True "
-                  "and you have archivable questions, like those with "
-                  "paragraph answers.")
+        help_text=_("Display separate, individual results if this field is "
+                    "True and you have archivable questions, like those with "
+                    "paragraph answers."))
     # A useful variable for holding different report displays so they don't
     # get saved to the database.
     survey_report_displays = None

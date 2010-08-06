@@ -342,6 +342,10 @@ filters at the top of the page?
 This option limits the number of results that Crowdsourcing
 displays. You could use it to make a top 10 list.
 
+**Featured**
+
+Include only featured submissions.
+
 **Display individual results**
 
 If you only want to display aggregate results like pie charts you can

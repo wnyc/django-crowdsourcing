@@ -110,7 +110,6 @@ This template displays survey reports. The context is
 * *submissions*: A complete list of all the submissions for the survey. You want to avoid this complete list and instead use page_obj.object_list wherever possible. page_obj.object_list lists just those submissions that appear on the page.
 * *paginator*: A paginator object that you can probably ignore. Use pages_to_link instead.
 * *page_obj*: page_obj.object_list is a list of all the submissions on the page. 
-* *ids*: If the survey report is only supposed to display a set number of submissions, then you can find the ids of those submissions in this comma delimited list.
 * *pages_to_link*: This handy list contains a useful set of page numbers that might be good to display links for if the survey has a lot of submissions. An example list might be ``[1, False, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, False, 30]`` if you were on page 10 of 30. The idea is that you can display elipses for False.
 * *fields*: This list contains all the public questions in the survey.
 * *archive_fields*: This list contains all the public questions that would display well in a reverse chronological list of individual submissions. For example, text questions like, "Describe your childhood," display best as a list of submissions. 
@@ -181,7 +180,7 @@ Or a YUI bar chart.
 
 Or a YUI line chart.
 
-**google_map(display, question, ids)**
+**google_map(display, question, report)**
 
 Or a Google Map.
 
@@ -208,7 +207,7 @@ Here, directly from the example app, is some effective code for rendering all th
       {% endfor %}
     {% else %}{% if display.is_map %}
       {% for question in display.questions %}
-        {% google_map display question ids %}
+        {% google_map display question report %}
       {% endfor %}
     {% else %}{% if display.is_bar %}
       {% yahoo_bar_chart display request.GET %}
