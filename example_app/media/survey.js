@@ -57,12 +57,12 @@ function loadSurvey(slug, elementId) {
   $(document).ready(function() {
     var url = "/crowdsourcing/" + slug + "/api/allowed_actions/";
     $.getJSON(url, function(data, status) {
-      loadSurveyForm(slug, elementId, !data["enter"], data["view"]);
+      loadSurveyForm(slug, elementId, data["enter"], data["view"], data["open"]);
     });
   });
 }
 
-function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
+function loadSurveyForm(slug, elementId, canEnter, canView, open) {
   var url = "/crowdsourcing/" + slug + "/api/questions/";
 
   $.getJSON(url, function(survey, status) {
@@ -92,8 +92,12 @@ function loadSurveyForm(slug, elementId, alreadyEntered, canView) {
     }
 
     var div = $("<div/>").attr("id", "inner_" + slug).appendTo(form);
-    if (alreadyEntered) {
-      div.text("You've already entered this survey.");
+    if (!canEnter) {
+      if (!open) {
+        div.text("This survey isn't open yet.");
+      } else {
+        div.text("You've already entered this survey.");
+      }
     } else {
       if (isPoll) {
         var question = survey.questions[0];
