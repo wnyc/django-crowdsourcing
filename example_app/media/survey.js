@@ -57,12 +57,12 @@ function loadSurvey(slug, elementId) {
   $(document).ready(function() {
     var url = "/crowdsourcing/" + slug + "/api/allowed_actions/";
     $.getJSON(url, function(data, status) {
-      loadSurveyForm(slug, elementId, data["enter"], data["view"], data["open"]);
+      loadSurveyForm(slug, elementId, !data["enter"], data["view"], data["open"]);
     });
   });
 }
 
-function loadSurveyForm(slug, elementId, canEnter, canView, open) {
+function loadSurveyForm(slug, elementId, cantEnter, canView, open) {
   var url = "/crowdsourcing/" + slug + "/api/questions/";
 
   $.getJSON(url, function(survey, status) {
@@ -92,11 +92,11 @@ function loadSurveyForm(slug, elementId, canEnter, canView, open) {
     }
 
     var div = $("<div/>").attr("id", "inner_" + slug).appendTo(form);
-    if (!canEnter) {
-      if (!open) {
-        div.text("This survey isn't open yet.");
-      } else {
+    if (cantEnter) {
+      if (open == true) { // I didn't use if (open) for backwards compatibility
         div.text("You've already entered this survey.");
+      } else {
+        div.text("This survey isn't open yet.");
       }
     } else {
       if (isPoll) {
