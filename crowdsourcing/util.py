@@ -31,9 +31,3 @@ class ChoiceEnum(object):
 
     def getdisplay(self, key):
         return [v[1] for v in self._choices if v[0] == key][0]
-
-
-def strip_html(from_this):
-    if isinstance(from_this, basestring):
-        return re.compile(u"<[^>]*>").sub("", from_this)
-    return from_this

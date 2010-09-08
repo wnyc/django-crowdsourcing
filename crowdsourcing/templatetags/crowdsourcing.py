@@ -2,18 +2,19 @@ import logging
 import re
 
 from django import template
-from django.core.urlresolvers import reverse
 from django.core.cache import cache
+from django.core.files.images import get_image_dimensions
+from django.core.urlresolvers import reverse
 from django.template import Node
 from django.utils.safestring import mark_safe
-from django.utils.html import escape
+from django.utils.html import escape, strip_tags
 from sorl.thumbnail.base import ThumbnailException
 
 from ..crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
     AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
     OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
-from ..crowdsourcing.util import ChoiceEnum, get_function, strip_html
+from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
 if local_settings.OEMBED_EXPAND:
@@ -85,7 +86,7 @@ def select_filter(wrapper_format, key, label, value, choices, blank=True):
         option_value = display = choice
         if hasattr(choice, "__iter__"):
             option_value, display = choice[0], choice[1]
-        option_value, display = strip_html(option_value), strip_html(display)
+        option_value, display = strip_tags(option_value), strip_tags(display)
         html.append('<option value="%s"' % option_value)
         if value == u"%s" % option_value:
             html.append('selected="selected"')
@@ -433,24 +434,27 @@ def submission_fields(submission,
             out.append('<div class="field">')
             out.append('<label>%s</label>: ' % question.label)
             if answer.image_answer:
+                valid = True
                 try:
                     thmb = answer.image_answer.thumbnail.absolute_url
                     args = (thmb, answer.id,)
                     out.append('<img src="%s" id="img_%d" />' % args)
-                    # This extra hidden input is in case you want to enlarge
-                    # images. Don't bother enlarging images unless we'll
-                    # increase their dimensions by at least 10%.
-                    thumb_width = Answer.image_answer_thumbnail_meta["size"][0]
-                    if float(answer.image_answer.width) / thumb_width > 1.1:
-                        format = ('<input type="hidden" id="img_%d_full_url" '
-                                  'value="%s" class="enlargeable" />')
-                        enlarge = answer.image_answer
-                        enlarge = enlarge.extra_thumbnails["max_enlarge"]
-                        enlarge = enlarge.absolute_url
-                        args = (answer.id, enlarge)
-                        out.append(format % args)
+                    x_y = get_image_dimensions(answer.image_answer.file)
                 except ThumbnailException as ex:
+                    valid = False
                     out.append('<div class="error">%s</div>' % str(ex))
+                thumb_width = Answer.image_answer_thumbnail_meta["size"][0]
+                # This extra hidden input is in case you want to enlarge
+                # images. Don't bother enlarging images unless we'll increase
+                # their dimensions by at least 10%.
+                if valid and x_y and float(x_y[0]) / thumb_width > 1.1:
+                    format = ('<input type="hidden" id="img_%d_full_url" '
+                              'value="%s" class="enlargeable" />')
+                    enlarge = answer.image_answer
+                    enlarge = enlarge.extra_thumbnails["max_enlarge"]
+                    enlarge = enlarge.absolute_url
+                    args = (answer.id, enlarge)
+                    out.append(format % args)
             elif question.option_type == OPTION_TYPE_CHOICES.VIDEO:
                 if oembed_expand:
                     html = video_html(answer.value, video_height, video_width)

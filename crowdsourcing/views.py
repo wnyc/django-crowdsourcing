@@ -243,7 +243,8 @@ def allowed_actions(request, slug):
     survey = _get_survey_or_404(slug, request)
     response = HttpResponse(mimetype='application/json')
     dump({"enter": _can_show_form(request, survey),
-          "view": survey.can_have_public_submissions()}, response)
+          "view": survey.can_have_public_submissions(),
+          "open": survey.is_open}, response)
     return response
 
 
