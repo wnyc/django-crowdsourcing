@@ -148,7 +148,7 @@ class PhotoUpload(BaseAnswerForm):
 
     def clean_answer(self):
         answer = self.cleaned_data['answer']
-        if not get_image_dimensions(answer.file):
+        if answer and not get_image_dimensions(answer.file):
             raise ValidationError(_(
                 "We couldn't read your file. Make sure it's a .jpeg, .png, or "
                 ".gif file, not a .psd or other unsupported type."))
