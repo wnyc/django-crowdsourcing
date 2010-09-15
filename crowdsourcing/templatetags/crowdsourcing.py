@@ -14,6 +14,7 @@ from ..crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
     AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
     OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
+from ..crowdsourcing.views import location_question_results
 from ..crowdsourcing.util import ChoiceEnum, get_function
 from ..crowdsourcing import settings as local_settings
 
@@ -328,12 +329,12 @@ def _yahoo_chart(display, unique_id, args):
 def google_map(display, question, report):
     map_id = "map_%d" % display.order
     detail_id = "map_detail_%d" % question.id
-    data_url = reverse(
-        "location_question_results",
-        kwargs={
-            "question_id": question.pk,
-            "limit_map_answers": display.limit_map_answers or "",
-            "survey_report_slug": report.slug})
+    kwargs = {
+        "question_id": question.pk,
+        "limit_map_answers": display.limit_map_answers or 0}
+    if report.slug:
+        kwargs["survey_report_slug"] = report.slug
+    data_url = reverse(location_question_results, kwargs=kwargs)
     img = '<img class="loading" src="/media/img/loading.gif" alt="loading" />'
     lat = number_to_javascript(display.map_center_latitude)
     lng = number_to_javascript(display.map_center_longitude)
