@@ -30,6 +30,10 @@ urlpatterns = patterns(
     url(r'^submission_for_map/(?P<id>\d+)/$',
         submission_for_map),
 
+    url(r'^location_question_results/(?P<question_id>\d+)/(?P<limit_map_answers>\d+)/$',
+        location_question_results,
+        kwargs={"survey_report_slug": ""}),
+
     url(r'^location_question_results/(?P<question_id>\d+)/(?P<limit_map_answers>\d*)/(?P<survey_report_slug>[-a-z0-9_]*)/$',
         location_question_results,
         name="location_question_results"),
