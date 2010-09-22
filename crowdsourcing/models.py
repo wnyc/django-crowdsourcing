@@ -807,8 +807,11 @@ class Answer(models.Model):
                         OTC.NUMERIC_CHOICE):
                 # Keep values in both the integer and float columns just in
                 # case the question switches between integer and float types.
-                self.float_answer = float(v)
-                self.integer_answer = int(round(self.float_answer))
+                if v:
+                    self.float_answer = float(v)
+                    self.integer_answer = int(round(self.float_answer))
+                else:
+                    self.float_answer = self.integer_answer = None
             else:
                 self.text_answer = v
 
