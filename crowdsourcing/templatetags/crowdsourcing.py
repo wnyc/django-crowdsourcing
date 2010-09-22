@@ -582,9 +582,8 @@ def issue(message):
 register.simple_tag(issue)
 
 
-def thanks_for_entering(entered, request, forms, survey):
-    check_forms = entered and "POST" == request.method
-    if check_forms and all([f.is_valid() for f in forms]):
+def thanks_for_entering(request, forms, survey):
+    if "POST" == request.method and all([f.is_valid() for f in forms]):
         message = survey.thanks or "Thanks for entering!"
         return mark_safe("<p>%s</p>" % message)
     return ""
