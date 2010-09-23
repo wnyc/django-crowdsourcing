@@ -427,7 +427,7 @@ def submissions(request, format):
 
 def _encode(possible):
     return datetime_to_string(possible) or possible
-    
+
 
 def submission(request, id):
     template = 'crowdsourcing/submission.html'
@@ -443,7 +443,8 @@ def _default_report(survey):
         OTC.SELECT,
         OTC.CHOICE,
         OTC.NUMERIC_SELECT,
-        OTC.NUMERIC_CHOICE)
+        OTC.NUMERIC_CHOICE,
+        OTC.BOOL_LIST,)
     all_choices = pie_choices + (OTC.LOCATION, OTC.PHOTO)
     public_fields = survey.get_public_fields()
     fields = [f for f in public_fields if f.option_type in all_choices]

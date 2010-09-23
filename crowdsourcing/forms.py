@@ -57,7 +57,7 @@ class BaseAnswerForm(Form):
         q = self.question
         answer.required = q.required
         answer.label = q.question
-        answer.help_text = q.help_text        
+        answer.help_text = q.help_text
         # set some property on the basis of question.fieldname? TBD
         return answer
 
@@ -91,11 +91,11 @@ class TextInputAnswer(BaseAnswerForm):
 class IntegerInputAnswer(BaseAnswerForm):
     answer = IntegerField()
 
-    
+
 class FloatInputAnswer(BaseAnswerForm):
     answer = FloatField()
 
-    
+
 class BooleanInputAnswer(BaseAnswerForm):
     answer = BooleanField(initial=False)
 
@@ -112,7 +112,7 @@ class BooleanInputAnswer(BaseAnswerForm):
         fld.required = False
         return fld
 
-        
+
 class TextAreaAnswer(BaseAnswerForm):
     answer = CharField(widget=Textarea)
 
@@ -166,7 +166,7 @@ class LocationAnswer(BaseAnswerForm):
                 obj.save()
             return obj
         return None
-        
+
 
 class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
@@ -176,7 +176,7 @@ class BaseOptionAnswer(BaseAnswerForm):
         if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices
-        
+
     def clean_answer(self):
         key = self.cleaned_data['answer']
         if not key and self.fields['answer'].required:
@@ -184,7 +184,7 @@ class BaseOptionAnswer(BaseAnswerForm):
         if not isinstance(key, (list, tuple)):
             key = (key,)
         return key
-    
+
     def save(self, commit=True):
         ans_list = []
         for text in self.cleaned_data['answer']:
@@ -206,7 +206,7 @@ class OptionAnswer(BaseOptionAnswer):
 class OptionRadio(BaseOptionAnswer):
     answer = ChoiceField(widget=RadioSelect)
 
-    
+
 class OptionCheckbox(BaseOptionAnswer):
     answer = MultipleChoiceField(widget=CheckboxSelectMultiple)
 
@@ -236,7 +236,7 @@ class SubmissionForm(ModelForm):
     def __init__(self, survey, *args, **kwargs):
         super(SubmissionForm, self).__init__(*args, **kwargs)
         self.survey = survey
-        
+
     class Meta:
         model = Submission
         exclude = (
