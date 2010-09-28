@@ -29,9 +29,9 @@
       {% google_map display question report %}
     {% endfor %}
   {% else %}{% if display.is_bar %}
-    {% yahoo_bar_chart display request.GET %}
+    {% yahoo_bar_chart display request.GET request.user.is_staff %}
   {% else %}{% if display.is_line %}
-    {% yahoo_line_chart display request.GET %}
+    {% yahoo_line_chart display request.GET request.user.is_staff %}
   {% else %}{% if display.is_slideshow %}
     {% for question in display.questions %}
       {% simple_slideshow display question request.GET "jcarousel-skin-tango" %}

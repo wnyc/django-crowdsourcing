@@ -20,6 +20,7 @@ from django.core.urlresolvers import reverse
 from django.db import models, connection
 from django.db.models import Count
 from django.db.models.fields.files import ImageFieldFile
+from django.db.models.query import EmptyQuerySet
 from decimal import Decimal
 from django.utils.translation import ugettext_lazy as _
 from django.utils.safestring import mark_safe
@@ -586,16 +587,27 @@ def _radians(degrees):
 class AggregateResultCount:
     """ This helper class makes it easier to write templates that display
     pie charts. """
-    def __init__(self, survey, field, request_data, surveyreport=None):
-        self.answer_set = field.public_answers.values(field.value_column)
-        self.answer_set = self.answer_set.annotate(count=Count("id"))
-        self.answer_set = extra_from_filters(self.answer_set,
-                                             "submission_id",
-                                             survey,
-                                             request_data)
-        if surveyreport and surveyreport.featured:
-            self.answer_set = self.answer_set.filter(submission__featured=True)
+    def __init__(self,
+                 survey,
+                 field,
+                 request_data,
+                 surveyreport=None,
+                 is_staff=False):
+        self.answer_set = field.answer_set.none()
         self.answer_value_lookup = {}
+        if is_staff or field.answer_is_public:
+            self.answer_set = field.public_answers
+            if is_staff:
+                self.answer_set = field.answer_set
+            self.answer_set = self.answer_set.values(field.value_column)
+            self.answer_set = self.answer_set.annotate(count=Count("id"))
+            self.answer_set = extra_from_filters(self.answer_set,
+                                                 "submission_id",
+                                                 survey,
+                                                 request_data)
+            if surveyreport and surveyreport.featured:
+                self.answer_set = self.answer_set.filter(
+                    submission__featured=True)
         for answer in self.answer_set:
             text = fill(u"%s" % answer[field.value_column], 30)
             if answer["count"]:
