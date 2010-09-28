@@ -735,8 +735,13 @@ class Submission(models.Model):
             return v
         if not answer_lookup:
             answer_lookup = get_all_answers([self], include_private_questions)
-        return_value = dict(data=dict((a.question.fieldname, to_json(a.value))
-                                      for a in answer_lookup.get(self.pk, [])),
+        data = {}
+        for a in answer_lookup.get(self.pk, []):
+            if a.question.option_type == OPTION_TYPE_CHOICES.BOOL_LIST:
+                data[a.value] = True
+            else:
+                data[a.question.fieldname] = to_json(a.value)
+        return_value = dict(data=data,
                             survey=self.survey.slug,
                             submitted_at=self.submitted_at,
                             featured=self.featured,
