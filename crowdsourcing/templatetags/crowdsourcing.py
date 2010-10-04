@@ -161,12 +161,16 @@ def filters_as_ul(filters):
                 '</form>'])
     return mark_safe("\n".join(out))
 register.simple_tag(filters_as_ul)
-    
 
-def yahoo_pie_chart(display, question, request_get):
+
+def yahoo_pie_chart(display, question, request_get, is_staff=False):
     report = display.get_report()
     survey = report.survey
-    aggregate = AggregateResultCount(survey, question, request_get, report)
+    aggregate = AggregateResultCount(survey,
+                                     question,
+                                     request_get,
+                                     report,
+                                     is_staff=is_staff)
     if not aggregate.answer_values:
         return ""
     fieldname = question.fieldname
@@ -191,17 +195,26 @@ def yahoo_pie_chart(display, question, request_get):
 register.simple_tag(yahoo_pie_chart)
 
 
-def yahoo_bar_chart(display, request_get):
-    return _yahoo_bar_line_chart_helper(display, request_get, "ColumnChart")
+def yahoo_bar_chart(display, request_get, is_staff=False):
+    return _yahoo_bar_line_chart_helper(display,
+                                        request_get,
+                                        "ColumnChart",
+                                        is_staff=is_staff)
 register.simple_tag(yahoo_bar_chart)
 
 
-def yahoo_line_chart(display, request_get):
-    return _yahoo_bar_line_chart_helper(display, request_get, "LineChart")
+def yahoo_line_chart(display, request_get, is_staff=False):
+    return _yahoo_bar_line_chart_helper(display,
+                                        request_get,
+                                        "LineChart",
+                                        is_staff=is_staff)
 register.simple_tag(yahoo_line_chart)
 
 
-def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
+def _yahoo_bar_line_chart_helper(display,
+                                 request_get,
+                                 chart_type,
+                                 is_staff=False):
     y_axes = display.questions()
     SATC = SURVEY_AGGREGATE_TYPE_CHOICES
     return_value = []
@@ -237,7 +250,8 @@ def _yahoo_bar_line_chart_helper(display, request_get, chart_type):
                 survey,
                 x_axis,
                 request_get,
-                report)
+                report,
+                is_staff=is_staff)
     if not aggregate.answer_values:
         return ""
     answer_string = aggregate.yahoo_answer_string

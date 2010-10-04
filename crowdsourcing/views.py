@@ -426,6 +426,10 @@ def submissions(request, format):
 
 
 def _encode(possible):
+    if possible is True:
+        return 1
+    elif possible is False:
+        return 0
     return datetime_to_string(possible) or possible
 
 
