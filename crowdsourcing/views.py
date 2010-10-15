@@ -273,7 +273,7 @@ def submissions(request, format):
     out:
     1. Enable filters on your survey and the questions you want to filter on.
     2. Go to the report page and fill out the filters you want.
-    3. Click Submit. 
+    3. Click Submit.
     4. Examine the query string of the page you end up on and note which
         parameters are filled out. Use those same parameters here. """
     format = format.lower()
@@ -598,6 +598,7 @@ def location_question_results(
     featured = limit_results_to = False
     if survey_report_slug:
         survey_report = get_object_or_404(SurveyReport.objects,
+                                          survey=question.survey,
                                           slug=survey_report_slug)
         featured = survey_report.featured
         limit_results_to = survey_report.limit_results_to
