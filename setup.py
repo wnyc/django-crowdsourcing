@@ -6,7 +6,7 @@ except ImportError:
 import os
 readme_file = os.path.join(os.path.dirname(__file__),
                            'README')
-long_description = open(readme_file).read()    
+long_description = open(readme_file).read()
 
 classifiers = [
     'Development Status :: 4 - Beta',
@@ -15,7 +15,7 @@ classifiers = [
 
 
 setup(name='django-crowdsourcing',
-      version='1.1.15',
+      version='1.1.17',
       classifiers=classifiers,
       description='Django app for collecting and displaying surveys.',
       long_description=long_description,
