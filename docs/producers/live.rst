@@ -54,6 +54,10 @@ Safe.
 Question
 ========
 
+**Adding and Removing Whole Questions**
+
+You won't break anything if you add or remove whole questions, but there are some things to be cognizant of. If you add a required question late in the game, you may confuse very detail oriented users who may remark, "Wait, this required question was only answered 100 times, but 200 people entered the survey. My world view is crumbling!" If you remove a whole question, Crowdsourcing will also delete all the answers to that question. This means that if you add the question back in later, you've lost that data.
+
 **Fieldname**
 
 You must be very careful when modifying this field because Survey Report Displays reference questions by fieldname. If you do modify the fieldname, make sure you also update all corresponding Survey Report Displays or you will break your reports.
