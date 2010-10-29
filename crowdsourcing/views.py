@@ -617,7 +617,7 @@ def location_question_results(
     answers = question.answer_set.filter(
         ~Q(latitude=None),
         ~Q(longitude=None),
-        submission__is_public=True)
+        submission__is_public=True).order_by("-submission__submitted_at")
     if featured:
         answers = answers.filter(submission__featured=True)
     answers = extra_from_filters(
