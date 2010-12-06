@@ -783,6 +783,9 @@ class Submission(models.Model):
     def email(self):
         return self.get_answer_dict().get('email', '')
 
+    def __unicode__(self):
+        return "%s Submission" % self.survey.title
+
 
 class Answer(models.Model):
     submission = models.ForeignKey(Submission)
