@@ -1,7 +1,11 @@
-Backwards incompatible changes
-* The thanks_for_entering template tag no longer takes the first parameter called "entered". The function signature is now (request, forms, survey)
+Version 1.1.19
+-----------------------
+* Maps with limited answers now correctly order by entry date descending.
+* Display answers to private questions if the user is a logged in staff user. This includes pie charts.
+* Reports, such as CSV and JSON, list all answers to bool list questions instead of just the first.
 
 Backwards incompatible changes
+* The thanks_for_entering template tag no longer takes the first parameter called "entered". The function signature is now (request, forms, survey)
 * The SurveyReport model has a new field featured = models.BooleanField(default=False). You will need to add this field to the SurveyReport table.
 * The google_map(display, question, ids) template tag is now google_map(display, question, report).
 * The survey_report.html and embeded_survey_report.html templates no longer get the "ids" context variable.
