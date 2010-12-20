@@ -42,7 +42,7 @@
 {% endfor %}
 {% load_maps_and_charts %}
 
-{% if archive_fields and report.display_individual_results %}
+{% if display_individual_results %}
   <h2>Submissions:</h2>
   {% submissions page_obj.object_list fields %}
   {% paginator survey report pages_to_link page_obj %}
