@@ -551,6 +551,9 @@ def _survey_report(request, slug, report, page, templates):
     if pages_to_link[-1] < paginator.num_pages:
         pages_to_link = pages_to_link + [False, paginator.num_pages]
 
+    display_individual_results = all([
+        report_obj.display_individual_results,
+        archive_fields or (is_staff and fields)])
     context = dict(
         survey=survey,
         submissions=submissions,
@@ -563,6 +566,7 @@ def _survey_report(request, slug, report, page, templates):
         report=report_obj,
         page_answers=page_answers,
         is_public=is_public,
+        display_individual_results=display_individual_results,
         request=request)
 
     return render_to_response(templates, context, _rc(request))
