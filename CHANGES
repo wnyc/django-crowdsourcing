@@ -1,3 +1,7 @@
+Version 1.1.20
+-----------------------
+* A new context variable display_individual_results which describes whether you should have an area of the report for individual results.
+
 Version 1.1.19
 -----------------------
 * Maps with limited answers now correctly order by entry date descending.
