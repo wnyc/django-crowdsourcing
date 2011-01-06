@@ -1,3 +1,8 @@
+Version 1.1.20
+-----------------------
+* Python 2.7 friendly imports in crowdsourcing.templatetags
+* Fixed AttributeError: 'list' object has no attribute 'none' on survey report that didn't show individual results but had a result limit.
+
 Version 1.1.19
 -----------------------
 * Maps with limited answers now correctly order by entry date descending.
