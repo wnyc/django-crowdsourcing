@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import logging
 import re
 
@@ -14,9 +15,9 @@ from ..crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
     AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
     OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
-from ..crowdsourcing.views import location_question_results
-from ..crowdsourcing.util import ChoiceEnum, get_function
-from ..crowdsourcing import settings as local_settings
+from crowdsourcing.views import location_question_results
+from crowdsourcing.util import ChoiceEnum, get_function
+from crowdsourcing import settings as local_settings
 
 if local_settings.OEMBED_EXPAND:
     try:
