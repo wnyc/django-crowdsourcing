@@ -522,20 +522,21 @@ def _survey_report(request, slug, report, page, templates):
 
     public = survey.public_submissions()
     id_field = "crowdsourcing_submission.id"
-    submissions = extra_from_filters(public, id_field, survey, request.GET)
-    # If you want to sort based on rating, wire it up here.
-    if local_settings.PRE_REPORT:
-        pre_report = get_function(local_settings.PRE_REPORT)
-        submissions = pre_report(
-            submissions=submissions,
-            report=report_obj,
-            request=request)
-    if report_obj.featured:
-        submissions = submissions.filter(featured=True)
-    if report_obj.limit_results_to:
-        submissions = submissions[:report_obj.limit_results_to]
     if not report_obj.display_individual_results:
-        submissions = submissions.none()
+        submissions = public.none()
+    else:
+        submissions = extra_from_filters(public, id_field, survey, request.GET)
+        # If you want to sort based on rating, wire it up here.
+        if local_settings.PRE_REPORT:
+            pre_report = get_function(local_settings.PRE_REPORT)
+            submissions = pre_report(
+                submissions=submissions,
+                report=report_obj,
+                request=request)
+        if report_obj.featured:
+            submissions = submissions.filter(featured=True)
+        if report_obj.limit_results_to:
+            submissions = submissions[:report_obj.limit_results_to]
     paginator, page_obj = paginate_or_404(submissions, page)
 
     page_answers = get_all_answers(
