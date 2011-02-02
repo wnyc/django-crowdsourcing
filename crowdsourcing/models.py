@@ -164,7 +164,7 @@ class Survey(models.Model):
             self.is_published,
             self.starts_at <= now,
             any([self.archive_policy != ARCHIVE_POLICY_CHOICES.NEVER,
-                not self.ends_at or self.ends_at < now])])
+                not self.ends_at or now < self.ends_at])])
 
     def get_public_fields(self, fieldnames=None):
         if fieldnames:
