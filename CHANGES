@@ -1,3 +1,7 @@
+Version 1.1.23
+-----------------------
+* csv includs ip address and session id for staff users
+
 Version 1.1.22
 -----------------------
 * Fixed a bug in Survey.is_live regarding the "Never" archive policy.
