@@ -722,6 +722,9 @@ class AggregateResult2AxisCount(AggregateResult2Axis):
         sup.__init__(y_axes, x_axis, request_data, "COUNT", report)
 
 
+BALLOT_STUFFING_FIELDS = ('ip_address', 'session_key',)
+
+
 class Submission(models.Model):
     survey = models.ForeignKey(Survey)
     user = models.ForeignKey(User, blank=True, null=True)
@@ -758,6 +761,9 @@ class Submission(models.Model):
                             submitted_at=self.submitted_at,
                             featured=self.featured,
                             is_public=self.is_public)
+        if include_private_questions:
+            bs = dict([(k, getattr(self, k),) for k in BALLOT_STUFFING_FIELDS])
+            return_value.update(bs)
         if self.user:
             return_value["user"] = self.user.username
         return return_value

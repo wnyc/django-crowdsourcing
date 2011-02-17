@@ -22,6 +22,7 @@ from django.utils.html import escape
 from .forms import forms_for_survey
 from .models import (
     Answer,
+    BALLOT_STUFFING_FIELDS,
     FORMAT_CHOICES,
     OPTION_TYPE_CHOICES,
     Question,
@@ -299,6 +300,8 @@ def submissions(request, format):
         'submitted_to',
         'featured',
         'is_public')
+    if is_staff:
+        basic_filters += BALLOT_STUFFING_FIELDS
     survey_slug = ""
     for field in [f for f in keys if f in basic_filters]:
         value = get[field]
@@ -368,8 +371,11 @@ def submissions(request, format):
             results = rs
     if limit:
         results = results[:limit]
-    answer_lookup = get_all_answers(results, is_staff)
-    result_data = [result.to_jsondata(answer_lookup) for result in results]
+    answer_lookup = get_all_answers(results,
+                                    include_private_questions=is_staff)
+    result_data = [result.to_jsondata(
+        answer_lookup,
+        include_private_questions=is_staff) for result in results]
 
     for data in result_data:
         data.update(data["data"])
