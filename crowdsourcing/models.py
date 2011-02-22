@@ -762,8 +762,8 @@ class Submission(models.Model):
                             featured=self.featured,
                             is_public=self.is_public)
         if include_private_questions:
-            bs = dict([(k, getattr(self, k),) for k in BALLOT_STUFFING_FIELDS])
-            return_value.update(bs)
+            for key in BALLOT_STUFFING_FIELDS:
+                return_value[key] = getattr(self, key)
         if self.user:
             return_value["user"] = self.user.username
         return return_value

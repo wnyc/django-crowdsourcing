@@ -373,9 +373,10 @@ def submissions(request, format):
         results = results[:limit]
     answer_lookup = get_all_answers(results,
                                     include_private_questions=is_staff)
-    result_data = [result.to_jsondata(
-        answer_lookup,
-        include_private_questions=is_staff) for result in results]
+    result_data = []
+    for r in results:
+        data = r.to_jsondata(answer_lookup, include_private_questions=is_staff)
+        result_data.append(data)
 
     for data in result_data:
         data.update(data["data"])
