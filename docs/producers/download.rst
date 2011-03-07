@@ -1,3 +1,5 @@
+.. _downloading-survey-submissions:
+
 ******************************
 Downloading Survey Submissions
 ******************************

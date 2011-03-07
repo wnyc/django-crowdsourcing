@@ -11,3 +11,4 @@ This documentation is meant for the people who will create the surveys, curate t
    filters
    live
    download
+   ballot_stuffing
