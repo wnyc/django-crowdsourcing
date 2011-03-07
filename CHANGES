@@ -1,3 +1,7 @@
+Veerion 1.1.24
+-----------------------
+* The embedding Javascript displays a correct message when the survey requires a login and the user isn't logged in.
+
 Version 1.1.23
 -----------------------
 * csv includs ip address and session id for staff users
