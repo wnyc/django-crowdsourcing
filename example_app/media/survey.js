@@ -57,12 +57,17 @@ function loadSurvey(slug, elementId) {
   $(document).ready(function() {
     var url = "/crowdsourcing/" + slug + "/api/allowed_actions/";
     $.getJSON(url, function(data, status) {
-      loadSurveyForm(slug, elementId, !data["enter"], data["view"], data["open"]);
+      loadSurveyForm(slug,
+                     elementId,
+                     !data["enter"],
+                     data["view"],
+                     data["open"],
+                     data["need_login"]);
     });
   });
 }
 
-function loadSurveyForm(slug, elementId, cantEnter, canView, open) {
+function loadSurveyForm(slug, elementId, cantEnter, canView, open, needLogin) {
   var url = "/crowdsourcing/" + slug + "/api/questions/";
 
   $.getJSON(url, function(survey, status) {
@@ -93,7 +98,10 @@ function loadSurveyForm(slug, elementId, cantEnter, canView, open) {
 
     var div = $("<div/>").attr("id", "inner_" + slug).appendTo(form);
     if (cantEnter) {
-      if (open == true) { // I didn't use if (open) for backwards compatibility
+      // I didn't use if (needLogin) or if (open) for backwards compatibility.
+      if (needLogin == true) {
+        div.text("You must login to enter this survey.");
+      } else if (open == true) {
         div.text("You've already entered this survey.");
       } else {
         div.text("This survey isn't open yet.");
@@ -191,11 +199,21 @@ function initializeWrapper(elementId, wrapperClass) {
 
 function initEnlargeable(parent) {
   parent.find("input:hidden.enlargeable").each(function() {
+    if ($(this).attr("data-initted") == "true") {
+      return;
+    } else {
+      $(this).attr("data-initted", "true");
+    }
     var url = $(this).attr("value");
     var id = $(this).attr("id").match(/(img_\d+)_full_url/)[1];
     var img = $("#" + id);
-    var css = {height: img.outerHeight(), width: img.outerWidth()};
-    var div = $("<div/>").addClass("enlarge_div").css(css);
+    var div = $("<div/>").addClass("enlarge_div");
+    var height = img.outerHeight();
+    var width = img.outerWidth();
+    if (height && width) {
+      var css = {height: img.outerHeight(), width: img.outerWidth()};
+      div.css(css);
+    }
     var makeA = function() {
       return $("<a/>").attr("href", "#").appendTo(div).click(function(e) {
         e.preventDefault();
@@ -219,7 +237,8 @@ function queryParametersAsLookup() {
   query = window.location.search.replace("?", "");
   var hashParts = query.split("&");
   var variables = {};
-  for (var i in hashParts) {
+  // Twitter's widget.js breaks this: for (var i in hashParts)
+  for (var i = 0; i < hashParts.length; i++) {
     var subParts = hashParts[i].split("=");
     if (subParts.length > 1 && subParts[1].length) {
       variables[unescape(subParts[0])] = unescape(subParts[1]);
