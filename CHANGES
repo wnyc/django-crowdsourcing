@@ -1,4 +1,8 @@
-Veerion 1.1.24
+Version 1.1.25
+-----------------------
+* Tweaked how the views load the email address to send notifications about new entries.
+
+Version 1.1.24
 -----------------------
 * The embedding Javascript displays a correct message when the survey requires a login and the user isn't logged in.
 

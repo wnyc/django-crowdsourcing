@@ -70,9 +70,11 @@ PRE_REPORT = getattr(_gs, 'CROWDSOURCING_PRE_REPORT', '')
 
 # If a survey is set to e-mail someone every time someone enters the survey,
 # this will be the return address.
-SURVEY_EMAIL_FROM = getattr(_gs,
-                            'CROWDSOURCING_SURVEY_EMAIL_FROM',
-                            'donotreply@donotreply.com')
+SURVEY_EMAIL_FROM = getattr(_gs, 'CROWDSOURCING_SURVEY_EMAIL_FROM', None)
+if SURVEY_EMAIL_FROM is None:
+    SURVEY_EMAIL_FROM = getattr(_gs, 'DEFAULT_FROM_EMAIL', None)
+if SURVEY_EMAIL_FROM is None:
+    SURVEY_EMAIL_FROM = 'donotreply@donotreply.com'
 
 
 # This site is for the notification emails that crowdsourcing sends when

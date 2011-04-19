@@ -6,6 +6,7 @@ from .views import (allowed_actions,
                     embeded_survey_questions,
                     embeded_survey_report,
                     location_question_results,
+                    location_question_map,
                     questions,
                     submissions,
                     submission,
@@ -37,6 +38,10 @@ urlpatterns = patterns(
     url(r'^location_question_results/(?P<question_id>\d+)/(?P<limit_map_answers>\d*)/(?P<survey_report_slug>[-a-z0-9_]*)/$',
         location_question_results,
         name="location_question_results"),
+
+    url(r'^location_question_map/(?P<question_id>\d+)/(?P<limit_map_answers>\d*)/(?P<survey_report_slug>[-a-z0-9_]*)/$',
+        location_question_map,
+        name="location_question_map"),
 
     url(r'^(?P<slug>[-a-z0-9_]+)/$',
         survey_detail,

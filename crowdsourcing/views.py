@@ -37,7 +37,7 @@ from .models import (
 from .jsonutils import dump, dumps, datetime_to_string
 
 from .util import ChoiceEnum, get_function
-from . import settings as local_settings
+from . import settings as crowdsourcing_settings
 
 
 def _user_entered_survey(request, survey):
@@ -61,8 +61,9 @@ def _get_remote_ip(request):
 
 
 def _login_url(request):
-    if local_settings.LOGIN_VIEW:
-        return reverse(local_settings.LOGIN_VIEW) + '?next=%s' % request.path
+    if crowdsourcing_settings.LOGIN_VIEW:
+        start_with = reverse(crowdsourcing_settings.LOGIN_VIEW) + '?next=%s'
+        return start_with % request.path
     return "/?login_required=true"
 
 
@@ -131,7 +132,7 @@ def _url_for_edit(request, obj):
         # Probably 'admin' is not a registered namespace on a site without an
         # admin. Just fake it.
         edit_url = "/admin/%s/%s/%d/" % (view_args + (obj.id,))
-    admin_url = local_settings.SURVEY_ADMIN_SITE
+    admin_url = crowdsourcing_settings.SURVEY_ADMIN_SITE
     if not admin_url:
         admin_url = "http://" + request.META["HTTP_HOST"]
     elif len(admin_url) < 4 or admin_url[:4].lower() != "http":
@@ -141,7 +142,7 @@ def _url_for_edit(request, obj):
 
 def _send_survey_email(request, survey, submission):
     subject = survey.title
-    sender = local_settings.SURVEY_EMAIL_FROM
+    sender = crowdsourcing_settings.SURVEY_EMAIL_FROM
     links = [(_url_for_edit(request, submission), "Edit Submission"),
              (_url_for_edit(request, survey), "Edit Survey"),]
     if survey.can_have_public_submissions():
@@ -418,7 +419,6 @@ def submissions(request, format):
                     cell.appendChild(doc.createTextNode(u"%s" % value))
         response = HttpResponse(doc.toxml(), mimetype='text/xml')
     elif format == 'html': # mostly for debugging.
-        data_list = []
         keys = get_keys()
         results = [
             "<html><body><table>",
@@ -498,7 +498,7 @@ def embeded_survey_report(request, slug, report=''):
 def _survey_report(request, slug, report, page, templates):
     """ Show a report for the survey. As rating is done in a separate
     application we don't directly check request.GET["sort"] here.
-    local_settings.PRE_REPORT is the place for that. """
+    crowdsourcing_settings.PRE_REPORT is the place for that. """
     if page is None:
         page = 1
     else:
@@ -536,8 +536,8 @@ def _survey_report(request, slug, report, page, templates):
     else:
         submissions = extra_from_filters(public, id_field, survey, request.GET)
         # If you want to sort based on rating, wire it up here.
-        if local_settings.PRE_REPORT:
-            pre_report = get_function(local_settings.PRE_REPORT)
+        if crowdsourcing_settings.PRE_REPORT:
+            pre_report = get_function(crowdsourcing_settings.PRE_REPORT)
             submissions = pre_report(
                 submissions=submissions,
                 report=report_obj,
@@ -657,6 +657,12 @@ def location_question_results(
     dump({"entries": entries}, response)
     return response
 
+def location_question_map(
+    request,
+    question_id,
+    limit_map_answers,
+    survey_report_slug=""):
+    return render_to_response('crowdsourcing/submission.html')
 
 def submission_for_map(request, id):
     template = 'crowdsourcing/submission_for_map.html'
