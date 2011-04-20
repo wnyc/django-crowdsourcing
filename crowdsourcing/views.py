@@ -660,9 +660,34 @@ def location_question_results(
 def location_question_map(
     request,
     question_id,
-    limit_map_answers,
+    display_id,
     survey_report_slug=""):
-    return render_to_response('crowdsourcing/submission.html')
+
+    question = Question.objects.get(pk=question_id)
+    if not question.answer_is_public and not request.user.is_staff:
+        raise Http404
+    report = None
+    limit = 0
+
+    if survey_report_slug:
+        report = SurveyReport.objects.get(slug=survey_report_slug,
+                                          survey=question.survey)
+        limit = report.limit_results_to
+    else:
+        report = _default_report(question.survey)
+
+    if int(display_id):
+        display = SurveyReportDisplay.objects.get(pk=display_id)
+    else:
+        for d in report.survey_report_displays:
+            if question.pk in [q.pk for q in d.questions()]:
+                display = d
+                display.limit_map_answers = limit
+
+    return render_to_response('crowdsourcing/location_question_map.html', dict(
+        display=display,
+        question=question,
+        report=report))
 
 def submission_for_map(request, id):
     template = 'crowdsourcing/submission_for_map.html'

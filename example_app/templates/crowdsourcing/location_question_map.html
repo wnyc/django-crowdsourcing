@@ -1,0 +1,15 @@
+{% load crowdsourcing %}
+<html>
+  <head>
+    <title>{{ question.survey.title }}</title>
+    {% include "header_tags.html" %}
+    <style type="text/css">
+      .google_map { height: 100%; width: 100% }
+      .google_map_wrapper { height: 100%; width: 100% }
+    </style>
+  </head>
+  <body>
+    {% popup_google_map display question report %}
+    {% load_maps_and_charts %}
+  </body>
+</html>

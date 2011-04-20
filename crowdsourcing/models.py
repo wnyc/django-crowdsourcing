@@ -584,7 +584,7 @@ def _radians(degrees):
     return degrees / _D_TO_R
 
 
-class AggregateResultCount:
+class AggregateResultCount(object):
     """ This helper class makes it easier to write templates that display
     pie charts. """
     def __init__(self,

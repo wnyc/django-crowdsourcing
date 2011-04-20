@@ -341,7 +341,7 @@ def _yahoo_chart(display, unique_id, args):
     return mark_safe("\n".join(out))
 
 
-def google_map(display, question, report):
+def google_map(display, question, report, is_popup=False):
     map_id = "map_%d" % display.order
     detail_id = "map_detail_%d" % question.id
     kwargs = {
@@ -356,8 +356,10 @@ def google_map(display, question, report):
     zoom = number_to_javascript(display.map_zoom)
     map_args = (map_id, detail_id, data_url, lat, lng, zoom)
     out = [
-        '<div class="google_map_wrapper">',
-        '  <h2 class="chart_title">%s</h2>' % display.annotation,
+        '<div class="google_map_wrapper">']
+    if not is_popup:
+        out.append('  <h2 class="chart_title">%s</h2>' % display.annotation)
+    out.extend([
         '  <div id="%s" class="google_map">' % map_id,
         '    ' + img,
         '  </div>',
@@ -365,10 +367,21 @@ def google_map(display, question, report):
         '  <script type="text/javascript">',
         '    setupMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
         '  </script>',
-        '</div>']
+        '</div>'])
+    if not is_popup:
+        url = reverse('location_question_map', kwargs=dict(
+            question_id=question.pk,
+            display_id=display.pk if display.pk else 0,
+            survey_report_slug=report.slug))
+        out.append('<a href="%s" target="_blank">popout</a>' % url)
     out.append(map_key(question.survey))
     return mark_safe("\n".join(out))
 register.simple_tag(google_map)
+
+
+def popup_google_map(display, question, report):
+    return google_map(display, question, report, is_popup=True)
+register.simple_tag(popup_google_map)
 
 
 def simple_slideshow(display, question, request_GET, css):
