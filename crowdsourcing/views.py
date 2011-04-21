@@ -524,17 +524,21 @@ def _survey_report(request, slug, report, page, templates):
     archive_fields = list(survey.get_public_archive_fields())
     is_staff = request.user.is_staff
     if is_staff:
+        submissions = survey.submission_set.all()
         fields = list(survey.get_fields())
     else:
+        submissions = survey.public_submissions()
         fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
 
-    public = survey.public_submissions()
     id_field = "crowdsourcing_submission.id"
     if not report_obj.display_individual_results:
-        submissions = public.none()
+        submissions = submissions.none()
     else:
-        submissions = extra_from_filters(public, id_field, survey, request.GET)
+        submissions = extra_from_filters(submissions,
+                                         id_field,
+                                         survey,
+                                         request.GET)
         # If you want to sort based on rating, wire it up here.
         if crowdsourcing_settings.PRE_REPORT:
             pre_report = get_function(crowdsourcing_settings.PRE_REPORT)
@@ -607,7 +611,8 @@ def location_question_results(
     question = get_object_or_404(Question.objects.select_related("survey"),
                                  pk=question_id,
                                  answer_is_public=True)
-    if not question.survey.can_have_public_submissions():
+    is_staff = request.user.is_staff
+    if not question.survey.can_have_public_submissions() and not is_staff:
         raise Http404
     featured = limit_results_to = False
     if survey_report_slug:
@@ -623,15 +628,17 @@ def location_question_results(
         for (option, icon) in icon_question.parsed_option_icon_pairs():
             if icon:
                 icon_by_answer[option] = icon
-        for answer in icon_question.answer_set.all().select_related("question"):
+        answer_set = icon_question.answer_set.all()
+        for answer in answer_set.select_related("question"):
             if answer.value in icon_by_answer:
                 icon = icon_by_answer[answer.value]
                 icon_lookup[answer.submission_id] = icon
 
     answers = question.answer_set.filter(
         ~Q(latitude=None),
-        ~Q(longitude=None),
-        submission__is_public=True).order_by("-submission__submitted_at")
+        ~Q(longitude=None)).order_by("-submission__submitted_at")
+    if not is_staff:
+        answers = answers.filter(submission__is_public=True)
     if featured:
         answers = answers.filter(submission__featured=True)
     answers = extra_from_filters(
@@ -641,7 +648,8 @@ def location_question_results(
         request.GET)
     limit_map_answers = int(limit_map_answers) if limit_map_answers else 0
     if limit_map_answers or limit_results_to:
-        answers = answers[:min(filter(None, [limit_map_answers, limit_results_to,]))]
+        answers = answers[:min(filter(None, [limit_map_answers,
+                                             limit_results_to,]))]
     entries = []
     view = "crowdsourcing.views.submission_for_map"
     for answer in answers:
