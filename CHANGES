@@ -1,3 +1,11 @@
+Version 1.1.26
+-----------------------
+* If no CROWDSOURCING_SURVEY_EMAIL_FROM setting exists, then try DEFAULT_FROM_EMAIL as well.
+* A popup link appears below google maps which allows the user to pop up a full page view of the map.
+
+Backwards incompatible changes
+* views.py loads the crowdsourcing settings as crowdsoucing_settings instead of local_settings
+
 Version 1.1.25
 -----------------------
 * Tweaked how the views load the email address to send notifications about new entries.
