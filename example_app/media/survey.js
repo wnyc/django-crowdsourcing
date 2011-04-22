@@ -164,7 +164,9 @@ function appendChoiceButtons(survey, question, wrapper) {
     a.appendTo(li).click(function(evt) {
       evt.preventDefault();
       var a = $(this); // Necessary. Review closures if you don't understand.
-      answerInput.attr("value", a.html().replace("&amp;", "&"));
+      // crowdsourcing.forms.BaseOptionAnswer.__init__ duplicates this.
+      var value = a.text().replace(/&amp;/g, "&").replace(/"/g, "'").trim();
+      answerInput.attr("value", value);
       a.parents("form").submit();
     }).mouseover(function() {
       $(this).addClass('surveyRoll');

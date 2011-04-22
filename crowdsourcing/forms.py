@@ -172,7 +172,12 @@ class BaseOptionAnswer(BaseAnswerForm):
     def __init__(self, *args, **kwargs):
         super(BaseOptionAnswer, self).__init__(*args, **kwargs)
         options = self.question.parsed_options
-        choices = [(strip_tags(x), mark_safe(x)) for x in options]
+        # appendChoiceButtons in survey.js duplicates this. jQuery and django
+        # use " for html attributes, so " will mess them up.
+        for x in options:
+            choices.append(
+                (strip_tags(x).replace('&amp;', '&').replace('"', "'").strip(),
+                 mark_safe(x)))
         if not self.question.required and not isinstance(self, OptionCheckbox):
             choices = [('', '---------',)] + choices
         self.fields['answer'].choices = choices

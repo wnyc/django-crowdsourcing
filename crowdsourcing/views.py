@@ -684,6 +684,9 @@ def location_question_map(
     else:
         report = _default_report(question.survey)
 
+    # This cast is not for validation since the urls file already guaranteed
+    # it would be a nonempty string of digits. It's simply because display_id
+    # is a string.
     if int(display_id):
         display = SurveyReportDisplay.objects.get(pk=display_id)
     else:
