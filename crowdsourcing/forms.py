@@ -174,6 +174,7 @@ class BaseOptionAnswer(BaseAnswerForm):
         options = self.question.parsed_options
         # appendChoiceButtons in survey.js duplicates this. jQuery and django
         # use " for html attributes, so " will mess them up.
+        choices = []
         for x in options:
             choices.append(
                 (strip_tags(x).replace('&amp;', '&').replace('"', "'").strip(),
