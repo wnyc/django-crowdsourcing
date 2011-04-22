@@ -8,3 +8,4 @@ Examples
    top_10
    categories
    favorite_composer
+   count_bar
