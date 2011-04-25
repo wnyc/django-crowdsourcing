@@ -702,5 +702,8 @@ def location_question_map(
 
 def submission_for_map(request, id):
     template = 'crowdsourcing/submission_for_map.html'
-    sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
+    if request.user.is_staff:
+        sub = get_object_or_404(Submission.objects, pk=id)
+    else:
+        sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
     return render_to_response(template, dict(submission=sub), _rc(request))

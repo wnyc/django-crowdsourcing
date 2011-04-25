@@ -113,3 +113,20 @@ function minMaxLatLong(entries) {
   }
   return [min_lat, min_long, max_lat, max_long];
 }
+
+function setupMapEmbed() {
+  $(".map_embed_link").each(function() {
+    var wrapper = $(this).parents(".google_map_wrapper");
+    var click = function(event) {
+      event.preventDefault();
+      wrapper.find("fieldset").toggle();
+    };
+    $(this).click(click);
+    wrapper.find(".close-map-button").click(click);
+    wrapper.find("textarea").click(function() {
+      this.select();
+    });
+  });
+}
+
+$(setupMapEmbed);

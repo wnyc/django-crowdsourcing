@@ -3,6 +3,7 @@ import logging
 import re
 
 from django import template
+from django.contrib.sites.models import Site
 from django.core.cache import cache
 from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
@@ -366,14 +367,26 @@ def google_map(display, question, report, is_popup=False):
         '  <div id="%s" class="map_story"></div>' % detail_id,
         '  <script type="text/javascript">',
         '    setupMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
-        '  </script>',
-        '</div>'])
+        '  </script>'])
     if not is_popup:
         url = reverse('location_question_map', kwargs=dict(
             question_id=question.pk,
             display_id=display.pk if display.pk else 0,
             survey_report_slug=report.slug))
-        out.append('<a href="%s" target="_blank">popout</a>' % url)
+        full_url = "http://%s%s" % (Site.objects.get_current().domain, url)
+        out.extend([
+            '  <ul class="map_tools">',
+            '    <li><a href="%s" target="_blank">popout</a></li>' % url,
+            '    <li><a href="#" class="map_embed_link">embed</a></li>',
+            '  </ul>',
+            '  <fieldset class="map_embed" style="display: none;">',
+            '    <p>Copy and paste the HTML below to embed this map onto your web page.</p>',
+            ('    <textarea id="audioplayer_125944_buttons_code" readonly="" rows="2" cols="44">'
+            '&lt;iframe src="%s" height="320" width="500" &gt;&lt;/iframe&gt;</textarea>') % full_url,
+            '    <a class="close-map-button" href="#">Close</a>',
+            '  </fieldset>'])
+    out.append('</div>')
+
     out.append(map_key(question.survey))
     return mark_safe("\n".join(out))
 register.simple_tag(google_map)

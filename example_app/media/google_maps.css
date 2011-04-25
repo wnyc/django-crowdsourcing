@@ -25,3 +25,20 @@
 .google_map_wrapper .loading {
   margin: 140px 230px 140px 230px;
 }
+
+.google_map_wrapper fieldset {
+  clear: both;
+  left: 0;
+  position: absolute;
+  z-index: 100;
+  margin: 20px 0 0;
+  padding: 5px;
+  background-color: #F6F6F6;
+  border: 1px solid #C6C6C6;
+  width: 288px;
+}
+
+.google_map_wrapper .map_tools li {
+  float: left;
+  margin-right: 10px;
+}
