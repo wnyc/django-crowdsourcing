@@ -556,14 +556,7 @@ def _survey_report(request, slug, report, page, templates):
         page_obj.object_list,
         include_private_questions=is_staff)
 
-    pages_to_link = []
-    for i in range(page - 5, page + 5):
-        if 1 <= i <= paginator.num_pages:
-            pages_to_link.append(i)
-    if pages_to_link[0] > 1:
-        pages_to_link = [1, False] + pages_to_link
-    if pages_to_link[-1] < paginator.num_pages:
-        pages_to_link = pages_to_link + [False, paginator.num_pages]
+    pages_to_link = pages_to_link_from_paginator(page, paginator)
 
     display_individual_results = all([
         report_obj.display_individual_results,
@@ -584,6 +577,18 @@ def _survey_report(request, slug, report, page, templates):
         request=request)
 
     return render_to_response(templates, context, _rc(request))
+
+
+def pages_to_link_from_paginator(page, paginator):
+    pages_to_link = []
+    for i in range(page - 5, page + 5):
+        if 1 <= i <= paginator.num_pages:
+            pages_to_link.append(i)
+    if pages_to_link[0] > 1:
+        pages_to_link = [1, False] + pages_to_link
+    if pages_to_link[-1] < paginator.num_pages:
+        pages_to_link = pages_to_link + [False, paginator.num_pages]
+    return pages_to_link
 
 
 def paginate_or_404(queryset, page, num_per_page=20):
