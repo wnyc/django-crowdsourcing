@@ -1,3 +1,11 @@
+Version 1.1.27
+-----------------------
+* Broke out pages_to_link_from_paginator, a helpful function others may want to use.
+* A link appears below maps offering to let the user embed the map.
+* Handle multiple choice answers with quotes and html differently.
+* Count bar chart example in the documentation
+* Private submissions should be visible to logged in staff users
+
 Version 1.1.26
 -----------------------
 * If no CROWDSOURCING_SURVEY_EMAIL_FROM setting exists, then try DEFAULT_FROM_EMAIL as well.
