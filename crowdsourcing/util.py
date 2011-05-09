@@ -5,9 +5,15 @@ from django.utils.importlib import import_module
 
 
 def get_function(path):
+    """ This used to use import_module, but certain Django-isms such as object
+    models appeared to not be available with that approach. """
     parts = path.split(".")
-    module = import_module(".".join(parts[:-1]))
-    return getattr(module, parts[-1])
+    to_exec = "from %s import %s as got" % (".".join(parts[:-1]), parts[-1])
+    try:
+        exec(to_exec)
+    except ImportError, error:
+        raise ImportError(error.msg, to_exec)
+    return got
 
 
 class ChoiceEnum(object):
