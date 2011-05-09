@@ -1,3 +1,7 @@
+Version 1.1.28
+-----------------------
+* better get_function
+
 Version 1.1.27
 -----------------------
 * Broke out pages_to_link_from_paginator, a helpful function others may want to use.
