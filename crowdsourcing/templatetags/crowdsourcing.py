@@ -369,10 +369,12 @@ def google_map(display, question, report, is_popup=False):
         '    setupMap("%s", "%s", "%s", %s, %s, %s);' % map_args,
         '  </script>'])
     if not is_popup:
-        url = reverse('location_question_map', kwargs=dict(
+        kwargs = dict(
             question_id=question.pk,
-            display_id=display.pk if display.pk else 0,
-            survey_report_slug=report.slug))
+            display_id=display.pk if display.pk else 0)
+        if report.slug:
+            kwargs["survey_report_slug"] = report.slug
+        url = reverse('location_question_map', kwargs=kwargs)
         full_url = "http://%s%s" % (Site.objects.get_current().domain, url)
         out.extend([
             '  <ul class="map_tools">',

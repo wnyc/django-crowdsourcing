@@ -39,6 +39,10 @@ urlpatterns = patterns(
         location_question_results,
         name="location_question_results"),
 
+    url(r'^location_question_map/(?P<question_id>\d+)/(?P<display_id>\d+)/$',
+        location_question_map,
+        name="location_question_map"),
+
     url(r'^location_question_map/(?P<question_id>\d+)/(?P<display_id>\d+)/(?P<survey_report_slug>[-a-z0-9_]*)/$',
         location_question_map,
         name="location_question_map"),
