@@ -1,3 +1,7 @@
+Version 1.1.29
+-----------------------
+* don't use // in the popup google map url
+
 Version 1.1.28
 -----------------------
 * better get_function
