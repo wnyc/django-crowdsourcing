@@ -601,9 +601,7 @@ def paginate_or_404(queryset, page, num_per_page=20):
     paginator = Paginator(queryset, num_per_page)
     try:
         page_obj = paginator.page(page)
-    except EmptyPage:
-        page_obj = paginator.page(paginator.num_pages)
-    except InvalidPage:
+    except EmptyPage, InvalidPage:
         raise Http404
     return paginator, page_obj
 
