@@ -580,15 +580,28 @@ def _survey_report(request, slug, report, page, templates):
 
 
 def pages_to_link_from_paginator(page, paginator):
-    pages_to_link = []
-    for i in range(page - 5, page + 5):
+    """ Return an array with numbers where you should link to a page, and False
+    where you should show elipses. For example, if you have 9 pages and you are
+    on page 9, return [1, False, 5, 6, 7, 8, 9]. """
+    pages = []
+    for i in range(page - 4, page + 5):
         if 1 <= i <= paginator.num_pages:
-            pages_to_link.append(i)
-    if pages_to_link[0] > 1:
-        pages_to_link = [1, False] + pages_to_link
-    if pages_to_link[-1] < paginator.num_pages:
-        pages_to_link = pages_to_link + [False, paginator.num_pages]
-    return pages_to_link
+            pages.append(i)
+    if pages[0] > 1:
+        pages = [1, False] + pages
+    if pages[-1] < paginator.num_pages:
+        pages = pages + [False, paginator.num_pages]
+
+    DISCARD = -999
+    for i in range(1, len(pages) - 1):
+        if pages[i - 1] + 2 == pages[i + 1]:
+            # Turn [1, False, 3... into [1, 2, 3
+            pages[i] = (pages[i - 1] + pages[i + 1]) / 2
+        elif pages[i - 1] + 1 == pages[i + 1]:
+            # Turn [1, False, 2... into [1, DISCARD, 2...
+            pages[i] = DISCARD
+
+    return [p for p in pages if p != DISCARD]
 
 
 def paginate_or_404(queryset, page, num_per_page=20):
