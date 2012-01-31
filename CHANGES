@@ -1,3 +1,11 @@
+Version 1.1.32
+-----------------------
+* If crowdsourcing from email setting isn't present, use django default if available.
+
+Version 1.1.31
+-----------------------
+* Changes pages_to_link_from_paginator return format.
+
 Version 1.1.30
 -----------------------
 * Web crawlers keep requesting wacky pages. Just 404.
