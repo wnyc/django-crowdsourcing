@@ -1,3 +1,7 @@
+Version 1.1.33
+-----------------------
+* templatetags/crowdsourcing.py has correct relative paths that work with Django 1.4.
+
 Version 1.1.32
 -----------------------
 * If crowdsourcing from email setting isn't present, use django default if available.
