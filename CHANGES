@@ -1,3 +1,7 @@
+Version 1.1.34
+-----------------------
+* templatetags/crowdsourcing.py had an import path that didn't work with Pythin 2.7
+
 Version 1.1.33
 -----------------------
 * templatetags/crowdsourcing.py has correct relative paths that work with Django 1.4.
