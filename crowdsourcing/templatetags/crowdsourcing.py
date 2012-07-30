@@ -33,7 +33,7 @@ if local_settings.OEMBED_EXPAND:
         oembed_expand = None
 else:
     try:
-        from ..crowdsourcing.oembedutils import oembed_expand
+        from crowdsourcing.oembedutils import oembed_expand
     except ImportError as ex:
         message = 'oembed not installed. Will just display links to videos. %s'
         logging.warn(message % str(ex))
