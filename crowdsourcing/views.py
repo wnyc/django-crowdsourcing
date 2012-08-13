@@ -41,6 +41,8 @@ from . import settings as crowdsourcing_settings
 
 
 def _user_entered_survey(request, survey):
+    if not request.user.is_authenticated():
+        return False
     return bool(survey.submissions_for(
         request.user,
         request.session.session_key.lower()).count())
