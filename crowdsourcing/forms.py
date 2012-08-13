@@ -255,7 +255,7 @@ class SubmissionForm(ModelForm):
 
 
 def forms_for_survey(survey, request='testing', submission=None):
-    testing = 'testing' == request
+    testing = bool(not request.user.is_authenticated() or request == 'testing')
     session_key = "" if testing else request.session.session_key.lower()
     post = None if testing else request.POST or None
     files = None if testing else request.FILES or None
