@@ -1,3 +1,7 @@
+Version 1.1.37
+-----------------------
+* Django session keys are None in 1.4. Handles that properly.
+
 Version 1.1.35
 -----------------------
 * Several other relative imports are fixed too.
