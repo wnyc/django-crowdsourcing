@@ -1,3 +1,11 @@
+Version 1.1.39
+--------------
+* Google API loading fix
+
+Version 1.1.38
+----------------------
+* Google API to replace yahoo
+
 Version 1.1.37
 -----------------------
 * Django session keys are None in 1.4. Handles that properly.

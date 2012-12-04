@@ -1,4 +1,5 @@
 from __future__ import absolute_import
+import json
 import logging
 import re
 
@@ -49,12 +50,22 @@ register = template.Library()
 
 
 def yahoo_api():
+    apisrc = 'http://yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js'
     return mark_safe("\n".join([
-        '<script src="http://yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js"></script>',
+        '<script type="text/javascript" src="%s">' % apisrc,
+        '</script>'
         '<style>',
         '  .chart_div { width: 600px; height: 300px; }',
         '</style>']))
 register.simple_tag(yahoo_api)
+
+
+def google_charts_api():
+    return mark_safe("\n".join([
+        '<style>',
+        '  .chart_div { width: 600px; height: 300px; }',
+        '</style>']))
+register.simple_tag(google_charts_api)
 
 
 def jquery_and_google_api():
@@ -197,12 +208,49 @@ def yahoo_pie_chart(display, question, request_get, is_staff=False):
 register.simple_tag(yahoo_pie_chart)
 
 
+def google_pie_chart(display, question, request_get, is_staff=False):
+    report = display.get_report()
+    survey = report.survey
+    aggregate = AggregateResultCount(survey,
+                                     question,
+                                     request_get,
+                                     report,
+                                     is_staff=is_staff)
+    if not aggregate.answer_values:
+        return ""
+    fieldname = question.fieldname
+    api_args = { # Arguments for google plotting API
+        "legend": {'position': 'right',
+                   'textStyle':
+                        {'fontName': 'Arial',
+                         'fontSize': 13}},
+        "title": display.annotation,
+        "chartArea": {'left': 0, # Take up the whole area
+                      'width': '100%'}}
+    args = {
+        "answer_string": aggregate.yahoo_answer_string,
+        "fieldnames": [fieldname, 'count'],
+        "chart_type": "PieChart",
+        "api_args": json.dumps(api_args)}
+    id_args = (display.index_in_report(), question.id)
+    return _google_chart(display, "%d_%d" % id_args, args)
+register.simple_tag(google_pie_chart)
+
+
 def yahoo_bar_chart(display, request_get, is_staff=False):
     return _yahoo_bar_line_chart_helper(display,
                                         request_get,
                                         "ColumnChart",
                                         is_staff=is_staff)
 register.simple_tag(yahoo_bar_chart)
+
+
+def google_bar_chart(display, request_get, is_staff=False):
+    return _google_bar_line_chart_helper(display,
+                                         request_get,
+                                         "ColumnChart",
+                                         is_staff=is_staff)
+register.simple_tag(google_bar_chart)
 
 
 def yahoo_line_chart(display, request_get, is_staff=False):
@@ -213,24 +261,33 @@ def yahoo_line_chart(display, request_get, is_staff=False):
 register.simple_tag(yahoo_line_chart)
 
 
-def _yahoo_bar_line_chart_helper(display,
-                                 request_get,
-                                 chart_type,
-                                 is_staff=False):
-    y_axes = display.questions()
+def google_line_chart(display, request_get, is_staff=False):
+    return _google_bar_line_chart_helper(display,
+                                         request_get,
+                                         "LineChart",
+                                        is_staff=is_staff)
+register.simple_tag(google_line_chart)
+
+
+def _validate_axes(x_axis, y_axes, display):
+    # Check axes line up to questions
     SATC = SURVEY_AGGREGATE_TYPE_CHOICES
-    return_value = []
+
+    message = ""
     if display.aggregate_type != SATC.COUNT and not y_axes:
         message = ("This chart uses y axes '%s', none of which are questions "
                    "in this survey.") % display.fieldnames
-        return issue(message)
-    x_axis = display.x_axis_question()
     if not x_axis:
         message = ("This chart uses x axis '%s' which isn't a question in "
                    "this survey.") % display.x_axis_fieldname
-        return issue(message)
-    single_count = False
+    return message
+
+
+def _get_aggregate(display, x_axis, y_axes, request_get, is_staff):
     report = display.get_report()
+    single_count = False
+    SATC = SURVEY_AGGREGATE_TYPE_CHOICES
+
     if display.aggregate_type in [SATC.DEFAULT, SATC.SUM]:
         aggregate_function = "Sum"
         aggregate = AggregateResultSum(y_axes, x_axis, request_get, report)
@@ -254,9 +311,33 @@ def _yahoo_bar_line_chart_helper(display,
                 request_get,
                 report,
                 is_staff=is_staff)
+
+    return aggregate, aggregate_function, single_count
+
+
+def _yahoo_bar_line_chart_helper(display,
+                           request_get,
+                           chart_type,
+                           is_staff=False):
+
+    x_axis = display.x_axis_question()
+    y_axes = display.questions()
+    SATC = SURVEY_AGGREGATE_TYPE_CHOICES
+    return_value = []
+
+    message = _validate_axes(x_axis, y_axes, display)
+    if message:
+        return issue(message)
+
+
+    single_count = False
+    aggregate, aggregate_function, single_count =\
+        _get_aggregate(display, x_axis, y_axes, request_get, is_staff)
+
     if not aggregate.answer_values:
         return ""
     answer_string = aggregate.yahoo_answer_string
+    index = display.index_in_report()
     series = []
     series_format = '{displayName: "%s", yField: "%s", style: {size: 10}}'
     if single_count:
@@ -269,13 +350,15 @@ def _yahoo_bar_line_chart_helper(display,
         axes = list(y_axes) + [x_axis]
         fieldnames = [f.fieldname for f in axes]
         for question in y_axes:
-            series.append(series_format % (question.label, question.fieldname))
+            series.append(series_format %
+              (question.label, question.fieldname))
+
     option_setup_args = (
         "NumericAxis" if x_axis.is_numeric else "CategoryAxis",
         x_axis.label,
         y_axis_label,)
-    option_setup_args = tuple(l.replace('"', r'\"') for l in option_setup_args)
-    index = display.index_in_report()
+    option_setup_args = tuple(l.replace('"', r'\"')\
+                            for l in option_setup_args)
     option_setup = """
         var xAxis = new YAHOO.widget.%s();
         xAxis.title = "%s";
@@ -294,9 +377,11 @@ def _yahoo_bar_line_chart_helper(display,
         "option_setup": option_setup,
         "chart_type": chart_type,
         "response_schema": '{fields: [%s]}' % fieldnames_str,
-        "style": '{xAxis: {labelRotation: -45}, yAxis: {titleRotation: -90}}',
+        "style":
+            '{xAxis: {labelRotation: -45}, yAxis: {titleRotation: -90}}',
         "options": options}
     return_value.append(_yahoo_chart(display, str(index), args))
+
     for question in y_axes:
         if not question.is_numeric:
             message = ("%s isn't numeric so it doesn't work as a y axis. "
@@ -304,6 +389,108 @@ def _yahoo_bar_line_chart_helper(display,
             message = message % question.fieldname
             return_value.append(issue(message))
     return mark_safe("\n".join(return_value))
+
+
+def _google_bar_line_chart_helper(display,
+                           request_get,
+                           chart_type,
+                           is_staff=False):
+
+    x_axis = display.x_axis_question()
+    y_axes = display.questions()
+    SATC = SURVEY_AGGREGATE_TYPE_CHOICES
+    return_value = []
+
+    message = _validate_axes(x_axis, y_axes, display)
+    if message:
+        return issue(message)
+
+
+    single_count = False
+    aggregate, aggregate_function, single_count =\
+        _get_aggregate(display, x_axis, y_axes, request_get, is_staff)
+
+    if not aggregate.answer_values:
+        return ""
+
+    answer_string = aggregate.yahoo_answer_string
+    index = display.index_in_report()
+
+    if single_count:
+        # Only one variable
+        y_axis_label = "Count"
+        fieldnames = [x_axis.fieldname, "count"]
+    else:
+        # Multiple variables
+        y_labels = ", ".join([y.label for y in y_axes])
+        y_axis_label = "%s %s" % (aggregate_function, y_labels)
+        axes = [x_axis] + list(y_axes)
+        fieldnames = [f.fieldname for f in axes]
+
+    api_args = {
+        'legend': {'position': 'none'}, # No legend on bar and line graphs
+        'hAxis': {'showTextEvery': 1, # Show every label
+                       'slantedText': True, # Use verticle text ...
+                       'slantedTextAngle': 90, # ... to fit more in labels
+                       'title': x_axis.label},
+        'vAxis': {'viewWindowMode': 'maximized',  # Fit more in
+                       'title': y_axis_label,
+                       'minValue': 0, # Start axis at 0,
+                       'baseline': 0}, # and put a tick there
+        'pointSize': 2, # reasonable sized data points
+        'title': display.annotation,
+        'chartArea': {'top': 0}} # Start graph at top of div
+    args = {
+        'answer_string': answer_string, # The data to graph
+        "chart_type": chart_type, # Type of graph
+        "fieldnames": fieldnames,
+        "api_args": json.dumps(api_args)}
+    return_value.append(_google_chart(display, str(index), args))
+
+    for question in y_axes:
+        if not question.is_numeric:
+            message = ("%s isn't numeric so it doesn't work as a y axis. "
+                       "Update the fieldnames of this Survey Report Display.")
+            message = message % question.fieldname
+            return_value.append(issue(message))
+    return mark_safe("\n".join(return_value))
+
+
+def _google_chart(display, unique_id, args):
+    out = []
+    out.append('<div class="chart_div" id="chart%s"></div>' % unique_id)
+
+    # Transform the data to the form and order Google wants
+
+    theData = json.loads(args['answer_string'])
+    chartData = []
+    fieldnames = args['fieldnames']
+    chartData.append(fieldnames)
+    for row in theData:
+        chartData.append([row[k] for k in fieldnames])
+
+    args.update(
+      div_id="chart%s" % unique_id,
+      title=display.annotation,
+      chartData=json.dumps(chartData))
+
+    script = """
+      <script src="https://www.google.com/jsapi"></script>
+      <script type="text/javascript">
+      function drawChart() {
+        var data = google.visualization.arrayToDataTable(%(chartData)s);
+        var options = %(api_args)s;
+
+        var chart = new
+            google.visualization.%(chart_type)s(
+                document.getElementById("%(div_id)s"));
+        chart.draw(data, options);
+      };
+      google.setOnLoadCallback(drawChart);
+      google.load("visualization", "1", {packages:["corechart"], callback: drawChart});
+    </script>""" % args
+    out.append(script)
+    return mark_safe("\n".join(out))
 
 
 def _yahoo_chart(display, unique_id, args):
@@ -323,7 +510,7 @@ def _yahoo_chart(display, unique_id, args):
         <script type="text/javascript">
           yahooChartCallbacks.push(function() {
             YAHOO.widget.Chart.SWFURL =
-              "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
+            "http://yui.yahooapis.com/2.8.0r4/build/charts/assets/charts.swf";
             var answerData = %(answer_string)s;
             var %(data_var)s = new YAHOO.util.DataSource(answerData);
             %(data_var)s.responseType = YAHOO.util.DataSource.TYPE_JSARRAY;
@@ -333,7 +520,6 @@ def _yahoo_chart(display, unique_id, args):
               "%(div_id)s",
               %(data_var)s,
               {%(options)s,
-  
                style: %(style)s,
                expressInstall: "assets/expressinstall.swf"});
           });
@@ -382,9 +568,12 @@ def google_map(display, question, report, is_popup=False):
             '    <li><a href="#" class="map_embed_link">embed</a></li>',
             '  </ul>',
             '  <fieldset class="map_embed" style="display: none;">',
-            '    <p>Copy and paste the HTML below to embed this map onto your web page.</p>',
-            ('    <textarea id="audioplayer_125944_buttons_code" readonly="" rows="2" cols="44">'
-            '&lt;iframe src="%s" height="320" width="500" &gt;&lt;/iframe&gt;</textarea>') % full_url,
+            '    <p>Copy and paste the HTML below\
+                     to embed this map onto your web page.</p>',
+            ('    <textarea id="audioplayer_125944_buttons_code"\
+                     readonly="" rows="2" cols="44">'
+            '&lt;iframe src="%s" height="320" width="500"\
+                 &gt;&lt;/iframe&gt;</textarea>') % full_url,
             '    <a class="close-map-button" href="#">Close</a>',
             '  </fieldset>'])
     out.append('</div>')
@@ -518,7 +707,7 @@ def video_html(vid, maxheight, maxwidth):
     value = cache.get(key, None)
     if not value:
         value = "Unable to find video %s." % escape(vid)
-        try: 
+        try:
             data = oembed_expand(vid, maxheight=maxheight, maxwidth=maxwidth)
             if data and 'html' in data:
                 html = '<div class="videoplayer">%s</div>' % data['html']
@@ -540,7 +729,7 @@ def submissions(object_list, fields):
     for submission in object_list:
         out.append('<div class="submission">')
         out.append(submission_fields(submission, fields, page_answers))
-        D = link_detail_survey_none=DETAIL_SURVEY_NONE.DETAIL
+        D = link_detail_survey_none = DETAIL_SURVEY_NONE.DETAIL
         out.append(submission_link(submission, D))
         out.append('</div>')
     return mark_safe("\n".join(out))
