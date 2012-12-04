@@ -133,7 +133,7 @@ class AnswerInline(admin.TabularInline):
 
 class SubmissionAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
-    search_fields = ('answer__text_answer',)
+    search_fields = ('answer__text_answer', 'answer__image_answer')
     list_display = ('survey', 'submitted_at', 'user',
                     'ip_address', 'email', 'is_public',)
     list_editable = ('is_public',)
