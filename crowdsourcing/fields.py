@@ -7,4 +7,5 @@ except ImportError:
     class ImageWithThumbnailsField(ImageField):
         def __init__(self, *args, **kwargs):
             kwargs.pop('thumbnail', None)
+            kwargs.pop('extra_thumbnails', None)
             super(ImageWithThumbnailsField, self).__init__(*args, **kwargs)

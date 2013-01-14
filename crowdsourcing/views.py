@@ -9,6 +9,7 @@ import smtplib
 from xml.dom.minidom import Document
 
 from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
@@ -17,6 +18,7 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext as _rc
+from django.template.loader import render_to_string
 from django.utils.html import escape
 
 from .forms import forms_for_survey
@@ -38,6 +40,61 @@ from .jsonutils import dump, dumps, datetime_to_string
 
 from .util import ChoiceEnum, get_function
 from . import settings as crowdsourcing_settings
+
+
+def allow_origin_sites():
+    database_sites = []
+    sites = Site.objects.all()
+    for protocol in ["http", "https"]:
+        database_sites += ["%s://%s" % (protocol, s.domain) for s in sites]
+    config_sites = getattr(settings, "ADDITIONAL_CORS_SITES", [])
+    return list(set(database_sites + config_sites))
+
+
+def api_response(request, data, callback=None, format='json'):
+    # http://www.loggly.com/blog/2011/12/enabling-cors-in-django-piston/
+    # for how to enable CORS
+    request_method = request.method.upper()
+    if request_method in ["OPTIONS", "HEAD"]:
+        response = HttpResponse()
+    elif isinstance(data, HttpResponseRedirect):
+        response = data
+    elif callback:
+        body = u'%s(%s);' % (callback, dumps(data))
+        response = HttpResponse(body, mimetype='application/javascript')
+    elif format == 'html':
+        response = HttpResponse(data)
+    else:
+        response = HttpResponse(mimetype='application/json')
+        dump(data, response)
+
+    origin = request.META.get('HTTP_REFERER', '') or \
+             request.META.get('HTTP_ORIGIN', '')
+    allowed = allow_origin_sites()
+    if origin:
+        allowed = [a for a in allowed if origin.find(a) >= 0]
+    response["Access-Control-Allow-Origin"] = " ".join(allowed)
+    response['Access-Control-Allow-Methods'] = \
+        'POST, GET, OPTIONS, HEAD, PUT, DELETE'
+    response["Access-Control-Allow-Headers"] = 'Authorization'
+    response["Access-Control-Allow-Credentials"] = 'true'
+
+    return response
+
+
+def api_response_decorator(format='json'):
+    def _api_response_decorator(the_func):
+        def _decorated(request, *args, **kwargs):
+            request_method = request.method.upper()
+            if request_method == "OPTIONS":
+                return api_response(request, {}, format=format)
+            result = the_func(request, *args, **kwargs)
+            if isinstance(result, HttpResponse):
+                return result
+            callback = request.GET.get('callback', None)
+            return api_response(request, result, callback=callback)
+        return _decorated
+    return _api_response_decorator
 
 
 def _user_entered_survey(request, survey):
@@ -213,6 +270,7 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
+@api_response_decorator(format='html')
 def embeded_survey_questions(request, slug):
     survey = _get_survey_or_404(slug, request)
     templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
@@ -223,7 +281,7 @@ def embeded_survey_questions(request, slug):
         if request.method == 'POST':
             if _submit_valid_forms(forms, request, survey):
                 forms = ()
-    return render_to_response(templates, dict(
+    return render_to_string(templates, dict(
         entered=_user_entered_survey(request, survey),
         request=request,
         forms=forms,
@@ -243,21 +301,20 @@ def _survey_report_url(survey):
                    kwargs={'slug': survey.slug})
 
 
+@api_response_decorator()
 def allowed_actions(request, slug):
     survey = _get_survey_or_404(slug, request)
     authenticated = request.user.is_authenticated()
-    response = HttpResponse(mimetype='application/json')
-    dump({"enter": _can_show_form(request, survey),
-          "view": survey.can_have_public_submissions(),
-          "open": survey.is_open,
-          "need_login": survey.require_login and not authenticated}, response)
-    return response
+    return {
+        "enter": _can_show_form(request, survey),
+        "view": survey.can_have_public_submissions(),
+        "open": survey.is_open,
+        "need_login": survey.require_login and not authenticated}
 
 
+@api_response_decorator()
 def questions(request, slug):
-    response = HttpResponse(mimetype='application/json')
-    dump(_get_survey_or_404(slug, request).to_jsondata(), response)
-    return response
+    return _get_survey_or_404(slug, request).to_jsondata()
 
 
 def submissions(request, format):
@@ -488,9 +545,10 @@ def _default_report(survey):
 def survey_report(request, slug, report='', page=None):
     templates = ['crowdsourcing/survey_report_%s.html' % slug,
                  'crowdsourcing/survey_report.html']
-    return _survey_report(request, slug, report, page, templates)
+    return HttpResponse(_survey_report(request, slug, report, page, templates))
 
 
+@api_response_decorator(format='html')
 def embeded_survey_report(request, slug, report=''):
     templates = ['crowdsourcing/embeded_survey_report_%s.html' % slug,
                  'crowdsourcing/embeded_survey_report.html']
@@ -578,7 +636,7 @@ def _survey_report(request, slug, report, page, templates):
         display_individual_results=display_individual_results,
         request=request)
 
-    return render_to_response(templates, context, _rc(request))
+    return render_to_string(templates, context, _rc(request))
 
 
 def pages_to_link_from_paginator(page, paginator):
