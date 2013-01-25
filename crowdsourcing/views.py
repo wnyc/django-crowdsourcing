@@ -545,7 +545,10 @@ def _default_report(survey):
 def survey_report(request, slug, report='', page=None):
     templates = ['crowdsourcing/survey_report_%s.html' % slug,
                  'crowdsourcing/survey_report.html']
-    return HttpResponse(_survey_report(request, slug, report, page, templates))
+    result = _survey_report(request, slug, report, page, templates)
+    if isinstance(result, HttpResponse):
+        return result
+    return HttpResponse(result)
 
 
 @api_response_decorator(format='html')
@@ -576,8 +579,8 @@ def _survey_report(request, slug, report, page, templates):
         report_obj = get_object_or_404(reports, slug=report)
     elif survey.default_report:
         args = {"slug": survey.slug, "report": survey.default_report.slug}
-        return HttpResponseRedirect(reverse("survey_report_page_1",
-                                    kwargs=args))
+        url = reverse("survey_report_page_1", kwargs=args)
+        return HttpResponseRedirect(url)
     else:
         report_obj = _default_report(survey)
 
