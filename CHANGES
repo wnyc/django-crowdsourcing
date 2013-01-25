@@ -1,3 +1,7 @@
+Version 1.1.40
+--------------
+* Supporting cross site API calls
+
 Version 1.1.39
 --------------
 * Google API loading fix
