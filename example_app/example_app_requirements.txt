@@ -10,4 +10,4 @@
 
 # You'll of course need django-crowdsourcing if you want to run the example
 # app. 
--e hg+https://django-crowdsourcing.googlecode.com/hg/#egg=crowdsourcing
+-e git+https://github.com/wnyc/django-crowdsourcing#egg=crowdsourcing
