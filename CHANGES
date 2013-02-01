@@ -1,3 +1,7 @@
+Version 1.1.43
+--------------
+* When sending emails, differentiate between staff and public emails.
+
 Version 1.1.42
 --------------
 * Google Maps doesn't require an API key any more. Requiring it was breaking location questions.

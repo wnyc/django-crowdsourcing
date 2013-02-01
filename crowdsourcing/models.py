@@ -52,6 +52,25 @@ ARCHIVE_POLICY_CHOICES = ChoiceEnum(('immediate',
                                      'never'))
 
 
+OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Box'),
+                                         ('email', 'Email Text Box'),
+                                         ('photo', 'Photo Upload'),
+                                         ('video', 'Video Link Text Box'),
+                                         ('location', 'Location Text Box'),
+                                         ('integer', 'Integer Text Box'),
+                                         ('float', 'Decimal Text Box'),
+                                         ('bool', 'Checkbox'),
+                                         ('text', 'Text Area'),
+                                         ('select', 'Drop Down List'),
+                                         ('choice', 'Radio Button List'),
+                                         ('bool_list', 'Checkbox List'),
+                                         ('numeric_select',
+                                          'Numeric Drop Down List'),
+                                         ('numeric_choice',
+                                          'Numeric Radio Button List')],
+                                        key=itemgetter(1)))
+
+
 class LiveSurveyManager(models.Manager):
     def get_query_set(self):
         now = datetime.datetime.now()
@@ -104,9 +123,10 @@ class Survey(models.Model):
     email = models.CharField(
         max_length=255,
         blank=True,
-        help_text=("Send a notification to these e-mail addresses whenever "
-                   "someone submits an entry to this survey. Comma "
-                   "delimited."))
+        help_text=(
+            "Send a notification to these e-mail addresses whenever someone "
+            "submits an entry to this survey. Comma delimited. Messages to "
+            "staff emails will include admin urls."))
     site = models.ForeignKey(Site)
     flickr_group_id = models.CharField(
         max_length=60,
@@ -256,25 +276,6 @@ class Survey(models.Model):
 
     objects = models.Manager()
     live = LiveSurveyManager()
-
-
-OPTION_TYPE_CHOICES = ChoiceEnum(sorted([('char', 'Text Box'),
-                                         ('email', 'Email Text Box'),
-                                         ('photo', 'Photo Upload'),
-                                         ('video', 'Video Link Text Box'),
-                                         ('location', 'Location Text Box'),
-                                         ('integer', 'Integer Text Box'),
-                                         ('float', 'Decimal Text Box'),
-                                         ('bool', 'Checkbox'),
-                                         ('text', 'Text Area'),
-                                         ('select', 'Drop Down List'),
-                                         ('choice', 'Radio Button List'),
-                                         ('bool_list', 'Checkbox List'),
-                                         ('numeric_select',
-                                          'Numeric Drop Down List'),
-                                         ('numeric_choice',
-                                          'Numeric Radio Button List')],
-                                        key=itemgetter(1)))
 
 
 FILTERABLE_OPTION_TYPES = (OPTION_TYPE_CHOICES.LOCATION,

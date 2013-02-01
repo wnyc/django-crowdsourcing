@@ -10,6 +10,7 @@ from xml.dom.minidom import Document
 
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.contrib.auth.models import User
 from django.core.exceptions import FieldError
 from django.core.mail import EmailMultiAlternatives
 from django.core.paginator import Paginator, EmptyPage, InvalidPage
@@ -200,30 +201,54 @@ def _url_for_edit(request, obj):
 
 
 def _send_survey_email(request, survey, submission):
-    subject = survey.title
-    sender = crowdsourcing_settings.SURVEY_EMAIL_FROM
-    links = [(_url_for_edit(request, submission), "Edit Submission"),
-             (_url_for_edit(request, survey), "Edit Survey"),]
-    if survey.can_have_public_submissions():
-        u = "http://" + request.META["HTTP_HOST"] + _survey_report_url(survey)
-        links.append((u, "View Survey",))
-    parts = ["<a href=\"%s\">%s</a>" % link for link in links]
-    set = submission.answer_set.all()
-    lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in set]
-    parts.extend(lines)
-    html_email = "<br/>\n".join(parts)
     recipients = [a.strip() for a in survey.email.split(",")]
-    email_msg = EmailMultiAlternatives(subject,
-                                       html_email,
-                                       sender,
-                                       recipients)
-    email_msg.attach_alternative(html_email, 'text/html')
-    try:
-        email_msg.send()
-    except smtplib.SMTPException as ex:
-        logging.exception("SMTP error sending email: %s" % str(ex))
-    except Exception as ex:
-        logging.exception("Unexpected error sending email: %s" % str(ex))
+    staff_users = User.objects.filter(email__in=recipients, is_staff=True)
+    staff = list(set([u.email for u in staff_users]))
+    public = [e for e in recipients if not e in staff]
+
+    def _send_msg(subject, parts, emails):
+        html_email = "<br/>\n".join(parts)
+        sender = crowdsourcing_settings.SURVEY_EMAIL_FROM
+        email_msg = EmailMultiAlternatives(subject, html_email, sender, emails)
+        email_msg.attach_alternative(html_email, 'text/html')
+        try:
+            email_msg.send()
+        except smtplib.SMTPException as ex:
+            logging.exception("SMTP error sending email: %s" % str(ex))
+        except Exception as ex:
+            logging.exception("Unexpected error sending email: %s" % str(ex))
+
+    answs = submission.answer_set.all()
+    host = "http://" + request.META["HTTP_HOST"]
+    report_url = host + _survey_report_url(survey)
+    if staff:
+        links = [(_url_for_edit(request, submission), "Edit Submission"),
+                 (_url_for_edit(request, survey), "Edit Survey"),]
+        if survey.can_have_public_submissions():
+            u = report_url
+            links.append((u, "View Survey",))
+        parts = ["<a href=\"%s\">%s</a>" % link for link in links]
+        lines = ["%s: %s" % (a.question.label, escape(a.value),) for a in answs]
+        parts.extend(lines)
+        _send_msg(survey.title, parts, staff)
+    if public:
+        subject = []
+        body = []
+        OTC = OPTION_TYPE_CHOICES
+        for ans in answs:
+            if ans.value:
+                opt_type = ans.question.option_type
+                if any([opt_type in (OTC.SELECT, OTC.LOCATION),
+                        ans.question.question.lower().find("title") >= 0]):
+                    subject.append(ans.value)
+                elif opt_type in (OTC.PHOTO):
+                    body.append("<img src='%s' />" % (settings.STATIC_URL + str(ans.image_answer)))
+                else:
+                    body.append(ans.value)
+        body.append("<a href='%s%s'>See the survey</a>" % report_url)
+        subject = ". ".join(subject) or survey.title
+        html_email = "<br/>\n".join(body)
+        _send_msg(subject, body, public)
 
 
 def _survey_show_form(request, survey, forms):
