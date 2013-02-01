@@ -242,9 +242,7 @@ def _send_survey_email(request, survey, submission):
                         ans.question.question.lower().find("title") >= 0]):
                     subject.append(ans.value)
                 elif opt_type in (OTC.PHOTO):
-                    image_src = settings.STATIC_URL + str(ans.image_answer)
-                    if image_src.find("http") == -1:
-                        image_src = host + image_src
+                    image_src = host + ans.image_answer.thumbnail.absolute_url
                     body.append("<img src='%s' />" % (image_src))
                 else:
                     body.append(ans.value)
