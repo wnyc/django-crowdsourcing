@@ -1,3 +1,7 @@
+Version 1.1.45
+--------------
+* Notification email uses the thumbnail.
+
 Version 1.1.44
 --------------
 * Resolved bug in 1.1.43
