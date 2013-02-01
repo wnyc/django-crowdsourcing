@@ -1,3 +1,7 @@
+Version 1.1.44
+--------------
+* Resolved bug in 1.1.43
+
 Version 1.1.43
 --------------
 * When sending emails, differentiate between staff and public emails.

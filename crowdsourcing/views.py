@@ -218,7 +218,7 @@ def _send_survey_email(request, survey, submission):
         except Exception as ex:
             logging.exception("Unexpected error sending email: %s" % str(ex))
 
-    answs = submission.answer_set.all()
+    answs = Answer.objects.filter(submission=submission)
     host = "http://" + request.META["HTTP_HOST"]
     report_url = host + _survey_report_url(survey)
     if staff:
@@ -242,10 +242,13 @@ def _send_survey_email(request, survey, submission):
                         ans.question.question.lower().find("title") >= 0]):
                     subject.append(ans.value)
                 elif opt_type in (OTC.PHOTO):
-                    body.append("<img src='%s' />" % (settings.STATIC_URL + str(ans.image_answer)))
+                    image_src = settings.STATIC_URL + str(ans.image_answer)
+                    if image_src.find("http") == -1:
+                        image_src = host + image_src
+                    body.append("<img src='%s' />" % (image_src))
                 else:
                     body.append(ans.value)
-        body.append("<a href='%s%s'>See the survey</a>" % report_url)
+        body.append("<a href='%s'>See the survey</a>" % report_url)
         subject = ". ".join(subject) or survey.title
         html_email = "<br/>\n".join(body)
         _send_msg(subject, body, public)
