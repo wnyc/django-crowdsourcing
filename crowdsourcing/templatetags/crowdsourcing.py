@@ -10,7 +10,7 @@ from django.core.files.images import get_image_dimensions
 from django.core.urlresolvers import reverse
 from django.template import Node
 from django.utils.safestring import mark_safe
-from django.utils.html import escape, strip_tags
+from django.utils.html import escape, strip_tags, linebreaks
 from sorl.thumbnail.base import ThumbnailException
 
 from crowdsourcing.models import (
@@ -696,7 +696,7 @@ def submission_fields(submission,
                     args = {"val": escape(answer.value)}
                     out.append('<a href="%(val)s">%(val)s</a>' % args)
             else:
-                out.append(escape(answer.value))
+                out.append(linebreaks(escape(answer.value)))
             out.append('</div>')
     return mark_safe("\n".join(out))
 register.simple_tag(submission_fields)

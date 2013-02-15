@@ -29,7 +29,7 @@ Installation
 
 Prerequisites are:
 
- * Django itself, of course -- 1.1 or better.
+ * Django itself, of course -- 1.4 or better.
  * `PIL`_
  * `django-positions`_
  * `sorl-thumbnail`_
@@ -53,7 +53,7 @@ Running The Example App
   2. $ pip install -r crowdsourcing_requirements.txt
   3. $ pip install -r example_app/example_app_requirements.txt
   4. By default the example app will use a sqlite db; if if you want to
-     change that, modify example_app/local_settings.py accordingly.
+     change that, modify example_app/example_app/settings.py accordingly.
   5. $ cd example_app
   6. $ ./manage.py syncdb
   7. $ ./manage.py runserver 
@@ -62,7 +62,7 @@ Running The Example App
 Notes
 ~~~~~
 
-  1. Should work under Django 1.1 and 1.2
+  1. Should work under Django 1.4
   2. Only tested on Python 2.6
 
 Documentation
