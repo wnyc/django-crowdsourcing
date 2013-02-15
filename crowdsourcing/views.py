@@ -93,7 +93,8 @@ def api_response_decorator(format='json'):
             if isinstance(result, HttpResponse):
                 return result
             callback = request.GET.get('callback', None)
-            return api_response(request, result, callback=callback)
+            return api_response(
+                    request, result, format=format, callback=callback)
         return _decorated
     return _api_response_decorator
 
@@ -202,9 +203,13 @@ def _url_for_edit(request, obj):
 
 def _send_survey_email(request, survey, submission):
     recipients = [a.strip() for a in survey.email.split(",")]
-    staff_users = User.objects.filter(email__in=recipients, is_staff=True)
-    staff = list(set([u.email for u in staff_users]))
-    public = [e for e in recipients if not e in staff]
+    if crowdsourcing_settings.ALL_STAFF_EMAIL_NOTIFICATION:
+        staff = recipients
+        public = []
+    else:
+        staff_users = User.objects.filter(email__in=recipients, is_staff=True)
+        staff = list(set([u.email for u in staff_users]))
+        public = [e for e in recipients if not e in staff]
 
     def _send_msg(subject, parts, emails):
         html_email = "<br/>\n".join(parts)

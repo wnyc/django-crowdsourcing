@@ -126,3 +126,14 @@ SYNCHRONOUS_FLICKR_UPLOAD = getattr(
     _gs,
     'CROWDSOURCING_SYNCHRONOUS_FLICKR_UPLOAD',
     True)
+
+
+# If you turn this to False, you can put arbitrary email addresses in the email
+# field. Non-staff email addresses as defined by the auth_user table will
+# receive a stripped down email without admin urls. This can be useful for
+# emailing notifications about a survey to non-staff. This setting is here to
+# support the default behavior.
+ALL_STAFF_EMAIL_NOTIFICATION = getattr(
+    _gs,
+    'CROWDSOURCING_ALL_STAFF_EMAIL_NOTIFICATION',
+    True)

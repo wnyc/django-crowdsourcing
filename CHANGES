@@ -1,3 +1,8 @@
+Version 1.1.46
+--------------
+* Public notification emails turned off by default.
+* Fixed a bug where the api returned a json encoded html string.
+
 Version 1.1.45
 --------------
 * Notification email uses the thumbnail.
