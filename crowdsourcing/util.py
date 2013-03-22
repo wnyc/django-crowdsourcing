@@ -37,3 +37,30 @@ class ChoiceEnum(object):
 
     def getdisplay(self, key):
         return [v[1] for v in self._choices if v[0] == key][0]
+
+
+""" This is handy for when you don't have sessions or authentication
+middleware. """
+class DummySession(object):
+    session_key = ""
+
+    def __setitem__(self, key, value):
+        pass
+
+
+class DummyUser(object):
+    is_staff = False
+
+    def is_authenticated(self):
+        return False
+
+    def is_anonymous(self):
+        return True
+
+
+def get_session(request):
+    return getattr(request, "session", DummySession())
+
+
+def get_user(request):
+    return getattr(request, "user", DummyUser())

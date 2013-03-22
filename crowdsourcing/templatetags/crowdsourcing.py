@@ -18,7 +18,7 @@ from crowdsourcing.models import (
     AggregateResultAverage, AggregateResult2AxisCount, Answer, FILTER_TYPE,
     OPTION_TYPE_CHOICES, SURVEY_AGGREGATE_TYPE_CHOICES, get_all_answers)
 from crowdsourcing.views import location_question_results
-from crowdsourcing.util import ChoiceEnum, get_function
+from crowdsourcing.util import ChoiceEnum, get_function, get_user
 from crowdsourcing import settings as local_settings
 
 if local_settings.OEMBED_EXPAND:
@@ -644,7 +644,7 @@ def submission_fields(submission,
                       request=None,
                       video_height=360,
                       video_width=288):
-    is_staff = request and request.user.is_staff
+    is_staff = request and get_user(request).is_staff
     if not page_answers:
         page_answers = get_all_answers(
             [submission],

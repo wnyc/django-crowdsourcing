@@ -32,6 +32,7 @@ from django.utils.translation import ugettext_lazy as _
 from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
+from .util import get_session, get_user
 
 try:
     from .oembedutils import oembed_expand
@@ -257,8 +258,8 @@ class SubmissionForm(ModelForm):
 def forms_for_survey(survey, request='testing', submission=None):
     testing = request == 'testing'
     session_key = ""
-    if not testing and request.user.is_authenticated():
-        session_key = request.session.session_key.lower()
+    if not testing and get_user(request).is_authenticated():
+        session_key = get_session(request).session_key.lower()
     post = None if testing else request.POST or None
     files = None if testing else request.FILES or None
     main_form = SubmissionForm(survey, data=post, files=files)

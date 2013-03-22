@@ -39,7 +39,7 @@ from .models import (
     get_filters)
 from .jsonutils import dump, dumps, datetime_to_string
 
-from .util import ChoiceEnum, get_function
+from .util import ChoiceEnum, get_function, get_session, get_user
 from . import settings as crowdsourcing_settings
 
 
@@ -100,11 +100,11 @@ def api_response_decorator(format='json'):
 
 
 def _user_entered_survey(request, survey):
-    if not request.user.is_authenticated():
+    if not get_user(request).is_authenticated():
         return False
     return bool(survey.submissions_for(
-        request.user,
-        request.session.session_key.lower()).count())
+        get_user(request),
+        get_session(request).session_key.lower()).count())
 
 
 def _entered_no_more_allowed(request, survey):
@@ -130,13 +130,13 @@ def _login_url(request):
 
 def _get_survey_or_404(slug, request=None):
     manager = Survey.live
-    if request and request.user.is_staff:
+    if request and get_user(request).is_staff:
         manager = Survey.objects
     return get_object_or_404(manager, slug=slug)
 
 
 def _survey_submit(request, survey):
-    if survey.require_login and request.user.is_anonymous():
+    if survey.require_login and get_user(request).is_anonymous():
         # again, the form should only be shown after the user is logged in, but
         # to be safe...
         return HttpResponseRedirect(_login_url(request))
@@ -168,8 +168,8 @@ def _submit_valid_forms(forms, request, survey):
     submission.survey = survey
     submission.ip_address = _get_remote_ip(request)
     submission.is_public = not survey.moderate_submissions
-    if request.user.is_authenticated():
-        submission.user = request.user
+    if get_user(request).is_authenticated():
+        submission.user = get_user(request)
     submission.save()
     for form in forms[1:]:
         answer = form.save(commit=False)
@@ -271,7 +271,7 @@ def _survey_show_form(request, survey, forms):
 
 
 def _can_show_form(request, survey):
-    authenticated = request.user.is_authenticated()
+    authenticated = get_user(request).is_authenticated()
     return all((
         survey.is_open,
         authenticated or not survey.require_login,
@@ -287,7 +287,7 @@ def survey_detail(request, slug):
         return _survey_results_redirect(request, survey)
     need_login = (survey.is_open
                   and survey.require_login
-                  and not request.user.is_authenticated())
+                  and not get_user(request).is_authenticated())
     if _can_show_form(request, survey):
         if request.method == 'POST':
             return _survey_submit(request, survey)
@@ -323,7 +323,7 @@ def embeded_survey_questions(request, slug):
 def _survey_results_redirect(request, survey, thanks=False):
     response = HttpResponseRedirect(_survey_report_url(survey))
     if thanks:
-        request.session['survey_thanks_%s' % survey.slug] = '1'
+        get_session(request)['survey_thanks_%s' % survey.slug] = '1'
     return response
 
 
@@ -335,7 +335,7 @@ def _survey_report_url(survey):
 @api_response_decorator()
 def allowed_actions(request, slug):
     survey = _get_survey_or_404(slug, request)
-    authenticated = request.user.is_authenticated()
+    authenticated = get_user(request).is_authenticated()
     return {
         "enter": _can_show_form(request, survey),
         "view": survey.can_have_public_submissions(),
@@ -375,7 +375,7 @@ def submissions(request, format):
         msg = ("%s is an unrecognized format. Crowdsourcing recognizes "
                "these: %s") % (format, ", ".join(FORMAT_CHOICES))
         return HttpResponse(msg)
-    is_staff = request.user.is_authenticated() and request.user.is_staff
+    is_staff = get_user(request).is_authenticated() and get_user(request).is_staff
     if is_staff:
         results = Submission.objects.all()
     else:
@@ -603,7 +603,7 @@ def _survey_report(request, slug, report, page, templates):
     survey = _get_survey_or_404(slug, request)
     # is the survey anything we can actually have a report on?
     is_public = survey.is_live and survey.can_have_public_submissions()
-    if not is_public and not request.user.is_staff:
+    if not is_public and not get_user(request).is_staff:
         raise Http404
     reports = survey.surveyreport_set.all()
     if report:
@@ -616,7 +616,7 @@ def _survey_report(request, slug, report, page, templates):
         report_obj = _default_report(survey)
 
     archive_fields = list(survey.get_public_archive_fields())
-    is_staff = request.user.is_staff
+    is_staff = get_user(request).is_staff
     if is_staff:
         submissions = survey.submission_set.all()
         fields = list(survey.get_fields())
@@ -668,7 +668,8 @@ def _survey_report(request, slug, report, page, templates):
         page_answers=page_answers,
         is_public=is_public,
         display_individual_results=display_individual_results,
-        request=request)
+        request=request,
+        is_staff=get_user(request).is_staff)
 
     return render_to_string(templates, context, _rc(request))
 
@@ -721,7 +722,7 @@ def location_question_results(
     question = get_object_or_404(Question.objects.select_related("survey"),
                                  pk=question_id,
                                  answer_is_public=True)
-    is_staff = request.user.is_staff
+    is_staff = get_user(request).is_staff
     if not question.survey.can_have_public_submissions() and not is_staff:
         raise Http404
     featured = limit_results_to = False
@@ -782,7 +783,7 @@ def location_question_map(
     survey_report_slug=""):
 
     question = Question.objects.get(pk=question_id)
-    if not question.answer_is_public and not request.user.is_staff:
+    if not question.answer_is_public and not get_user(request).is_staff:
         raise Http404
     report = None
     limit = 0
@@ -812,7 +813,7 @@ def location_question_map(
 
 def submission_for_map(request, id):
     template = 'crowdsourcing/submission_for_map.html'
-    if request.user.is_staff:
+    if get_user(request).is_staff:
         sub = get_object_or_404(Submission.objects, pk=id)
     else:
         sub = get_object_or_404(Submission.objects, is_public=True, pk=id)
