@@ -15,7 +15,7 @@ from . import settings as local_settings
 def get_latitude_and_longitude(location):
     if geopy is None:
         raise ImportError("No module named geopy")
-    g = geopy.geocoders.Google()
+    g = geopy.geocoders.GoogleV3()
     oldstdout = sys.stdout
     try:
         sys.stdout = cStringIO.StringIO()
