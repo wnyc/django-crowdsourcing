@@ -538,7 +538,7 @@ def submission(request, id):
     return render_to_response(template, dict(submission=sub), _rc(request))
 
 
-def _default_report(survey):
+def _default_report(survey, is_staff):
     field_count = count(1)
     OTC = OPTION_TYPE_CHOICES
     pie_choices = (
@@ -549,7 +549,7 @@ def _default_report(survey):
         OTC.NUMERIC_CHOICE,
         OTC.BOOL_LIST,)
     all_choices = pie_choices + (OTC.LOCATION, OTC.PHOTO)
-    public_fields = survey.get_public_fields()
+    public_fields = survey.get_fields() if is_staff else survey.get_public_fields()
     fields = [f for f in public_fields if f.option_type in all_choices]
     report = SurveyReport(
         survey=survey,
@@ -593,6 +593,7 @@ def _survey_report(request, slug, report, page, templates):
     """ Show a report for the survey. As rating is done in a separate
     application we don't directly check request.GET["sort"] here.
     crowdsourcing_settings.PRE_REPORT is the place for that. """
+    is_staff = get_user(request).is_staff
     if page is None:
         page = 1
     else:
@@ -603,7 +604,7 @@ def _survey_report(request, slug, report, page, templates):
     survey = _get_survey_or_404(slug, request)
     # is the survey anything we can actually have a report on?
     is_public = survey.is_live and survey.can_have_public_submissions()
-    if not is_public and not get_user(request).is_staff:
+    if not is_public and not is_staff:
         raise Http404
     reports = survey.surveyreport_set.all()
     if report:
@@ -613,14 +614,14 @@ def _survey_report(request, slug, report, page, templates):
         url = reverse("survey_report_page_1", kwargs=args)
         return HttpResponseRedirect(url)
     else:
-        report_obj = _default_report(survey)
+        report_obj = _default_report(survey, is_staff)
 
-    archive_fields = list(survey.get_public_archive_fields())
-    is_staff = get_user(request).is_staff
     if is_staff:
+        archive_fields = list(survey.get_archive_fields())
         submissions = survey.submission_set.all()
         fields = list(survey.get_fields())
     else:
+        archive_fields = list(survey.get_public_archive_fields())
         submissions = survey.public_submissions()
         fields = list(survey.get_public_fields())
     filters = get_filters(survey, request.GET)
@@ -793,7 +794,7 @@ def location_question_map(
                                           survey=question.survey)
         limit = report.limit_results_to
     else:
-        report = _default_report(question.survey)
+        report = _default_report(question.survey, get_user(request).is_staff)
 
     # This cast is not for validation since the urls file already guaranteed
     # it would be a nonempty string of digits. It's simply because display_id

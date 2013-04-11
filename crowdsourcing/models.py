@@ -201,12 +201,15 @@ class Survey(models.Model):
         return fields
 
     def get_public_archive_fields(self):
+        return [f for f in self.get_archive_fields() if f.answer_is_public]
+
+    def get_archive_fields(self):
         types = (
             OPTION_TYPE_CHOICES.CHAR,
             OPTION_TYPE_CHOICES.PHOTO,
             OPTION_TYPE_CHOICES.VIDEO,
             OPTION_TYPE_CHOICES.TEXT)
-        return [f for f in self.get_public_fields() if f.option_type in types]
+        return [f for f in self.get_fields() if f.option_type in types]
 
     def icon_questions(self):
         OTC = OPTION_TYPE_CHOICES

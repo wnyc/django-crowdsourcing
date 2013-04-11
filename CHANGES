@@ -1,3 +1,7 @@
+Version 1.1.49
+--------------
+* Staff users can see the answers to private questions.
+
 Version 1.1.48
 --------------
 * Fix geocoders call to use Google Api V3
