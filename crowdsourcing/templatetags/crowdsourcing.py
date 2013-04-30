@@ -50,7 +50,7 @@ register = template.Library()
 
 
 def yahoo_api():
-    apisrc = 'http://yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js'
+    apisrc = '//yui.yahooapis.com/2.8.1/build/yuiloader/yuiloader-min.js'
     return mark_safe("\n".join([
         '<script type="text/javascript" src="%s">' % apisrc,
         '</script>'
