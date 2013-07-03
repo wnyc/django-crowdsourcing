@@ -102,10 +102,8 @@ def api_response_decorator(format='json'):
 def _user_entered_survey(request, survey):
     try:
         user = get_user(request)
-        if not user.is_authenticated():
-            user = None
         return bool(survey.submissions_for(
-                get_user(request),
+                user.is_authenticated() and user,
                 get_session(request).session_key.lower()).count())
     except AttributeError:
         return False
