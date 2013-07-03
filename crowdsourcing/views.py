@@ -100,11 +100,15 @@ def api_response_decorator(format='json'):
 
 
 def _user_entered_survey(request, survey):
-    if not get_user(request).is_authenticated():
+    try:
+        user = get_user(request)
+        if not user.is_authenticated():
+            user = None
+        return bool(survey.submissions_for(
+                get_user(request),
+                get_session(request).session_key.lower()).count())
+    except AttributeError:
         return False
-    return bool(survey.submissions_for(
-        get_user(request),
-        get_session(request).session_key.lower()).count())
 
 
 def _entered_no_more_allowed(request, survey):
