@@ -145,7 +145,7 @@ class Survey(models.Model):
 
     @property
     def cookie_key(self):
-        return 'django-crowdsourceing-survey-' + self.slug
+        return 'django-crowdsourcing-survey-' + self.slug
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
