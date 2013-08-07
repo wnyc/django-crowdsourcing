@@ -143,6 +143,10 @@ class Survey(models.Model):
                    "of this survey we'll use this report. If it's left blank, "
                    "we'll use the default report behavior."))
 
+    @property
+    def cookie_key(self):
+        return 'django-crowdsourceing-survey-' + self.slug
+
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
         submit_url = reverse('embeded_survey_questions', kwargs=kwargs)

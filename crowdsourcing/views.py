@@ -98,19 +98,12 @@ def api_response_decorator(format='json'):
         return _decorated
     return _api_response_decorator
 
-
 def _user_entered_survey(request, survey):
     try:
-        session_key = get_session(request).session_key.lower()
         user = get_user(request)
-        if not (user.is_authenticated() or session_key):
-            # Users without session keys can't possiably be interested
-            # in voting because they didn't read what they are voting
-            # about yet.
-            return True
         return bool(survey.submissions_for(
                 user.is_authenticated() and user,
-                session_key = session_key).count(),)
+                session_key = session_key).count()) or survey.cookie_key in request.cookies
     except AttributeError:
         return True
 
