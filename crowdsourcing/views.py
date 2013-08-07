@@ -99,14 +99,11 @@ def api_response_decorator(format='json'):
     return _api_response_decorator
 
 def _user_entered_survey(request, survey):
-    try:
-        user = get_user(request)
-        return bool(survey.submissions_for(
-                user.is_authenticated() and user,
-                session_key = session_key).count()) or survey.cookie_key in request.cookies
-    except AttributeError:
-        return True
-
+    if not get_user(request).is_authenticated():
+        return survey.cookie_key in request.COOKIES
+    return bool(survey.submissions_for(
+        get_user(request),
+        get_session(request).session_key.lower()).count())
 
 def _entered_no_more_allowed(request, survey):
     """ The user entered the survey and the survey allows only one entry. """
@@ -155,7 +152,11 @@ def _survey_submit(request, survey):
 
     if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
-            return _survey_results_redirect(request, survey, thanks=True)
+            response = _survey_results_redirect(request, survey, thanks=True)
+            response.COOKIES[survey.cookie_key] = 'voted'
+            response.COOKIES[survey.cookie_key]['expires'] = survey.ends_at
+            return response
+
         return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
