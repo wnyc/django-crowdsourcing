@@ -154,7 +154,7 @@ def _survey_submit(request, survey):
     if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
             response = _survey_results_redirect(request, survey, thanks=True)
-            response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at)
+            response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at, domain=settings.SESSION_COOKIE_DOMAIN)
             return response
 
         return _survey_show_form(request, survey, ())
