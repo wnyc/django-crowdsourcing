@@ -20,7 +20,7 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.shortcuts import get_object_or_404, render_to_response
 from django.template import RequestContext as _rc
 from django.template.loader import render_to_string
-from django.views.decorators.vary import vary_on_cookies
+from django.views.decorators.vary import vary_on_cookie
 from django.utils.html import escape
 
 from .forms import forms_for_survey
@@ -280,7 +280,7 @@ def _can_show_form(request, survey):
         authenticated or not survey.require_login,
         not _entered_no_more_allowed(request, survey)))
 
-@vary_on_cookies()
+@vary_on_cookie()
 def survey_detail(request, slug):
     """ When you load the survey, this view decides what to do. It displays
     the form, redirects to the results page, displays messages, or whatever
