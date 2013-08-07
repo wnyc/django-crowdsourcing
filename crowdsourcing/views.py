@@ -280,7 +280,7 @@ def _can_show_form(request, survey):
         authenticated or not survey.require_login,
         not _entered_no_more_allowed(request, survey)))
 
-@vary_on_cookie()
+@vary_on_cookie
 def survey_detail(request, slug):
     """ When you load the survey, this view decides what to do. It displays
     the form, redirects to the results page, displays messages, or whatever
