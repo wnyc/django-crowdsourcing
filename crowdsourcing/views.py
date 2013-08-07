@@ -102,6 +102,7 @@ def api_response_decorator(format='json'):
 def _user_entered_survey(request, survey):
     if not get_user(request).is_authenticated():
         return survey.cookie_key in request.COOKIES
+
     return bool(survey.submissions_for(
         get_user(request),
         get_session(request).session_key.lower()).count())
@@ -133,6 +134,10 @@ def _get_survey_or_404(slug, request=None):
         manager = Survey.objects
     return get_object_or_404(manager, slug=slug)
 
+def set_voted_cookie(response, survey):
+    if survey.ends_at:
+        response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at or datetime.datetime.now + datetime.timedelta(days=28))
+    return response
 
 def _survey_submit(request, survey):
     if survey.require_login and get_user(request).is_anonymous():
@@ -153,8 +158,8 @@ def _survey_submit(request, survey):
 
     if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
-            response = _survey_results_redirect(request, survey, thanks=True)
-            response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at, domain=settings.SESSION_COOKIE_DOMAIN)
+            return set_voted_cookie(_survey_results_redirect(request, survey, thanks=True),
+                                    survey)
             return response
         return _survey_show_form(request, survey, ())
     else:
@@ -292,9 +297,8 @@ def survey_detail(request, slug):
                   and not get_user(request).is_authenticated())
     if _can_show_form(request, survey):
         if request.method == 'POST':
-            response = _survey_submit(request, survey)
-            response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at, domain=settings.SESSION_COOKIE_DOMAIN)
-            return response
+            return set_voted_cookie(_survey_submit(request, survey),
+                                    survey)
         forms = forms_for_survey(survey, request)
     elif need_login:    
         forms = ()
@@ -305,7 +309,6 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-# api_response_decorator(format='html')
 def embeded_survey_questions(request, slug):
     survey = _get_survey_or_404(slug, request)
     templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
@@ -325,7 +328,7 @@ def embeded_survey_questions(request, slug):
         survey=survey,
         login_url=_login_url(request)), _rc(request))
     if give_user_a_cookie:
-        response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at)
+        response = set_voted_cookie(response, survey)
     return response 
 
 
