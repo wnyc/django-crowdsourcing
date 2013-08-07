@@ -3,6 +3,7 @@ from __future__ import absolute_import
 
 import datetime
 import logging
+import hashlib
 from math import sin, cos
 from operator import itemgetter
 import re
@@ -145,7 +146,8 @@ class Survey(models.Model):
 
     @property
     def cookie_key(self):
-        return 'django-crowdsourcing-survey-' + self.slug
+        value = 'django-crowdsourcing-survey-%s' % (self.slug,)
+        return hashlib.md5(value).hexdigest()[:16]
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}

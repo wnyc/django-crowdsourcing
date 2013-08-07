@@ -154,9 +154,9 @@ def _survey_submit(request, survey):
     if _submit_valid_forms(forms, request, survey):
         if survey.can_have_public_submissions():
             response = _survey_results_redirect(request, survey, thanks=True)
+            print survey.cookie_key, settings.SESSION_COOKIE_DOMAIN
             response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at, domain=settings.SESSION_COOKIE_DOMAIN)
             return response
-
         return _survey_show_form(request, survey, ())
     else:
         return _survey_show_form(request, survey, forms)
@@ -285,6 +285,7 @@ def survey_detail(request, slug):
     the form, redirects to the results page, displays messages, or whatever
     makes sense based on the survey, the user, and the user's entries. """
     survey = _get_survey_or_404(slug, request)
+
     if not survey.is_open and survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
     need_login = (survey.is_open
@@ -292,9 +293,11 @@ def survey_detail(request, slug):
                   and not get_user(request).is_authenticated())
     if _can_show_form(request, survey):
         if request.method == 'POST':
-            return _survey_submit(request, survey)
+            response = _survey_submit(request, survey)
+            response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at, domain=settings.SESSION_COOKIE_DOMAIN)
+            return response
         forms = forms_for_survey(survey, request)
-    elif need_login:
+    elif need_login:    
         forms = ()
     elif survey.can_have_public_submissions():
         return _survey_results_redirect(request, survey)
@@ -303,23 +306,28 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
-@api_response_decorator(format='html')
+# api_response_decorator(format='html')
 def embeded_survey_questions(request, slug):
     survey = _get_survey_or_404(slug, request)
     templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
                  'crowdsourcing/embeded_survey_questions.html']
     forms = ()
+    give_user_a_cookie = False
     if _can_show_form(request, survey):
         forms = forms_for_survey(survey, request)
         if request.method == 'POST':
             if _submit_valid_forms(forms, request, survey):
+                give_user_a_cookie = True
                 forms = ()
-    return render_to_string(templates, dict(
+    response = render_to_response(templates, dict(
         entered=_user_entered_survey(request, survey),
         request=request,
         forms=forms,
         survey=survey,
         login_url=_login_url(request)), _rc(request))
+    if give_user_a_cookie:
+        response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at)
+    return response 
 
 
 def _survey_results_redirect(request, survey, thanks=False):
