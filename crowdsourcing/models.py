@@ -146,8 +146,7 @@ class Survey(models.Model):
 
     @property
     def cookie_key(self):
-        value = 'django-crowdsourcing-survey-%s' % (self.slug,)
-        return hashlib.md5(value).hexdigest()[:16]
+        return 'django_crowd%s' % hashlib.md5(self.slug).hexdigest()[:16]
 
     def to_jsondata(self):
         kwargs = {'slug': self.slug}
