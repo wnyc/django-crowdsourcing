@@ -135,8 +135,7 @@ def _get_survey_or_404(slug, request=None):
     return get_object_or_404(manager, slug=slug)
 
 def set_voted_cookie(response, survey):
-    if survey.ends_at:
-        response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at or datetime.datetime.now + datetime.timedelta(days=28))
+    response.set_cookie(survey.cookie_key, 'voted', expires=survey.ends_at or datetime.datetime.now + datetime.timedelta(days=28))
     return response
 
 def _survey_submit(request, survey):
