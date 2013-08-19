@@ -53,6 +53,20 @@ def allow_origin_sites():
     return list(set(database_sites + config_sites))
 
 
+def add_origin_sites_to_response(request, response):
+    origin = request.META.get('HTTP_REFERER', '') or \
+             request.META.get('HTTP_ORIGIN', '')
+    allowed = allow_origin_sites()
+    if origin:
+        allowed = [a for a in allowed if origin.find(a) >= 0]
+    response["Access-Control-Allow-Origin"] = " ".join(allowed)
+    response['Access-Control-Allow-Methods'] = \
+        'POST, GET, OPTIONS, HEAD, PUT, DELETE'
+    response["Access-Control-Allow-Headers"] = 'Authorization'
+    response["Access-Control-Allow-Credentials"] = 'true'    
+    return response
+
+
 def api_response(request, data, callback=None, format='json'):
     # http://www.loggly.com/blog/2011/12/enabling-cors-in-django-piston/
     # for how to enable CORS
@@ -69,19 +83,7 @@ def api_response(request, data, callback=None, format='json'):
     else:
         response = HttpResponse(mimetype='application/json')
         dump(data, response)
-
-    origin = request.META.get('HTTP_REFERER', '') or \
-             request.META.get('HTTP_ORIGIN', '')
-    allowed = allow_origin_sites()
-    if origin:
-        allowed = [a for a in allowed if origin.find(a) >= 0]
-    response["Access-Control-Allow-Origin"] = " ".join(allowed)
-    response['Access-Control-Allow-Methods'] = \
-        'POST, GET, OPTIONS, HEAD, PUT, DELETE'
-    response["Access-Control-Allow-Headers"] = 'Authorization'
-    response["Access-Control-Allow-Credentials"] = 'true'
-
-    return response
+    return add_origin_sites_to_response(request, response)
 
 
 def api_response_decorator(format='json'):
@@ -308,6 +310,7 @@ def survey_detail(request, slug):
     return _survey_show_form(request, survey, forms)
 
 
+@vary_on_cookie
 def embeded_survey_questions(request, slug):
     survey = _get_survey_or_404(slug, request)
     templates = ['crowdsourcing/embeded_survey_questions_%s.html' % slug,
@@ -328,6 +331,7 @@ def embeded_survey_questions(request, slug):
         login_url=_login_url(request)), _rc(request))
     if give_user_a_cookie:
         response = set_voted_cookie(response, survey)
+    add_origin_sites_to_response(request, response)
     return response 
 
 
@@ -343,6 +347,7 @@ def _survey_report_url(survey):
                    kwargs={'slug': survey.slug})
 
 
+@vary_on_cookie
 @api_response_decorator()
 def allowed_actions(request, slug):
     survey = _get_survey_or_404(slug, request)
