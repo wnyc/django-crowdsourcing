@@ -7,7 +7,7 @@
 PIL>=1.1.6
 
 # for image thumbnailing
-sorl-thumbnail==3.2.5
+wnyc-sorl-thumbnail==3.2.5
 
 # for ordering inlines
 -e git://github.com/jpwatts/django-positions.git#egg=django-positions

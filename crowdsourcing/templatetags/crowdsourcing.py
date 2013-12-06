@@ -619,7 +619,7 @@ def simple_slideshow(display, question, request_GET, css):
         try:
             image = answer.image_answer.thumbnail_tag
         except ThumbnailException:
-            image = "Can't find %s" % answer.image_answer.url
+            image = "Can't find %s for %r" % (answer.image_answer.url, answer.image_answer)
         out.extend([
             '<li>',
             image,
