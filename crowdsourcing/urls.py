@@ -1,6 +1,11 @@
 from __future__ import absolute_import
 
-from django.conf.urls.defaults import patterns, url
+try:
+    from django.conf.urls.defaults import patterns, url
+except:
+    #Fix for django 1.6
+    from django.conf.urls import patterns, url
+                    
 
 from .views import (allowed_actions,
                     embeded_survey_questions,
