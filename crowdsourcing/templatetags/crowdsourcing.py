@@ -11,7 +11,6 @@ from django.core.urlresolvers import reverse
 from django.template import Node
 from django.utils.safestring import mark_safe
 from django.utils.html import escape, strip_tags, linebreaks
-from sorl.thumbnail.base import ThumbnailException
 
 from crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
@@ -618,7 +617,7 @@ def simple_slideshow(display, question, request_GET, css):
     for answer in answers:
         try:
             image = answer.image_answer.thumbnail_tag
-        except ThumbnailException:
+        except:
             image = "Can't find %s" % answer.image_answer.url
         out.extend([
             '<li>',
@@ -669,11 +668,12 @@ def submission_fields(submission,
             if answer.image_answer:
                 valid = True
                 try:
+                    import pdb; pdb.set_trace()
                     thmb = answer.image_answer.thumbnail.absolute_url
                     args = (thmb, answer.id,)
                     out.append('<img src="%s" id="img_%d" />' % args)
                     x_y = get_image_dimensions(answer.image_answer.file)
-                except ThumbnailException as ex:
+                except Exception as ex:
                     valid = False
                     out.append('<div class="error">%s</div>' % str(ex))
                 thumb_width = Answer.image_answer_thumbnail_meta["size"][0]
