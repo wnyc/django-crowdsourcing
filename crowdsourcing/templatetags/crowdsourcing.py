@@ -11,7 +11,6 @@ from django.core.urlresolvers import reverse
 from django.template import Node
 from django.utils.safestring import mark_safe
 from django.utils.html import escape, strip_tags, linebreaks
-from sorl.thumbnail.base import ThumbnailException
 
 from crowdsourcing.models import (
     extra_from_filters, AggregateResultCount, AggregateResultSum,
@@ -20,6 +19,7 @@ from crowdsourcing.models import (
 from crowdsourcing.views import location_question_results
 from crowdsourcing.util import ChoiceEnum, get_function, get_user
 from crowdsourcing import settings as local_settings
+from sorl.thumbnail.shortcuts import get_thumbnail
 
 if local_settings.OEMBED_EXPAND:
     try:
@@ -617,8 +617,8 @@ def simple_slideshow(display, question, request_GET, css):
         request_GET)
     for answer in answers:
         try:
-            image = answer.image_answer.thumbnail_tag
-        except ThumbnailException:
+            image = answer.thumbnail_tag
+        except:
             image = "Can't find %s" % answer.image_answer.url
         out.extend([
             '<li>',
@@ -667,27 +667,7 @@ def submission_fields(submission,
             out.append('<div class="field">')
             out.append('<label>%s</label>: ' % question.label)
             if answer.image_answer:
-                valid = True
-                try:
-                    thmb = answer.image_answer.thumbnail.absolute_url
-                    args = (thmb, answer.id,)
-                    out.append('<img src="%s" id="img_%d" />' % args)
-                    x_y = get_image_dimensions(answer.image_answer.file)
-                except ThumbnailException as ex:
-                    valid = False
-                    out.append('<div class="error">%s</div>' % str(ex))
-                thumb_width = Answer.image_answer_thumbnail_meta["size"][0]
-                # This extra hidden input is in case you want to enlarge
-                # images. Don't bother enlarging images unless we'll increase
-                # their dimensions by at least 10%.
-                if valid and x_y and float(x_y[0]) / thumb_width > 1.1:
-                    format = ('<input type="hidden" id="img_%d_full_url" '
-                              'value="%s" class="enlargeable" />')
-                    enlarge = answer.image_answer
-                    enlarge = enlarge.extra_thumbnails["max_enlarge"]
-                    enlarge = enlarge.absolute_url
-                    args = (answer.id, enlarge)
-                    out.append(format % args)
+                out.append(answer.render_image_tag())
             elif question.option_type == OPTION_TYPE_CHOICES.VIDEO:
                 if oembed_expand:
                     html = video_html(answer.value, video_height, video_width)

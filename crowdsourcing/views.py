@@ -248,6 +248,8 @@ def _send_survey_email(request, survey, submission):
                     subject.append(ans.value)
                 elif opt_type in (OTC.PHOTO):
                     image_src = host + ans.image_answer.thumbnail.absolute_url
+                    #BROKEN
+                    image_src =''
                     body.append("<img src='%s' />" % (image_src))
                 else:
                     body.append(ans.value)

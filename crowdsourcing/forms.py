@@ -29,6 +29,7 @@ from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.utils.translation import ugettext_lazy as _
 
+from sorl.thumbnail.fields import ImageFormField
 from .geo import get_latitude_and_longitude
 from .models import OPTION_TYPE_CHOICES, Answer, Survey, Question, Submission
 from .settings import VIDEO_URL_PATTERNS, IMAGE_UPLOAD_PATTERN
@@ -145,7 +146,8 @@ class VideoAnswer(BaseAnswerForm):
 
 
 class PhotoUpload(BaseAnswerForm):
-    answer = ImageField()
+    answer = ImageFormField()
+    #WithThumbnailsFormField()
 
     def clean_answer(self):
         answer = self.cleaned_data['answer']

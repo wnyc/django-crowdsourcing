@@ -115,6 +115,9 @@ GOOGLE_MAPS_API_KEY = getattr(
 # max_enlarge is in case users upload huge images that enlarge far too big.
 EXTRA_THUMBNAILS = {'max_enlarge': {'size': (1000, 1000)}}
 EXTRA_THUMBNAILS.update(getattr(_gs, 'CROWDSOURCING_EXTRA_THUMBNAILS', {}))
+CROWDSOURCING_THUMBNAIL_SIZE = (65, 65)
+CROWDSOURCING_ENLARGE_SIZE = (1000,1000)
+CROWDSOURCING_SLIDESHOW_SIZE = (620, 350)
 
 
 # Syncing flickr synchronously means that crowdsourcing will attempt to sync on

@@ -8,6 +8,7 @@ from operator import itemgetter
 import re
 from textwrap import fill
 
+from sorl.thumbnail.shortcuts import get_thumbnail
 try:
     import simplejson as json
 except ImportError:
@@ -26,7 +27,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.safestring import mark_safe
 
 
-from .fields import ImageWithThumbnailsField
+from sorl.thumbnail.fields import ImageField
 from .geo import get_latitude_and_longitude
 from .util import ChoiceEnum
 from . import settings as local_settings
@@ -804,11 +805,9 @@ class Answer(models.Model):
     float_answer = models.FloatField(blank=True, null=True)
     boolean_answer = models.NullBooleanField()
     image_answer_thumbnail_meta = dict(size=(250, 250)) # width, height
-    image_answer = ImageWithThumbnailsField(
+    image_answer = ImageField(
         max_length=500,
         blank=True,
-        thumbnail=image_answer_thumbnail_meta,
-        extra_thumbnails=local_settings.EXTRA_THUMBNAILS,
         upload_to=local_settings.IMAGE_UPLOAD_PATTERN)
     latitude = models.FloatField(blank=True, null=True)
     longitude = models.FloatField(blank=True, null=True)
@@ -870,6 +869,41 @@ class Answer(models.Model):
                 except Exception as ex:
                     message = "error in syncing to flickr: %s" % str(ex)
                     logging.exception(message)
+    @property
+    def slideshow_tag(self):
+        size = '%sx%s' % local_settings.CROWDSOURCING_SLIDESHOW_SIZE
+        thmb = get_thumbnail(self.image_answer, size).url
+        #can this be id of field? I guess formfields don't have ids so 
+        args = (thmb, self.id)
+        return '<img src="%s" id="img_%d" />' % args
+
+
+    @property
+    def thumbnail_tag(self):
+        size = '%sx%s' % local_settings.CROWDSOURCING_THUMBNAIL_SIZE
+        thmb = get_thumbnail(self.image_answer, size).url
+        #can this be id of field? I guess formfields don't have ids so 
+        args = (thmb, self.id)
+        return '<img src="%s" id="img_%d" />' % args
+
+    @property
+    def enlarge_tag(self):
+        enlarge = get_thumbnail(self.image_answer, '%sx%s' % local_settings.CROWDSOURCING_ENLARGE_SIZE).url
+        return ('<input type="hidden" id="img_%d_full_url" '\
+                    'value="%s" class="enlargeable" />') % (self.id, enlarge)
+        
+        #can this be id of field? I guess formfields don't have ids so 
+        args = (enlarge, self.id)
+        return '<img src="%s" id="img_%d" />' % args
+
+    def render_image_tag(self):
+        out = []
+        thmb = self.thumbnail_tag
+        out.append(thmb)
+        enlarge = self.enlarge_tag
+        out.append(enlarge)
+        return ''.join(out)
+
 
     @classmethod
     def sync_to_flickr(cls):
@@ -934,6 +968,7 @@ class SurveyReport(models.Model):
             self.survey_report_displays = srds
             for srd in self.survey_report_displays:
                 srd._report = self
+
         return self.survey_report_displays
 
     def has_display_type(self, type):
